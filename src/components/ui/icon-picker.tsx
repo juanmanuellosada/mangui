@@ -2,13 +2,14 @@
 
 /**
  * IconPicker — bespoke icon selector modal for mangui account icons.
- * Tabs: Emojis (searchable catalog) | Íconos (lucide finance set) | Subir imagen
- * Stores: emoji string | "lucide:<name>" | public image URL
+ * Tabs: Emojis (searchable catalog) | Íconos (lucide finance set) | Bancos AR | Subir imagen
+ * Stores: emoji string | "lucide:<name>" | /icons/ar/… path | public image URL
  */
 
 import * as React from "react"
 import { useState, useRef, useCallback } from "react"
 import { Search, Upload, X, Check } from "lucide-react"
+import { AR_FINTECH_ICONS, AR_ICON_CATEGORIES } from "@/lib/ar-fintech-icons"
 import {
   // Finance / account icons
   Landmark,
@@ -158,9 +159,145 @@ const LUCIDE_FINANCE_ICONS: LucideOption[] = [
   { name: "Droplets", label: "Agua", icon: Droplets },
 ]
 
+// ── Bancos AR tab ─────────────────────────────────────────────────────────────
+
+function BancosArTab({
+  value,
+  onSelect,
+}: {
+  value: string
+  onSelect: (v: string) => void
+}) {
+  const [search, setSearch] = useState("")
+  const [activeCategory, setActiveCategory] = useState(AR_ICON_CATEGORIES[0].id)
+
+  const filtered = search.trim()
+    ? AR_FINTECH_ICONS.filter((icon) =>
+        icon.title.toLowerCase().includes(search.toLowerCase()) ||
+        icon.id.toLowerCase().includes(search.toLowerCase())
+      )
+    : AR_FINTECH_ICONS.filter((icon) => {
+        const cat = AR_ICON_CATEGORIES.find((c) => c.label === icon.category)
+        return cat?.id === activeCategory
+      })
+
+  return (
+    <div className="flex flex-col gap-3 h-full">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+        <input
+          type="text"
+          placeholder="Buscar banco, acción…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={cn(
+            "w-full pl-8 pr-3 h-8 rounded-lg border border-input bg-background text-sm",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
+            "placeholder:text-muted-foreground"
+          )}
+          aria-label="Buscar ícono financiero AR"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Limpiar búsqueda"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Category tabs (only when not searching) */}
+      {!search && (
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+          {AR_ICON_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              className={cn(
+                "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-150 whitespace-nowrap cursor-pointer",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                activeCategory === cat.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Icon grid */}
+      <div className="overflow-y-auto flex-1 -mx-1 px-1">
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">
+            Sin resultados para &ldquo;{search}&rdquo;
+          </p>
+        ) : (
+          <div className="grid grid-cols-5 gap-2">
+            {filtered.map((icon) => {
+              const isSelected = value === icon.path
+              return (
+                <button
+                  key={icon.id}
+                  type="button"
+                  onClick={() => onSelect(icon.path)}
+                  title={icon.title}
+                  aria-label={icon.title}
+                  aria-pressed={isSelected}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1 h-16 rounded-xl border transition-colors duration-150 cursor-pointer",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "hover:bg-accent/20",
+                    isSelected
+                      ? "bg-primary/15 border-primary/40"
+                      : "border-border/60"
+                  )}
+                >
+                  {/* White/zinc chip so dark logos are visible in dark mode */}
+                  <div className="h-8 w-8 rounded-lg bg-white dark:bg-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={icon.path}
+                      alt={icon.title}
+                      className="h-7 w-7 object-contain"
+                      loading="lazy"
+                    />
+                  </div>
+                  <span className="text-[9px] font-medium leading-tight truncate w-full text-center px-1 text-muted-foreground">
+                    {icon.title}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Attribution */}
+      <p className="text-[10px] text-muted-foreground text-center shrink-0">
+        Íconos por{" "}
+        <a
+          href="https://icons.com.ar"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-foreground transition-colors"
+        >
+          icons.com.ar
+        </a>
+      </p>
+    </div>
+  )
+}
+
 // ── Tab type ──────────────────────────────────────────────────────────────────
 
-type Tab = "emojis" | "iconos" | "subir"
+type Tab = "emojis" | "iconos" | "bancos-ar" | "subir"
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -520,6 +657,7 @@ export function IconPicker({ open, onClose, value, onChange, userId }: IconPicke
   const tabs: { id: Tab; label: string }[] = [
     { id: "emojis", label: "Emojis" },
     { id: "iconos", label: "Íconos" },
+    { id: "bancos-ar", label: "Bancos AR" },
     { id: "subir", label: "Subir imagen" },
   ]
 
@@ -557,6 +695,9 @@ export function IconPicker({ open, onClose, value, onChange, userId }: IconPicke
           )}
           {tab === "iconos" && (
             <IconosTab value={value} onSelect={handleSelect} />
+          )}
+          {tab === "bancos-ar" && (
+            <BancosArTab value={value} onSelect={handleSelect} />
           )}
           {tab === "subir" && (
             <SubirTab value={value} onSelect={handleSelect} userId={userId} />
