@@ -149,6 +149,7 @@ console.log("[4/6] Extracting icon objects …")
 // source field is always a quoted string: either "$<refId>" or inline "<svg...>"
 
 const icons = []
+// Dedup key is (type, id) — same id in different categories is legitimate (e.g. "JPM" in CEDEARs and Bancos y Billeteras)
 const seen = new Set()
 let searchPos = 0
 
@@ -187,18 +188,31 @@ while (true) {
     // Reference token: "$2a" → refs["2a"]
     const refKey = rawSource.slice(1)
     svgContent = refs[refKey] ?? null
-  } else if (rawSource.startsWith("<svg") || rawSource.startsWith("<?xml") || rawSource.startsWith("<path")) {
-    // Inline JSON-escaped SVG — the regex capture group already has the JSON-inner content.
-    // We need to JSON-decode the escape sequences.
+    if (!svgContent) {
+      console.warn(`    [WARN] Unresolved ref "$${refKey}" for id="${id}" type="${type}" title="${title}"`)
+    }
+  } else {
+    // Inline JSON-escaped SVG. The raw capture may have leading whitespace escapes (e.g. "\n<svg...")
+    // Decode first, then check content.
+    let decoded = rawSource
     try {
-      svgContent = JSON.parse(`"${rawSource}"`)
+      decoded = JSON.parse(`"${rawSource}"`)
     } catch {
-      svgContent = rawSource
+      // Use as-is if JSON decode fails
+    }
+    const trimmed = decoded.trim()
+    if (trimmed.startsWith("<svg") || trimmed.startsWith("<?xml") || trimmed.startsWith("<path")) {
+      svgContent = decoded
+    } else if (!rawSource.startsWith("$")) {
+      // Not a ref and not recognized SVG — warn loudly
+      console.warn(`    [WARN] Unrecognized source for id="${id}" type="${type}" title="${title}": ${rawSource.slice(0, 60)}`)
     }
   }
 
-  if (svgContent && !seen.has(id)) {
-    seen.add(id)
+  // Dedup key: type + id (same id is allowed across different categories)
+  const dedupKey = `${type}\0${id}`
+  if (svgContent && !seen.has(dedupKey)) {
+    seen.add(dedupKey)
     icons.push({ id, title, type, svgContent })
   }
 
@@ -211,10 +225,15 @@ console.log(`    ${icons.length} icons found before validation`)
 
 console.log("[5/6] Writing SVG files …")
 
-// Ensure directories exist
+// Ensure directories exist (clear existing SVGs to avoid orphans from prior runs)
 fs.mkdirSync(PUBLIC_AR, { recursive: true })
 for (const slug of Object.values(CATEGORY_SLUGS)) {
-  fs.mkdirSync(path.join(PUBLIC_AR, slug), { recursive: true })
+  const dir = path.join(PUBLIC_AR, slug)
+  fs.mkdirSync(dir, { recursive: true })
+  // Remove stale SVGs from previous runs
+  for (const f of fs.readdirSync(dir)) {
+    if (f.endsWith(".svg")) fs.rmSync(path.join(dir, f))
+  }
 }
 
 function sanitizeSvg(raw) {
@@ -240,6 +259,8 @@ const catalog = []
 const failedParse = []
 const countByCategory = {}
 const unknownCategories = new Set()
+// Track filenames used within each category to avoid within-category id collisions
+const usedFilenames = {}  // categorySlug → Set of filenames (without .svg)
 
 for (const icon of icons) {
   const categorySlug = CATEGORY_SLUGS[icon.type]
@@ -254,10 +275,23 @@ for (const icon of icons) {
     continue
   }
 
-  const filePath = path.join(PUBLIC_AR, categorySlug, `${icon.id}.svg`)
+  // Disambiguate filename if there's a within-category id collision
+  if (!usedFilenames[categorySlug]) usedFilenames[categorySlug] = new Set()
+  let filename = icon.id
+  if (usedFilenames[categorySlug].has(filename)) {
+    // Append -2, -3, etc. until unique
+    let suffix = 2
+    while (usedFilenames[categorySlug].has(`${filename}-${suffix}`)) suffix++
+    const newFilename = `${filename}-${suffix}`
+    console.warn(`    [WARN] Within-category id collision: "${filename}" in ${categorySlug} → renamed to "${newFilename}" for title="${icon.title}"`)
+    filename = newFilename
+  }
+  usedFilenames[categorySlug].add(filename)
+
+  const filePath = path.join(PUBLIC_AR, categorySlug, `${filename}.svg`)
   fs.writeFileSync(filePath, svg, "utf8")
 
-  const publicPath = `/icons/ar/${categorySlug}/${icon.id}.svg`
+  const publicPath = `/icons/ar/${categorySlug}/${filename}.svg`
   catalog.push({
     id: icon.id,
     title: icon.title,

@@ -89,6 +89,7 @@ function CreateAccountDialog({ asIconButton = false, userId }: { asIconButton?: 
           icon: values.icon,
           color: values.color,
           is_hidden: values.is_hidden,
+          account_number: values.type !== "tarjeta_credito" && values.account_number ? values.account_number : null,
           closing_day: values.type === "tarjeta_credito" ? (values.closing_day ?? null) : null,
           due_day: values.type === "tarjeta_credito" ? (values.due_day ?? null) : null,
         })
@@ -168,6 +169,7 @@ function EditAccountDialog({ account, userId }: { account: Account; userId?: str
           icon: values.icon,
           color: values.color,
           is_hidden: values.is_hidden,
+          account_number: values.type !== "tarjeta_credito" && values.account_number ? values.account_number : null,
           closing_day: values.type === "tarjeta_credito" ? (values.closing_day ?? null) : null,
           due_day: values.type === "tarjeta_credito" ? (values.due_day ?? null) : null,
           updated_at: new Date().toISOString(),
@@ -193,6 +195,7 @@ function EditAccountDialog({ account, userId }: { account: Account; userId?: str
                 icon: values.icon ?? a.icon,
                 color: values.color ?? a.color,
                 is_hidden: values.is_hidden,
+                account_number: values.type !== "tarjeta_credito" && values.account_number ? values.account_number : null,
                 closing_day: values.closing_day ?? null,
                 due_day: values.due_day ?? null,
               }
