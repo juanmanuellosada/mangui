@@ -188,8 +188,11 @@ function LogoCell({
             the round coin sits centred on the same square-tile surface. */}
         <div
           className={cn(
-            "w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-muted/50 flex items-center justify-center",
-            "aspect-square"
+            "w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center aspect-square",
+            // Solid rounded-square chip so every tile reads as a square w/ rounded
+            // corners. Bank/AR logos cover it (object-cover); crypto round coins sit
+            // centred on this visible chip so they match the same square-tile shape.
+            "bg-muted border border-border/60"
           )}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
