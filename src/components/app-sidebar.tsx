@@ -18,6 +18,7 @@ import {
   Wallet,
   Target,
   Plug,
+  Bot,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
@@ -114,6 +115,19 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
 
       {/* Footer: settings + user + logout */}
       <div className="p-3 space-y-0.5 pb-4">
+        <Link
+          href="/app/ia"
+          className={cn(
+            "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            pathname === "/app/ia" &&
+              "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+          )}
+        >
+          <Bot className="h-4 w-4 text-sidebar-foreground/70 flex-shrink-0" />
+          Inteligencia artificial
+        </Link>
         <Link
           href="/app/integraciones"
           className={cn(

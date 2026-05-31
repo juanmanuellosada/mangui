@@ -691,6 +691,72 @@ user_preferences
 | `0013_budgets_goals.sql` | Enums `budget_period`, `budget_status`, `goal_type`, `goal_status`; tablas `budgets`, `goals`, `goal_snapshots` |
 | `0014_saved_views.sql` | Tabla `saved_views` (filtros serializados de analytics) |
 | `0015_push_notifications.sql` | Tablas `push_subscriptions`, `notification_log`; columnas de notificaciones en `user_preferences` |
+| `0016_user_ai_settings.sql` | Tabla `user_ai_settings` (configuración de IA por usuario, BYOK) |
+
+---
+
+## Fase 8 — IA Quick-Add: configuración BYOK (`0016_user_ai_settings.sql`)
+
+### Contexto
+
+Esta fase agrega soporte de base de datos para la funcionalidad de carga rápida asistida por IA (BYOK — *bring-your-own-key*). Cada usuario configura su propio proveedor de IA y asocia una API key personal. La key se almacena **cifrada** en la base de datos (AES-256-GCM); el descifrado ocurre exclusivamente en el servidor.
+
+**Proveedor recomendado para usuarios:** Google Gemini (capa gratuita disponible, no requiere tarjeta de crédito).
+
+### Nueva tabla
+
+#### `user_ai_settings`
+
+Una fila por usuario (UNIQUE `user_id`). Almacena el proveedor elegido, el modelo preferido y el ciphertext de la API key.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL UNIQUE | FK → `auth.users` ON DELETE CASCADE |
+| `provider` | text NOT NULL | DEFAULT `'google'`. CHECK IN (`'google'`, `'openai'`, `'anthropic'`) |
+| `model` | text NULL | Modelo específico del proveedor. NULL = usar default del proveedor. Ej: `'gemini-2.0-flash'`, `'gpt-4o-mini'`, `'claude-3-5-haiku-latest'` |
+| `api_key_encrypted` | text NULL | Ciphertext AES-256-GCM en formato `<iv_b64>:<tag_b64>:<data_b64>`. NULL = key no configurada. **NUNCA texto plano.** |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**CONSTRAINT `chk_ai_provider`:** `provider IN ('google', 'openai', 'anthropic')`.
+
+**Índice:** `(user_id)` (la UNIQUE ya genera uno; explicitado para claridad).
+
+### Modelo de seguridad de la API key
+
+```
+Cliente (browser)
+  │
+  │  SELECT provider, model,
+  │         api_key_encrypted IS NOT NULL AS has_key   ← NUNCA api_key_encrypted directamente
+  │
+Supabase RLS (auth.uid() = user_id)
+  │
+  └─► servidor (service_role, bypass RLS)
+            │  SELECT api_key_encrypted
+            │  decrypt(AES-256-GCM, APP_ENCRYPTION_KEY)  ← solo en el servidor
+            └─► proveedor de IA (Google / OpenAI / Anthropic)
+```
+
+- **`api_key_encrypted`** contiene únicamente el ciphertext serializado `<iv_base64>:<authTag_base64>:<data_base64>`.
+- El cliente **nunca** recibe ni envía la clave en texto plano.
+- El cifrado/descifrado usa `APP_ENCRYPTION_KEY` (variable de entorno server-only, nunca expuesta al cliente).
+- La clave del usuario se cifra en el servidor antes de persistirla y se descifra en el servidor justo antes de llamar al proveedor de IA.
+
+### RLS
+
+Cuatro políticas estándar (`select`/`insert`/`update`/`delete` propias via `auth.uid() = user_id`), idéntico al patrón de `movements`, `accounts`, etc. Bloques `DO $$ EXCEPTION WHEN duplicate_object THEN NULL END $$` para idempotencia.
+
+### Diagrama de relaciones (adición)
+
+```
+auth.users
+    │
+    └── user_ai_settings (1:1, UNIQUE user_id)
+            provider            text   DEFAULT 'google'
+            model               text   NULL
+            api_key_encrypted   text   NULL  ← ciphertext AES-256-GCM, nunca plaintext
+```
 
 ---
 

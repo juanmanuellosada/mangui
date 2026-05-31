@@ -1157,6 +1157,100 @@ All icons are clean SVG — NO emoji. IBM Plex Sans throughout, IBM Plex Mono fo
 
 Photorealistic, implementation-friendly. Light mode. Premium fintech settings screen. es-AR copy throughout.`,
   },
+
+  // ─── IA QUICK-ADD + BYOK SETTINGS ────────────────────────────────────────
+  {
+    id: 'ia-settings',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app INTELIGENCIA ARTIFICIAL (configuración BYOK).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9. Premium fintech settings screen, es-AR. ONE screen from status bar to bottom nav. No fake-data tells.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): left back-arrow SVG icon (muted dark, 20px). Center "Inteligencia artificial" IBM Plex Sans 600 16px dark. Right: empty.
+
+2. PROVEEDOR — a section label "Proveedor" IBM Plex Sans 600 13px muted uppercase, left-aligned, 16px top margin, 6px bottom margin. Below it a card (radius 14px, warm-white bg, hairline border rgba(0,0,0,.06), padding 0; rows use 14px 16px internal padding). The card contains a segmented selector spanning the full card width, divided into 3 equal text-only segments separated by hairline dividers (1px rgba(0,0,0,.06) vertical lines):
+   Segment 1: "Google Gemini" IBM Plex Sans 600 14px. Selected state: lime text #65A30D + 2px solid lime underline accent below the label, subtle lime-tinted background tint (#65A30D at 6% opacity) in the segment.
+   Segment 2: "OpenAI" IBM Plex Sans 500 14px muted dark. Unselected: plain.
+   Segment 3: "Anthropic Claude" IBM Plex Sans 500 14px muted dark. Unselected: plain.
+   Segment height 48px. NO emoji in segments — text labels only. The active segment "Google Gemini" is clearly highlighted by lime color + underline.
+
+3. MODELO — section label "Modelo" IBM Plex Sans 600 13px muted uppercase, 16px top margin, 6px bottom margin. A select field (full-width, radius 8px, hairline border rgba(0,0,0,.06), padding 12px 14px). Shows: "gemini-2.0-flash" IBM Plex Sans 400 14px dark on the left. Right: chevron-down SVG icon (muted, 14px). Below the field: helper text "Gemini 2.0 Flash es el modelo recomendado para esta función." IBM Plex Sans 300 12px muted stone, 4px top margin.
+
+4. API KEY — section label "API key" IBM Plex Sans 600 13px muted uppercase, 16px top margin, 6px bottom margin. A card (radius 14px, warm-white bg, hairline border rgba(0,0,0,.06), padding 16px). Content:
+   TOP ROW: a password-style input field (full-width, hairline border rgba(0,0,0,.06), radius 8px, padding 12px 14px, height 48px). Shows configured state: left icon = lock SVG (lime #65A30D, 16px) + text "Configurada ✓" IBM Plex Sans 500 14px lime #65A30D (the checkmark is part of the text, not an emoji). Right side of input: two compact buttons inline inside the field: "Reemplazar" IBM Plex Sans 500 12px muted dark (text button, 8px left margin from content) + a separator hairline + "Quitar" IBM Plex Sans 500 12px #DC2626 red (destructive text button). The field has a subtle lime-tinted background (#65A30D at 4% opacity) to signal configured state.
+   BELOW INPUT (4px margin): a row with a small lock SVG icon (muted stone, 12px) on the left + "Se guarda encriptada. Nunca la compartimos ni la almacenamos en texto plano." IBM Plex Sans 300 11px muted stone, wrapping to 2 lines max, 55ch max.
+
+5. NOTA DESTACADA — a highlighted info card (radius 12px, very subtle lime-tinted background #65A30D at 5% opacity, lime left-border 3px solid #65A30D, padding 14px 16px). Content:
+   First line: "Usá tu propia API key." IBM Plex Sans 600 14px dark.
+   Second line: "Gemini tiene capa gratuita sin tarjeta de crédito." IBM Plex Sans 400 13px dark, wrapping.
+   Third line (4px margin below second): a tappable text link "¿Cómo obtener una key?" IBM Plex Sans 500 13px lime #65A30D with a subtle underline. Right of this link: an external-link SVG icon (lime, 12px).
+   The card has NO shadow — only the left lime border and tinted bg distinguish it.
+
+6. BOTTOM NAV: fixed, 5 items (Inicio / Movimientos / Cuentas / Stats / Más). "Más" tab active (lime). Safe-area bottom padding.
+
+All icons are clean SVG — NO emoji as structural icons. IBM Plex Sans throughout. Hairline borders only (1px rgba(0,0,0,.06)). Light mode. One screen only. NO glassmorphism. NO nested box-in-box-in-box. Premium fintech settings. Clear trust cues (lock icon, encryption note, info card). Segmented selector uses text labels ONLY — no logos or emoji.
+
+Photorealistic, implementation-friendly. Light mode. es-AR copy throughout.`,
+  },
+  {
+    id: 'quick-add-ia',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app CARGAR CON IA (bottom sheet de interpretación de lenguaje natural).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only.
+
+Background: dark #0B1410 dashboard blurred (backdrop-filter blur(6px) + rgba(0,0,0,.5) overlay), showing just enough context to indicate the home screen.
+
+BOTTOM SHEET: light background #FAFAF9, rounded top corners only (radius 24px top-left/top-right), drag handle (short gray rounded bar, 36px wide × 4px tall, stone color) at top center. Padding 24px. Sheet covers ~88% of screen height.
+
+Sheet content top to bottom:
+
+1. SHEET HEADER ROW: left icon: a small sparkle/star SVG (lime #65A30D, 18px, clean vector, NOT emoji) + "Cargar con IA" IBM Plex Sans 600 18px dark. Close × icon right (muted dark, 20px). The lime sparkle icon signals AI assistance with trust, not gimmick.
+
+2. INPUT DE LENGUAJE NATURAL: a large multiline text area (full-width, radius 12px, hairline border rgba(0,0,0,.06), padding 14px 16px, min-height ~96px, lime focus ring 3px). Content: placeholder text (muted stone IBM Plex Sans 400 15px) "Escribí lo que gastaste… ej: 'gasté 5000 en el súper con la Visa ayer'". The text area is active/focused (lime focus ring visible). Below the textarea, a bottom-right row inside the field boundary: a microphone SVG icon button (stone, 20px, tappable — for voice input) sitting at the bottom-right corner of the textarea, 8px from edges. The textarea has no bottom border on that side so the mic icon floats cleanly within.
+
+3. BOTÓN PRIMARIO: full-width solid lime button "Interpretar" (IBM Plex Sans 700 16px white, height 52px, radius 12px). A subtle lime glow shadow beneath (0 4px 12px rgba(101,163,13,.25)). The button sits 12px below the textarea.
+
+4. RESULTADO INTERPRETADO — a section label "Resultado interpretado" IBM Plex Sans 500 13px muted uppercase, 20px top margin, 8px bottom margin. (This is the ONLY eyebrow-style label on this sheet.)
+
+Below the label: a premium double-bezel card (outer shell warm-white, hairline border rgba(0,0,0,.06), radius 16px, padding 4px; inner core slightly contrasted warm bg #F5F4F0, radius 12px, padding 16px). The card represents an EDITABLE movement preview:
+
+INNER CARD CONTENT:
+   Row 1 (tipo + monto): left "Gasto" badge (stone bg, IBM Plex Sans 600 13px muted, rounded-full, padding 4px 10px). Right: "$ 5.000" Calistoga ~1.8rem dark tabular-nums IBM Plex Mono. Both on the same line, spaced apart.
+
+   Hairline divider (rgba(0,0,0,.06)).
+
+   Row 2 (categoría + cuenta): two columns. Left column: a small shopping-cart SVG icon (lime, 14px) + "Supermercado" IBM Plex Sans 500 13px dark. Right column: credit-card SVG icon (muted, 14px) + "Visa" IBM Plex Sans 500 13px dark. Between columns: a hairline vertical divider.
+
+   Hairline divider.
+
+   Row 3 (fecha + nota): left: calendar SVG icon (muted, 14px) + "ayer" IBM Plex Sans 400 13px dark. Right: small pencil SVG icon (muted, 12px) — indicates editable. No note text (optional field, empty state).
+
+   IA CHIPS ROW (8px top margin, no divider): three small rounded-full chips with lime hairline border (1px #65A30D) and lime text (#65A30D) IBM Plex Sans 500 11px — these mark what the AI detected:
+   "monto detectado" · "categoría detectada" · "fecha detectada"
+   Chips are compact (padding 3px 8px). They sit in a horizontal row, left-aligned, wrapping if needed.
+
+5. DISCLAIMER ROW (4px below the card): a row with a small info-circle SVG icon (muted stone, 12px) + "La IA nunca guarda sin tu confirmación." IBM Plex Sans 300 12px muted stone. Left-aligned.
+
+6. ACTION BUTTONS ROW (16px top margin): two buttons side by side:
+   Left button (secondary, ~45% width): outline hairline border rgba(0,0,0,.12), radius 10px, height 48px. Text "Editar" IBM Plex Sans 600 14px dark. A pencil SVG icon (muted, 14px) left of text.
+   Right button (primary, ~53% width): solid lime #65A30D, radius 10px, height 48px. Text "Confirmar" IBM Plex Sans 700 14px white. A check SVG icon (white, 16px) left of text. Lime glow shadow beneath.
+   4px gap between buttons.
+
+Bottom safe-area padding below the action buttons.
+
+All icons are clean SVG — NO emoji. IBM Plex Sans throughout; IBM Plex Mono and Calistoga for the interpreted amount. Hairline borders only. Light sheet on dark blurred background. Premium, trustworthy fintech feel. The "La IA nunca guarda sin tu confirmación." disclaimer is deliberately visible — it builds trust. NO glassmorphism. ONE screen.
+
+Photorealistic, implementation-friendly. Light sheet. es-AR copy. Playful-premium mango fintech.`,
+  },
 ];
 
 // ---------------------------------------------------------------------------

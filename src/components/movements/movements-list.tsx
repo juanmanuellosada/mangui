@@ -16,6 +16,7 @@ import {
   Clock,
   Search,
   CreditCard,
+  Sparkles,
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -40,6 +41,7 @@ import {
 import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { InstallmentForm, type InstallmentFormValues } from "@/components/installments/installment-form"
+import { AiQuickAddSheet } from "@/components/ai/ai-quick-add-sheet"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
@@ -475,7 +477,7 @@ function FiltersPanel({
 
 // ── Quick-add menu ─────────────────────────────────────────────────────────────
 
-type QuickAddMode = "movement" | "transfer" | "installment"
+type QuickAddMode = "movement" | "transfer" | "installment" | "ai"
 
 async function createInstallmentPurchaseWithMovements(
   values: InstallmentFormValues,
@@ -754,13 +756,30 @@ function QuickAddMenu({
                 <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
                 <span className="font-medium">Gasto en cuotas</span>
               </button>
+              <div className="h-px bg-border/60 mx-2" />
+              <button
+                type="button"
+                onClick={() => openDialog("ai")}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
+              >
+                <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                <span className="font-medium">Cargar con IA</span>
+              </button>
             </div>
           </>
         )}
       </div>
 
+      {/* AI Quick Add Sheet — rendered outside the dropdown */}
+      <AiQuickAddSheet
+        open={open && mode === "ai"}
+        onOpenChange={(v) => { if (!v) setOpen(false) }}
+        accounts={accounts}
+        categories={categories}
+      />
+
       {/* Dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open && mode !== "ai"} onOpenChange={setOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           {mode === "movement" ? (
             <>
@@ -946,6 +965,7 @@ function FABQuickAdd({
                   { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
                   { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
                   { m: "installment" as const, type: undefined, icon: CreditCard, label: "En cuotas", color: "bg-primary text-primary-foreground" },
+                  { m: "ai" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground" },
                 ] as const
               ).map(({ m, type, icon: Icon, label, color }) => (
                 <button
@@ -982,8 +1002,16 @@ function FABQuickAdd({
         </button>
       </div>
 
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* AI Quick Add Sheet */}
+      <AiQuickAddSheet
+        open={dialogOpen && mode === "ai"}
+        onOpenChange={(v) => { if (!v) setDialogOpen(false) }}
+        accounts={accounts}
+        categories={categories}
+      />
+
+      {/* Dialog (non-AI modes) */}
+      <Dialog open={dialogOpen && mode !== "ai"} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           {mode === "movement" ? (
             <>

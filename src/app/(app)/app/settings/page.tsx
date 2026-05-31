@@ -8,7 +8,7 @@ import { z } from "zod"
 import { useTheme } from "next-themes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info, Plug, ExternalLink } from "lucide-react"
+import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info, Plug, ExternalLink, Bot } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -555,6 +555,25 @@ export default function SettingsPage() {
       {/* Categories */}
       <SettingsSection id="categories" icon={Tag} title="Categorías">
         <CategoriesManager />
+      </SettingsSection>
+
+      {/* IA link */}
+      <SettingsSection id="ia" icon={Bot} title="Inteligencia artificial">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Carga inteligente de movimientos</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Configurá tu API key (BYOK) para interpretar gastos con lenguaje natural.
+            </p>
+          </div>
+          <Link
+            href="/app/ia"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
+          >
+            Ir
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
       </SettingsSection>
 
       {/* Integraciones link */}
