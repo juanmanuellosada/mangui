@@ -158,96 +158,128 @@ export function MovementForm({
       : amount * liveRate
   })()
 
+  const submitLabel_resolved = submitLabel !== "Guardar"
+    ? submitLabel
+    : type === "income" ? "Guardar ingreso" : "Guardar gasto"
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {/* Type toggle */}
-      <div className="space-y-1.5">
-        <Label>Tipo</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {(["income", "expense"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => {
-                setValue("type", t, { shouldValidate: true })
-                setValue("category_id", null)
-              }}
-              className={cn(
-                "h-10 rounded-xl text-sm font-semibold border transition-all duration-150 cursor-pointer press-effect",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                type === t && t === "income"
-                  ? "bg-success/15 border-success/40 text-success"
-                  : type === t && t === "expense"
-                  ? "bg-destructive/10 border-destructive/40 text-destructive"
-                  : "bg-muted/40 border-border/60 text-muted-foreground hover:bg-muted"
-              )}
-            >
-              {t === "income" ? "+ Ingreso" : "− Gasto"}
-            </button>
-          ))}
-        </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      {/* Type toggle — Gasto / Ingreso (3-way if transferencia available, but form only handles movements) */}
+      <div className="flex rounded-xl bg-muted p-1 gap-1">
+        {(["expense", "income"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => {
+              setValue("type", t, { shouldValidate: true })
+              setValue("category_id", null)
+            }}
+            className={cn(
+              "flex-1 h-9 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer press-effect",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              type === t
+                ? t === "income"
+                  ? "bg-success text-white shadow-sm"
+                  : "bg-destructive text-white shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t === "income" ? "Ingreso" : "Gasto"}
+          </button>
+        ))}
       </div>
 
-      {/* Account */}
+      {/* Amount — prominent, large */}
       <div className="space-y-1.5">
-        <Label>Cuenta</Label>
-        <Select
-          value={accountId}
-          onValueChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleccioná una cuenta" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-                <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">
-                  {a.currency}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.account_id && (
-          <p className="text-xs text-destructive">{errors.account_id.message}</p>
-        )}
-      </div>
-
-      {/* Amount + currency row */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-2 space-y-1.5">
-          <Label htmlFor="amount">Monto</Label>
+        <Label htmlFor="amount" className="text-xs text-muted-foreground font-medium">
+          Monto
+        </Label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none">
+            $
+          </span>
           <Input
             id="amount"
             type="number"
             step="0.01"
             min="0.01"
             inputMode="decimal"
-            placeholder="0,00"
-            className="tabular-nums"
+            placeholder="0"
+            className={cn(
+              "pl-9 text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+              "focus:border-primary focus:ring-2 focus:ring-ring/30",
+              type === "income" ? "focus:border-success" : "focus:border-destructive"
+            )}
             {...register("amount")}
             aria-invalid={!!errors.amount}
           />
-          {errors.amount && (
-            <p className="text-xs text-destructive">{errors.amount.message}</p>
-          )}
+          {/* Currency select inline */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Select
+              value={originalCurrency}
+              onValueChange={(v) => {
+                setValue("original_currency", v as "ARS" | "USD", { shouldValidate: true })
+                setValue("converted_amount", null)
+              }}
+            >
+              <SelectTrigger className="w-20 h-8 text-xs font-bold border-border/60 bg-muted/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ARS">ARS</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        {errors.amount && (
+          <p className="text-xs text-destructive">{errors.amount.message}</p>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          Escribí el monto en {originalCurrency === "ARS" ? "pesos" : "dólares"}
+        </p>
+      </div>
+
+      {/* Cuenta + Categoría — 2-col row */}
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>Moneda</Label>
+          <Label className="text-xs text-muted-foreground font-medium">Cuenta</Label>
           <Select
-            value={originalCurrency}
-            onValueChange={(v) => {
-              setValue("original_currency", v as "ARS" | "USD", { shouldValidate: true })
-              setValue("converted_amount", null)
-            }}
+            value={accountId}
+            onValueChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
           >
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue placeholder="Cuenta" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ARS">ARS</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.account_id && (
+            <p className="text-xs text-destructive">{errors.account_id.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
+          <Select
+            value={watch("category_id") ?? "none"}
+            onValueChange={(v) => setValue("category_id", v === "none" ? null : v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sin categoría</SelectItem>
+              {filteredCategories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -266,7 +298,7 @@ export function MovementForm({
 
           {/* Dollar type picker */}
           <div className="space-y-1.5">
-            <Label>Tipo de dólar</Label>
+            <Label className="text-xs text-muted-foreground font-medium">Tipo de dólar</Label>
             <div className="flex flex-wrap gap-1.5">
               {(Object.entries(DOLLAR_TYPE_LABELS) as [DollarType, string][]).map(([key, label]) => (
                 <button
@@ -289,7 +321,7 @@ export function MovementForm({
 
           {/* Converted amount field */}
           <div className="space-y-1.5">
-            <Label htmlFor="converted_amount">
+            <Label htmlFor="converted_amount" className="text-xs text-muted-foreground font-medium">
               Monto en {accountCurrency}{" "}
               {liveRate && (
                 <span className="text-muted-foreground font-normal">
@@ -322,39 +354,11 @@ export function MovementForm({
         </div>
       )}
 
-      {/* Date */}
+      {/* Descripción (nota) */}
       <div className="space-y-1.5">
-        <Label htmlFor="date">Fecha</Label>
-        <Input id="date" type="date" {...register("date")} aria-invalid={!!errors.date} />
-        {errors.date && (
-          <p className="text-xs text-destructive">{errors.date.message}</p>
-        )}
-      </div>
-
-      {/* Category */}
-      <div className="space-y-1.5">
-        <Label>Categoría</Label>
-        <Select
-          value={watch("category_id") ?? "none"}
-          onValueChange={(v) => setValue("category_id", v === "none" ? null : v)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Sin categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Sin categoría</SelectItem>
-            {filteredCategories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Note */}
-      <div className="space-y-1.5">
-        <Label htmlFor="note">Nota (opcional)</Label>
+        <Label htmlFor="note" className="text-xs text-muted-foreground font-medium">
+          Descripción (opcional)
+        </Label>
         <Input
           id="note"
           placeholder="Ej: supermercado, pago de sueldo…"
@@ -363,22 +367,49 @@ export function MovementForm({
         />
       </div>
 
-      {/* Future movement toggle */}
-      <div className="flex items-center gap-2">
-        <input
-          id="is_future"
-          type="checkbox"
-          className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
-          checked={isFuture}
-          onChange={(e) => setValue("is_future", e.target.checked)}
-        />
-        <Label htmlFor="is_future" className="cursor-pointer font-normal">
-          Movimiento futuro (programado)
-        </Label>
+      {/* Date + future toggle row */}
+      <div className="flex items-end gap-3">
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="date" className="text-xs text-muted-foreground font-medium">
+            Fecha
+          </Label>
+          <Input
+            id="date"
+            type="date"
+            {...register("date")}
+            aria-invalid={!!errors.date}
+            className="text-sm"
+          />
+          {errors.date && (
+            <p className="text-xs text-destructive">{errors.date.message}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 pb-2">
+          <input
+            id="is_future"
+            type="checkbox"
+            className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+            checked={isFuture}
+            onChange={(e) => setValue("is_future", e.target.checked)}
+          />
+          <Label htmlFor="is_future" className="cursor-pointer font-normal text-xs text-muted-foreground whitespace-nowrap">
+            Futuro
+          </Label>
+        </div>
       </div>
 
-      <Button type="submit" className="w-full press-effect" disabled={isLoading}>
-        {isLoading ? "Guardando…" : submitLabel}
+      {/* Submit */}
+      <Button
+        type="submit"
+        className={cn(
+          "w-full press-effect font-semibold h-11",
+          type === "income"
+            ? "bg-success hover:bg-success/90 text-white shadow-sm shadow-success/20"
+            : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/20"
+        )}
+        disabled={isLoading}
+      >
+        {isLoading ? "Guardando…" : submitLabel_resolved}
       </Button>
     </form>
   )

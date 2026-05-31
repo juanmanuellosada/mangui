@@ -1,6 +1,5 @@
 import { fetchDolarRates, type RateType } from "@/lib/rates/dolar"
 import { cn } from "@/lib/utils"
-import { TrendingUp } from "lucide-react"
 
 const RATE_LABELS: Record<Exclude<RateType, "manual">, string> = {
   oficial: "Oficial",
@@ -32,11 +31,10 @@ export async function RatesStrip({ preferredRateType = "blue" }: RatesStripProps
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5 items-center rounded-xl bg-muted/40 border border-border/40 px-3 py-2">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mr-1">
-        <TrendingUp className="h-3.5 w-3.5" />
-        <span className="uppercase tracking-wider text-[10px] font-semibold">USD/ARS</span>
-      </div>
+    <div className="flex items-center gap-1.5 rounded-xl bg-muted/50 border border-border/40 px-3 py-2 overflow-x-auto no-scrollbar">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1 shrink-0">
+        USD/ARS
+      </span>
       {RATE_ORDER.map((rateType) => {
         const data = rates[rateType]
         if (!data) return null
@@ -46,16 +44,16 @@ export async function RatesStrip({ preferredRateType = "blue" }: RatesStripProps
           <div
             key={rateType}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all",
+              "inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium shrink-0 transition-all",
               isPreferred
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "bg-background/80 text-muted-foreground border border-border/60"
+                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                : "bg-background/70 text-muted-foreground border border-border/60"
             )}
           >
             <span className="font-semibold">{RATE_LABELS[rateType]}</span>
-            <span className={cn("text-[10px]", isPreferred ? "text-primary-foreground/60" : "opacity-50")}>C</span>
+            <span className={cn("text-[9px]", isPreferred ? "text-primary-foreground/60" : "opacity-40")}>C</span>
             <span className="tabular-nums">{formatRate(data.buy)}</span>
-            <span className={cn("text-[10px]", isPreferred ? "text-primary-foreground/60" : "opacity-50")}>V</span>
+            <span className={cn("text-[9px]", isPreferred ? "text-primary-foreground/60" : "opacity-40")}>V</span>
             <span className="tabular-nums">{formatRate(data.sell)}</span>
           </div>
         )

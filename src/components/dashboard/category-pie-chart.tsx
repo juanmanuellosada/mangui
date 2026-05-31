@@ -43,26 +43,25 @@ async function fetchCategories(): Promise<Category[]> {
   return data
 }
 
-// Brand palette for categories — accessible (not color-only, values shown in tooltip)
-// Light theme: slightly muted; Dark theme: brighter for contrast on dark backgrounds
+// Accessible palette that works in both light and dark modes
 const CATEGORY_COLORS_LIGHT = [
   "oklch(0.748 0.219 131.7)",   // lime primary
   "oklch(0.714 0.213 47.6)",    // orange
-  "oklch(0.65 0.15 185)",       // teal
-  "oklch(0.82 0.18 95)",        // yellow
+  "oklch(0.60 0.15 185)",       // teal
+  "oklch(0.75 0.18 95)",        // yellow-green
   "oklch(0.55 0.18 300)",       // purple
   "oklch(0.6 0.22 20)",         // red-orange
-  "oklch(0.7 0.18 220)",        // blue
+  "oklch(0.65 0.18 220)",       // blue
 ]
 
 const CATEGORY_COLORS_DARK = [
   "oklch(0.82 0.22 131.7)",     // lime bright
   "oklch(0.78 0.21 47.6)",      // orange bright
   "oklch(0.72 0.16 185)",       // teal bright
-  "oklch(0.88 0.19 95)",        // yellow bright
+  "oklch(0.84 0.19 95)",        // yellow-green bright
   "oklch(0.65 0.20 300)",       // purple bright
-  "oklch(0.70 0.24 20)",        // red-orange bright
-  "oklch(0.76 0.20 220)",       // blue bright
+  "oklch(0.72 0.24 20)",        // red-orange bright
+  "oklch(0.74 0.20 220)",       // blue bright
 ]
 
 const TOP_N = 5
@@ -134,15 +133,11 @@ export function CategoryPieChart() {
   }, [movements, categories])
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
+    <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
-            <PieChart className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <h3 className="text-sm font-semibold">Gastos por categoría</h3>
-        </div>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+        <h3 className="text-sm font-semibold">Gastos por categoría</h3>
+        <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
           Este mes
         </span>
       </div>
@@ -169,28 +164,31 @@ export function CategoryPieChart() {
 
       {!isLoading && chartData.length > 0 && (
         <>
-          <EvilPieChart
-            config={config}
-            data={chartData}
-            dataKey="value"
-            nameKey="name"
-            className="h-52"
-          >
-            <Pie
-              innerRadius="55%"
-              outerRadius="80%"
-              cornerRadius={4}
-              paddingAngle={2}
-              isClickable
-            />
-            <Tooltip />
-            <Legend variant="rounded-square" />
-          </EvilPieChart>
+          {/* Center label inside donut */}
+          <div className="relative">
+            <EvilPieChart
+              config={config}
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              className="h-52"
+            >
+              <Pie
+                innerRadius="52%"
+                outerRadius="78%"
+                cornerRadius={4}
+                paddingAngle={2}
+                isClickable
+              />
+              <Tooltip />
+              <Legend variant="rounded-square" />
+            </EvilPieChart>
+          </div>
 
-          {/* Total label */}
-          <div className="text-center pt-1">
+          {/* Total below chart */}
+          <div className="flex items-center justify-between border-t border-border/40 pt-3">
             <p className="text-xs text-muted-foreground">Total gastos</p>
-            <p className="text-lg font-bold tabular-nums">
+            <p className="text-sm font-bold tabular-nums">
               {formatCurrency(totalExpenses, "ARS")}
             </p>
           </div>

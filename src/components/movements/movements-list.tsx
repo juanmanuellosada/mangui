@@ -11,11 +11,10 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   ArrowLeftRight,
-  Filter,
   X,
   SlidersHorizontal,
   Clock,
-  ChevronDown,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,7 +26,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -37,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { formatCurrency, cn } from "@/lib/utils"
@@ -154,9 +151,9 @@ function MovementRow({
         )}
       >
         {isIncome ? (
-          <ArrowUpCircle className="h-4 w-4 text-success" />
+          <ArrowUpCircle className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
         ) : (
-          <ArrowDownCircle className="h-4 w-4 text-destructive" />
+          <ArrowDownCircle className="h-4.5 w-4.5 text-destructive" style={{ width: "1.125rem", height: "1.125rem" }} />
         )}
       </div>
 
@@ -170,33 +167,21 @@ function MovementRow({
             <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           )}
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-muted-foreground font-medium">
-            {account?.name ?? "—"}
-          </span>
-          <Badge
-            variant="outline"
-            className="text-[9px] px-1 py-0 h-3.5 font-medium border-border/60 text-muted-foreground uppercase"
-          >
-            {displayCurrency}
-          </Badge>
-          {movement.note && (
-            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-              · {movement.note}
-            </span>
-          )}
-        </div>
+        <p className="text-[11px] text-muted-foreground truncate">
+          {account?.name ?? "—"}
+          {movement.note ? ` · ${movement.note}` : ""}
+        </p>
       </div>
 
       {/* Amount */}
-      <div className="text-right flex-shrink-0 mr-1">
+      <div className="text-right flex-shrink-0">
         <p
           className={cn(
             "text-sm font-semibold tabular-nums",
             isIncome ? "text-success" : "text-destructive"
           )}
         >
-          {isIncome ? "+" : "−"}
+          {isIncome ? "+ " : "− "}
           {formatCurrency(displayAmount, displayCurrency)}
         </p>
         {isCross && (
@@ -206,8 +191,8 @@ function MovementRow({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+      {/* Actions — visible on hover */}
+      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -251,7 +236,7 @@ function TransferRow({
 
   return (
     <div className="flex items-center gap-3 py-3 group">
-      {/* Icon — neutral blue-ish */}
+      {/* Icon — neutral */}
       <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted">
         <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
       </div>
@@ -260,34 +245,20 @@ function TransferRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
           <p className="text-sm font-medium truncate">
-            {fromAccount?.name ?? "—"} → {toAccount?.name ?? "—"}
+            Transferencia
           </p>
           {transfer.is_future && (
             <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           )}
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-muted-foreground font-medium">
-            Transferencia
-          </span>
-          {isCross && (
-            <Badge
-              variant="outline"
-              className="text-[9px] px-1 py-0 h-3.5 font-medium border-border/60 text-muted-foreground"
-            >
-              {fromAccount?.currency} → {toAccount?.currency}
-            </Badge>
-          )}
-          {transfer.note && (
-            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-              · {transfer.note}
-            </span>
-          )}
-        </div>
+        <p className="text-[11px] text-muted-foreground truncate">
+          {fromAccount?.name ?? "—"} → {toAccount?.name ?? "—"}
+          {transfer.note ? ` · ${transfer.note}` : ""}
+        </p>
       </div>
 
-      {/* Amounts — neutral (no income/expense color) */}
-      <div className="text-right flex-shrink-0 mr-1 space-y-0.5">
+      {/* Amounts */}
+      <div className="text-right flex-shrink-0 space-y-0.5">
         <p className="text-sm font-semibold tabular-nums text-muted-foreground">
           −{formatCurrency(transfer.from_amount, fromAccount?.currency ?? "ARS")}
         </p>
@@ -299,7 +270,7 @@ function TransferRow({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
         <Button
           variant="ghost"
           size="icon-sm"
@@ -399,25 +370,6 @@ function FiltersPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* Type */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Tipo</Label>
-          <Select
-            value={typeValue}
-            onValueChange={(v) => updateParam("type", v === "all" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="income">Ingresos</SelectItem>
-              <SelectItem value="expense">Gastos</SelectItem>
-              <SelectItem value="transfer">Transferencias</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* Account */}
         <div className="space-y-1.5">
           <Label className="text-xs">Cuenta</Label>
@@ -483,15 +435,18 @@ function FiltersPanel({
         </div>
 
         {/* Search */}
-        <div className="space-y-1.5 col-span-2 sm:col-span-1">
+        <div className="space-y-1.5 col-span-2 sm:col-span-2">
           <Label className="text-xs">Buscar en nota</Label>
-          <Input
-            type="text"
-            placeholder="Buscar…"
-            value={searchValue}
-            onChange={(e) => updateParam("q", e.target.value || null)}
-            className="text-xs"
-          />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Buscar…"
+              value={searchValue}
+              onChange={(e) => updateParam("q", e.target.value || null)}
+              className="text-xs pl-8"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -628,7 +583,9 @@ function QuickAddMenu({
             )}
             aria-label="Opciones de nuevo registro"
           >
-            <ChevronDown className="h-3.5 w-3.5" />
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
           </button>
         </div>
 
@@ -851,8 +808,7 @@ function FABQuickAdd({
             "shadow-lg shadow-primary/35 press-effect relative z-20",
             "flex items-center justify-center",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            "transition-transform duration-150",
-            menuOpen && "rotate-45"
+            menuOpen && "rotate-45 transition-transform duration-150"
           )}
           aria-label="Agregar"
         >
@@ -1233,6 +1189,54 @@ function DeleteMovementDialog({
   )
 }
 
+// ── Type filter pills ─────────────────────────────────────────────────────────
+
+function TypeFilterPills() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [, startTransition] = useTransition()
+
+  const current = searchParams.get("type") ?? "all"
+
+  const pills = [
+    { value: "all", label: "Todos" },
+    { value: "expense", label: "Gastos" },
+    { value: "income", label: "Ingresos" },
+    { value: "transfer", label: "Transferencias" },
+  ]
+
+  const setType = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === "all") params.delete("type")
+    else params.set("type", value)
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+      {pills.map(({ value, label }) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => setType(value)}
+          className={cn(
+            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-150 press-effect cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            current === value
+              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+              : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function MovementsList() {
@@ -1324,7 +1328,6 @@ export function MovementsList() {
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(fi)
     }
-    // Sort items within each day: movements/transfers by created_at desc (they come pre-sorted from DB)
     return [...map.entries()]
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, items]) => [key, items] as [string, FeedItem[]])
@@ -1343,42 +1346,37 @@ export function MovementsList() {
   return (
     <div className="space-y-5 max-w-3xl animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between pt-1">
-        <div className="space-y-0.5">
-          <h1
-            className="text-2xl md:text-3xl tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Actividad
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Movimientos y transferencias
-          </p>
-        </div>
+      <div className="flex items-center justify-between pt-1">
+        <h1
+          className="text-2xl md:text-3xl tracking-tight font-bold"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Movimientos
+        </h1>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "gap-1.5 cursor-pointer press-effect",
-              hasActiveFilters && "border-primary/40 text-primary"
-            )}
+          <button
+            type="button"
             onClick={() => setShowFilters((v) => !v)}
-          >
-            <Filter className="h-3.5 w-3.5" />
-            Filtros
-            {hasActiveFilters && (
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            className={cn(
+              "inline-flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-150 press-effect cursor-pointer",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              showFilters || hasActiveFilters
+                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                : "bg-muted text-muted-foreground hover:text-foreground"
             )}
-          </Button>
+            title="Filtros"
+            aria-label="Filtros"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
           <div className="hidden lg:block">
-            <QuickAddMenu
-              accounts={accounts}
-              categories={categories}
-            />
+            <QuickAddMenu accounts={accounts} categories={categories} />
           </div>
         </div>
       </div>
+
+      {/* Type filter pills */}
+      <TypeFilterPills />
 
       {/* Filters panel */}
       {showFilters && (
@@ -1391,20 +1389,22 @@ export function MovementsList() {
 
       {/* Loading skeleton */}
       {isLoading && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="space-y-2">
-              <Skeleton className="h-4 w-20" />
-              {[...Array(2)].map((_, j) => (
-                <div key={j} className="flex items-center gap-3 py-2">
-                  <Skeleton className="h-9 w-9 rounded-xl flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-3.5 w-32" />
-                    <Skeleton className="h-2.5 w-20" />
+              <Skeleton className="h-4 w-24" />
+              <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+                {[...Array(2)].map((_, j) => (
+                  <div key={j} className="flex items-center gap-3 px-4 py-3 border-b border-border/40 last:border-0">
+                    <Skeleton className="h-9 w-9 rounded-xl flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-3.5 w-32" />
+                      <Skeleton className="h-2.5 w-20" />
+                    </div>
+                    <Skeleton className="h-4 w-20" />
                   </div>
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -1436,19 +1436,24 @@ export function MovementsList() {
 
       {/* Grouped feed */}
       {!isLoading && grouped.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {grouped.map(([dayKey, dayItems]) => {
             const firstDate = dayItems[0].kind === "movement"
               ? dayItems[0].item.date
               : dayItems[0].item.date
             return (
               <div key={dayKey}>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1">
+                {/* Date header */}
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">
                   {formatDayLabel(firstDate)}
                 </p>
-                <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/40">
-                  {dayItems.map((fi, idx) => (
-                    <div key={fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`} className="px-4">
+                {/* Items card */}
+                <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+                  {dayItems.map((fi) => (
+                    <div
+                      key={fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`}
+                      className="px-4"
+                    >
                       {fi.kind === "movement" ? (
                         <MovementRow
                           movement={fi.item}
@@ -1465,9 +1470,6 @@ export function MovementsList() {
                           onEdit={setEditingTransfer}
                           onDelete={setDeletingTransfer}
                         />
-                      )}
-                      {idx < dayItems.length - 1 && (
-                        <Separator className="opacity-40" />
                       )}
                     </div>
                   ))}

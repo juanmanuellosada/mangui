@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
-import { Clock, ChevronRight, ArrowUpCircle, ArrowDownCircle, PlusCircle } from "lucide-react"
+import { ChevronRight, ArrowUpCircle, ArrowDownCircle, PlusCircle } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, cn } from "@/lib/utils"
@@ -176,13 +176,9 @@ export function RecentMovements() {
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <h3 className="text-sm font-semibold">Últimos movimientos</h3>
-        </div>
+        <h3 className="text-sm font-semibold">Actividad reciente</h3>
         {accounts.length > 0 && (
           <QuickAddDialog accounts={accounts} categories={categories} />
         )}
@@ -214,7 +210,7 @@ export function RecentMovements() {
       )}
 
       {!loadingMovements && movements && movements.length > 0 && (
-        <div className="space-y-1">
+        <div className="divide-y divide-border/40">
           {movements.map((m) => {
             const isIncome = m.type === "income"
             const account = accountMap.get(m.account_id)
@@ -225,8 +221,9 @@ export function RecentMovements() {
             return (
               <div
                 key={m.id}
-                className="flex items-center gap-3 py-2 rounded-lg hover:bg-muted/30 transition-colors duration-150 px-1"
+                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
               >
+                {/* Icon */}
                 <div
                   className={cn(
                     "h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0",
@@ -240,18 +237,20 @@ export function RecentMovements() {
                   )}
                 </div>
 
+                {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">
+                  <p className="text-sm font-medium truncate">
                     {category?.name ?? "Sin categoría"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     {account?.name ?? "—"} · {formatDateShort(m.date)}
                   </p>
                 </div>
 
+                {/* Amount */}
                 <p
                   className={cn(
-                    "text-xs font-semibold tabular-nums flex-shrink-0",
+                    "text-sm font-semibold tabular-nums flex-shrink-0",
                     isIncome ? "text-success" : "text-destructive"
                   )}
                 >

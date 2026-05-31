@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, PiggyBank, PlusCircle, Settings } from "lucide-react";
+import { BarChart3, Home, PiggyBank, ArrowLeftRight, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Inicio", href: "/app/dashboard" },
+  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movements" },
   { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
-  { icon: PlusCircle, label: "Nuevo", href: "/app/movements", isAction: true },
   { icon: BarChart3, label: "Stats", href: "/app/stats" },
   { icon: Settings, label: "Más", href: "/app/settings" },
 ];
 
 /**
  * Mobile bottom navigation bar — visible only on small/medium screens (lg:hidden).
- * Uses usePathname for active state.
+ * Glass effect, safe-area aware, active state with lime indicator dot + bold label.
  */
 export function AppBottomNav() {
   const pathname = usePathname();
@@ -25,29 +25,16 @@ export function AppBottomNav() {
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass bg-background/85 border-t border-border/60 pb-safe"
       aria-label="Navegación principal"
     >
-      <div className="flex items-center justify-around h-16 px-1">
+      <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
-          const isActive = !item.isAction && pathname === item.href;
-
-          if (item.isAction) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="-mt-5 flex flex-col items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/35 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label="Movimientos"
-              >
-                <item.icon className="h-6 w-6" />
-              </Link>
-            );
-          }
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all duration-150",
+                "relative flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl transition-all duration-150 min-w-0",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isActive
                   ? "text-primary"
@@ -57,20 +44,24 @@ export function AppBottomNav() {
             >
               <item.icon
                 className={cn(
-                  "h-5 w-5 transition-all duration-150",
+                  "h-5 w-5 transition-transform duration-150",
                   isActive && "scale-110"
                 )}
               />
               <span
                 className={cn(
-                  "text-[10px] font-medium",
-                  isActive && "font-semibold"
+                  "text-[10px] font-medium leading-none",
+                  isActive && "font-bold"
                 )}
               >
                 {item.label}
               </span>
+              {/* Active indicator dot */}
               {isActive && (
-                <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-primary" />
+                <span
+                  aria-hidden
+                  className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-primary"
+                />
               )}
             </Link>
           );

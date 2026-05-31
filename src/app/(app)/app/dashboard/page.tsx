@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { RatesStrip } from "@/components/rates-strip"
 import { BalanceCards } from "@/components/dashboard/balance-cards"
-import { AccountSummary } from "@/components/dashboard/account-summary"
 import { CategoryPieChart } from "@/components/dashboard/category-pie-chart"
 import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart"
 import { RecentMovements } from "@/components/dashboard/recent-movements"
@@ -48,26 +47,28 @@ export default async function DashboardPage() {
   const manualRate = prefs?.manual_rate ?? null
 
   return (
-    <div className="space-y-6 max-w-5xl animate-fade-in">
+    <div className="space-y-5 max-w-2xl animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between pt-1">
         <div className="space-y-0.5">
-          <p className="text-sm text-muted-foreground font-medium">
-            Hola, {firstName}
+          <p className="text-xs font-medium text-muted-foreground">
+            Saldo total
           </p>
-          <h1
-            className="text-2xl md:text-3xl tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Tus finanzas
-          </h1>
         </div>
       </div>
 
+      {/* Balance hero — full width */}
+      {hasAccounts && (
+        <BalanceCards
+          defaultCurrency={defaultCurrency}
+          rateType={rateType}
+          manualRate={manualRate}
+          rates={rates}
+        />
+      )}
+
       {/* Exchange rates strip */}
-      <Suspense
-        fallback={<Skeleton className="h-8 w-full rounded-xl" />}
-      >
+      <Suspense fallback={<Skeleton className="h-9 w-full rounded-xl" />}>
         <RatesStrip preferredRateType={rateType} />
       </Suspense>
 
@@ -91,7 +92,10 @@ export default async function DashboardPage() {
           </div>
           <Link
             href="/app/accounts"
-            className={cn(buttonVariants({ size: "default" }), "gap-2 font-semibold shadow-sm shadow-primary/20 press-effect")}
+            className={cn(
+              buttonVariants({ size: "default" }),
+              "gap-2 font-semibold shadow-sm shadow-primary/20 press-effect"
+            )}
           >
             <Wallet className="h-4 w-4" />
             Agregar cuenta
@@ -99,44 +103,16 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Bento grid — accounts/balances + summary */}
+      {/* Charts — stacked, full width on mobile; side by side on md+ */}
       {hasAccounts && (
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* Balance hero: spans 2 columns on md+ */}
-          <div className="md:col-span-2 space-y-4">
-            <BalanceCards
-              defaultCurrency={defaultCurrency}
-              rateType={rateType}
-              manualRate={manualRate}
-              rates={rates}
-            />
-          </div>
-
-          {/* Account summary: 1 column on md+ */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Cuentas
-              </p>
-            </div>
-            <AccountSummary />
-          </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <CategoryPieChart />
+          <IncomeExpenseChart />
         </div>
       )}
 
-      {/* Charts + recent movements */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Recent movements — spans full width on mobile, half on md+ */}
-        <div className="md:col-span-2">
-          <RecentMovements />
-        </div>
-
-        {/* Category donut */}
-        <CategoryPieChart />
-
-        {/* Income vs expenses bar */}
-        <IncomeExpenseChart />
-      </div>
+      {/* Recent movements — full width */}
+      <RecentMovements />
     </div>
   )
 }

@@ -95,15 +95,11 @@ export function IncomeExpenseChart() {
   const hasData = chartData.some((r) => r.ingresos > 0 || r.gastos > 0)
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
+    <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <h3 className="text-sm font-semibold">Ingresos vs Gastos</h3>
-        </div>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+        <h3 className="text-sm font-semibold">Ingresos vs Gastos</h3>
+        <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
           Últimos 6 meses
         </span>
       </div>
@@ -115,7 +111,7 @@ export function IncomeExpenseChart() {
               <Skeleton
                 key={i}
                 className="flex-1 rounded-t-md"
-                style={{ height: `${40 + Math.random() * 60}%` }}
+                style={{ height: `${40 + (i * 10)}%` }}
               />
             ))}
           </div>
@@ -155,27 +151,27 @@ export function IncomeExpenseChart() {
         </EvilBarChart>
       )}
 
-      {/* Summary row */}
+      {/* Summary row — current month */}
       {!isLoading && hasData && (() => {
         const currentMonth = chartData[chartData.length - 1]
         if (!currentMonth) return null
         const diff = currentMonth.ingresos - currentMonth.gastos
         return (
-          <div className="flex gap-4 pt-1 text-xs border-t border-border/40">
+          <div className="flex gap-4 pt-2 text-xs border-t border-border/40">
             <div className="flex-1 text-center">
-              <p className="text-muted-foreground">Ingresos (mes)</p>
+              <p className="text-muted-foreground mb-0.5">Ingresos</p>
               <p className="font-semibold tabular-nums text-success">
                 {formatCurrency(currentMonth.ingresos, "ARS")}
               </p>
             </div>
             <div className="flex-1 text-center">
-              <p className="text-muted-foreground">Gastos (mes)</p>
+              <p className="text-muted-foreground mb-0.5">Gastos</p>
               <p className="font-semibold tabular-nums text-destructive">
                 {formatCurrency(currentMonth.gastos, "ARS")}
               </p>
             </div>
             <div className="flex-1 text-center">
-              <p className="text-muted-foreground">Balance</p>
+              <p className="text-muted-foreground mb-0.5">Balance</p>
               <p
                 className={`font-semibold tabular-nums ${diff >= 0 ? "text-success" : "text-destructive"}`}
               >

@@ -58,7 +58,10 @@ export function AccountSummary() {
       {balances.map((b) => (
         <div
           key={b.account_id}
-          className="rounded-xl border border-border/60 bg-card px-3 py-2.5 flex items-center gap-3 hover:border-primary/20 transition-all duration-150"
+          className={cn(
+            "rounded-xl border border-border/60 bg-card px-3 py-2.5 flex items-center gap-3",
+            "hover:border-primary/20 transition-all duration-150"
+          )}
         >
           {/* Icon */}
           <div className="h-9 w-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">

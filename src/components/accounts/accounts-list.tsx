@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { PlusCircle, Pencil, Trash2, EyeOff, Landmark, Briefcase } from "lucide-react"
+import { Plus, Pencil, Trash2, EyeOff, Briefcase } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,7 +15,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
 import { AccountForm, accountToFormValues, type AccountFormValues } from "./account-form"
 import {
   ACCOUNT_TYPE_LABELS,
@@ -62,19 +61,19 @@ function AccountTypeIcon({ type, className }: { type: AccountType; className?: s
 
 function AccountCardSkeleton() {
   return (
-    <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center gap-3">
-      <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+    <div className="rounded-2xl border border-border/60 bg-card px-4 py-4 flex items-center gap-3">
+      <Skeleton className="h-11 w-11 rounded-xl flex-shrink-0" />
       <div className="flex-1 space-y-1.5">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-3 w-20" />
       </div>
-      <Skeleton className="h-5 w-20" />
+      <Skeleton className="h-5 w-24" />
     </div>
   )
 }
 
 // ── Create dialog ─────────────────────────────────────────────
-function CreateAccountDialog() {
+function CreateAccountDialog({ asIconButton = false }: { asIconButton?: boolean }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -120,10 +119,25 @@ function CreateAccountDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={
-        <Button className="gap-2 font-semibold press-effect">
-          <PlusCircle className="h-4 w-4" />
-          Nueva cuenta
-        </Button>
+        asIconButton ? (
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center justify-center h-8 w-8 rounded-xl",
+              "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
+              "press-effect transition-all hover:bg-primary/80",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+            )}
+            aria-label="Agregar cuenta"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        ) : (
+          <Button className="gap-2 font-semibold press-effect">
+            <Plus className="h-4 w-4" />
+            Nueva cuenta
+          </Button>
+        )
       } />
       <DialogContent className="max-w-md">
         <DialogHeader>
@@ -210,7 +224,7 @@ function EditAccountDialog({ account }: { account: Account }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={
-        <Button variant="ghost" size="icon-sm" title="Editar cuenta" className="press-effect">
+        <Button variant="ghost" size="icon-sm" title="Editar cuenta" className="press-effect cursor-pointer">
           <Pencil className="h-3.5 w-3.5" />
         </Button>
       } />
@@ -277,7 +291,7 @@ function DeleteAccountDialog({ account }: { account: Account }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={
-        <Button variant="ghost" size="icon-sm" title="Eliminar cuenta" className="press-effect">
+        <Button variant="ghost" size="icon-sm" title="Eliminar cuenta" className="press-effect cursor-pointer">
           <Trash2 className="h-3.5 w-3.5 text-destructive" />
         </Button>
       } />
@@ -324,14 +338,14 @@ function AccountCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center gap-3",
+        "rounded-2xl border border-border/60 bg-card px-4 py-4 flex items-center gap-3",
         "hover:border-primary/20 hover:shadow-sm transition-all duration-150",
         account.is_hidden && "opacity-60"
       )}
     >
-      {/* Icon — use custom if set, otherwise type icon */}
+      {/* Icon */}
       <div
-        className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{
           backgroundColor: account.color
             ? account.color + "22"
@@ -343,7 +357,7 @@ function AccountCard({
         ) : (
           <AccountTypeIcon
             type={account.type}
-            className="h-5 w-5"
+            className="h-5 w-5 text-muted-foreground"
           />
         )}
       </div>
@@ -357,13 +371,16 @@ function AccountCard({
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <Badge
-            variant="outline"
-            className="text-[10px] px-1.5 py-0 h-4 font-medium border-border/60 text-muted-foreground"
-          >
+          <span className="text-[11px] text-muted-foreground font-medium">
             {ACCOUNT_TYPE_LABELS[account.type]}
-          </Badge>
-          <span className="text-[10px] text-muted-foreground font-medium uppercase">
+          </span>
+          <span className="text-[10px] text-muted-foreground/60">·</span>
+          <span
+            className={cn(
+              "inline-flex items-center px-1.5 py-0 rounded-md text-[10px] font-bold uppercase tracking-wider",
+              "bg-muted text-muted-foreground"
+            )}
+          >
             {account.currency}
           </span>
         </div>
@@ -373,7 +390,7 @@ function AccountCard({
       <div className="text-right flex-shrink-0 mr-1">
         <p
           className={cn(
-            "text-sm font-semibold tabular-nums",
+            "text-sm font-bold tabular-nums",
             currentBalance < 0 ? "text-destructive" : "text-foreground"
           )}
         >
@@ -404,6 +421,64 @@ function ACCOUNT_TYPE_ICON_FALLBACK(type: AccountType): string {
   return MAP[type]
 }
 
+// ── Patrimonio total hero card ────────────────────────────────
+function PatrimonioCard({
+  balances,
+  accounts,
+}: {
+  balances: AccountBalance[]
+  accounts: Account[]
+}) {
+  const visibleBalances = balances.filter((b) => !b.is_hidden)
+
+  const totalARS = visibleBalances
+    .filter((b) => b.currency === "ARS")
+    .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
+
+  const totalUSD = visibleBalances
+    .filter((b) => b.currency === "USD")
+    .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
+
+  const totalAccountsCount = accounts.length
+
+  return (
+    <div className="rounded-2xl bg-card border border-border/60 p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Patrimonio total
+        </p>
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+          {totalAccountsCount} {totalAccountsCount === 1 ? "cuenta" : "cuentas"}
+        </span>
+      </div>
+
+      {/* Grand total approximation (ARS) */}
+      <p
+        className="text-3xl font-bold tabular-nums text-foreground leading-none"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
+        {formatCurrency(totalARS, "ARS")}
+      </p>
+
+      {/* Sub-totals */}
+      <div className="flex gap-4 text-xs text-muted-foreground">
+        <span className="tabular-nums">
+          ARS {formatCurrency(totalARS, "ARS")}
+        </span>
+        {totalUSD > 0 && (
+          <>
+            <span>·</span>
+            <span className="tabular-nums text-accent font-semibold">
+              {totalUSD > 0 ? "+" : ""}
+              {formatCurrency(totalUSD, "USD")}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────
 export function AccountsList() {
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
@@ -411,12 +486,12 @@ export function AccountsList() {
     queryFn: fetchAccounts,
   })
 
-  const { data: balances } = useQuery({
+  const { data: balances = [] } = useQuery({
     queryKey: BALANCES_KEY,
     queryFn: fetchBalances,
   })
 
-  const balanceMap = new Map(balances?.map((b) => [b.account_id, b]))
+  const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
 
   const visible = accounts?.filter((a) => !a.is_hidden) ?? []
   const hidden = accounts?.filter((a) => a.is_hidden) ?? []
@@ -424,20 +499,20 @@ export function AccountsList() {
   return (
     <div className="space-y-6 max-w-3xl animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between pt-1">
-        <div className="space-y-0.5">
-          <h1
-            className="text-2xl md:text-3xl tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Cuentas
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Administrá tus cuentas y billeteras
-          </p>
-        </div>
-        <CreateAccountDialog />
+      <div className="flex items-center justify-between pt-1">
+        <h1
+          className="text-2xl md:text-3xl tracking-tight font-bold"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Cuentas
+        </h1>
+        <CreateAccountDialog asIconButton />
       </div>
+
+      {/* Patrimonio hero */}
+      {!loadingAccounts && accounts && accounts.length > 0 && (
+        <PatrimonioCard balances={balances} accounts={accounts} />
+      )}
 
       {/* Loading */}
       {loadingAccounts && (
@@ -452,7 +527,7 @@ export function AccountsList() {
       {!loadingAccounts && accounts?.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
-            <Landmark className="h-8 w-8 text-primary" />
+            <Briefcase className="h-8 w-8 text-primary" />
           </div>
           <div className="space-y-1.5">
             <h2
@@ -471,31 +546,43 @@ export function AccountsList() {
 
       {/* Visible accounts */}
       {!loadingAccounts && visible.length > 0 && (
-        <div className="space-y-2">
-          {visible.map((account) => (
-            <AccountCard
-              key={account.id}
-              account={account}
-              balance={balanceMap.get(account.id) ?? undefined}
-            />
-          ))}
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
+            Mis cuentas
+          </p>
+          <div className="space-y-2">
+            {visible.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                balance={balanceMap.get(account.id) ?? undefined}
+              />
+            ))}
+          </div>
         </div>
       )}
 
       {/* Hidden accounts */}
       {!loadingAccounts && hidden.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest px-1">
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
             Cuentas ocultas
           </p>
-          {hidden.map((account) => (
-            <AccountCard
-              key={account.id}
-              account={account}
-              balance={balanceMap.get(account.id) ?? undefined}
-            />
-          ))}
+          <div className="space-y-2">
+            {hidden.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                balance={balanceMap.get(account.id) ?? undefined}
+              />
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* Add account dashed button */}
+      {!loadingAccounts && accounts && accounts.length > 0 && (
+        <CreateAccountDialog />
       )}
     </div>
   )

@@ -264,6 +264,15 @@
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
   }
+
+  /* Hide scrollbar visually (keep scroll functional) */
+  .no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
 }
 
 /* ============================================================
