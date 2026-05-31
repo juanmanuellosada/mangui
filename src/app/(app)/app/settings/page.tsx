@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -7,7 +8,7 @@ import { z } from "zod"
 import { useTheme } from "next-themes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info } from "lucide-react"
+import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info, Plug, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -554,6 +555,25 @@ export default function SettingsPage() {
       {/* Categories */}
       <SettingsSection id="categories" icon={Tag} title="Categorías">
         <CategoriesManager />
+      </SettingsSection>
+
+      {/* Integraciones link */}
+      <SettingsSection id="integrations" icon={Plug} title="Integraciones">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Notificaciones push y PWA</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Activá avisos de tarjetas, transacciones y la instalación de la app.
+            </p>
+          </div>
+          <Link
+            href="/app/integraciones"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
+          >
+            Ir
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
       </SettingsSection>
 
       {/* Data / account */}

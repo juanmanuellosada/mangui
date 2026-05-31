@@ -593,6 +593,107 @@ auth.users
 
 ---
 
+## Fase 7 — PWA Offline + Web Push Notifications (`0015_push_notifications.sql`)
+
+### Contexto
+
+Esta fase agrega el soporte de infraestructura de base de datos para:
+1. Registrar las suscripciones VAPID de cada browser/dispositivo del usuario.
+2. Deduplicar eventos notificados para que un mismo evento no genere más de un push por usuario.
+3. Almacenar las preferencias de notificación del usuario directamente en `user_preferences`.
+
+### Nuevas tablas
+
+#### `push_subscriptions`
+Una fila por browser o dispositivo que el usuario autorizó para recibir Web Push Notifications. Las claves VAPID se almacenan aquí y las usa el backend (edge function o cron) al llamar a la Web Push API.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `endpoint` | text NOT NULL | URL del push endpoint (provista por el browser) |
+| `p256dh` | text NOT NULL | Clave pública del cliente, Base64url, P-256 |
+| `auth` | text NOT NULL | Clave de autenticación del cliente, Base64url |
+| `user_agent` | text NULL | Opcional. Identifica el dispositivo en la UI. |
+| `created_at` | timestamptz NOT NULL | DEFAULT now() |
+
+**UNIQUE:** `(user_id, endpoint)` — evita duplicados si el service worker se re-registra con el mismo endpoint.
+
+**Índice:** `(user_id)`.
+
+#### `notification_log`
+Registro de deduplicación. El cron/edge function consulta esta tabla antes de enviar un push: si ya existe un registro `(user_id, event_key)`, no envía de nuevo. La clave `event_key` sigue el formato `'<tipo>:<id>:<período>'`, por ejemplo `'card_due:<accountId>:2025-06'`.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `event_key` | text NOT NULL | Identificador único del evento notificado |
+| `channel` | text NOT NULL | DEFAULT `'push'`. Reservado para futuros canales. |
+| `sent_at` | timestamptz NOT NULL | DEFAULT now() |
+
+**UNIQUE:** `(user_id, event_key)` — una sola entrada por evento por usuario.
+
+**Índice:** `(user_id)`.
+
+### RLS
+
+**`push_subscriptions`:** RLS habilitado con las cuatro políticas estándar (`select`/`insert`/`update`/`delete` propias via `auth.uid() = user_id`). El cliente inserta y revoca sus propias suscripciones; el backend usa `service_role` para leer todas al hacer el fanout (el `service_role` bypassa RLS).
+
+**`notification_log`:** RLS habilitado con una sola política SELECT propia. Sin políticas `INSERT`/`UPDATE`/`DELETE` → solo el `service_role` puede escribir (patrón idéntico al de `exchange_rates`).
+
+### Columnas agregadas a `user_preferences`
+
+| Columna | Tipo | Default | Notas |
+|---|---|---|---|
+| `push_enabled` | boolean NOT NULL | `false` | El usuario activa explícitamente las notificaciones push. |
+| `notify_hour` | int NOT NULL | `9` | Hora (0–23, hora AR) para los avisos programados. CHECK 0–23. |
+| `card_reminder_enabled` | boolean NOT NULL | `true` | Recordatorio de fechas/vencimiento de tarjeta. |
+
+Las tres columnas se agregan con `ADD COLUMN IF NOT EXISTS` (idempotente). Los usuarios existentes obtienen los valores por defecto sin intervención.
+
+### Diagrama de relaciones (adición)
+
+```
+auth.users
+    │
+    ├── push_subscriptions (1:N)
+    │       UNIQUE (user_id, endpoint)
+    │
+    └── notification_log (1:N)
+            UNIQUE (user_id, event_key)
+            escritura: service_role solo
+            lectura:   usuario autenticado propio
+
+user_preferences
+    │
+    ├── push_enabled          boolean DEFAULT false
+    ├── notify_hour           int     DEFAULT 9 CHECK 0–23
+    └── card_reminder_enabled boolean DEFAULT true
+```
+
+---
+
+## Archivos de migración (tabla actualizada)
+
+| Archivo | Contenido |
+|---|---|
+| `0001_init_extensions_and_enums.sql` | Extensiones (pgcrypto) y todos los tipos enum |
+| `0002_profiles_preferences.sql` | `profiles`, `user_preferences`, trigger `updated_at`, función helper `set_updated_at()` |
+| `0003_accounts_categories.sql` | `accounts`, `categories` |
+| `0004_movements_transfers.sql` | `movements`, `transfers` |
+| `0005_exchange_rates.sql` | `exchange_rates` (caché global de cotizaciones) |
+| `0006_triggers_seed.sql` | Trigger de signup `on_auth_user_created`, función `handle_new_user()`, `seed_default_categories()` |
+| `0007_views.sql` | Vista `account_balances` (saldo derivado), vista `account_balances_projected` |
+| `0010_installments_cards.sql` | `installment_purchases`, FK `movements → installment_purchases`, `card_statements` |
+| `0011_recurring_scheduled.sql` | `recurring_transactions`, `recurring_occurrences`, `scheduled_transactions` |
+| `0012_auto_rules.sql` | Enums `rule_match`, `rule_field`, `rule_operator`; tablas `auto_rules`, `auto_rule_conditions` |
+| `0013_budgets_goals.sql` | Enums `budget_period`, `budget_status`, `goal_type`, `goal_status`; tablas `budgets`, `goals`, `goal_snapshots` |
+| `0014_saved_views.sql` | Tabla `saved_views` (filtros serializados de analytics) |
+| `0015_push_notifications.sql` | Tablas `push_subscriptions`, `notification_log`; columnas de notificaciones en `user_preferences` |
+
+---
+
 ## Cómo aplicar las migraciones
 
 ```bash

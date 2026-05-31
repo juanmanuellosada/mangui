@@ -1086,6 +1086,77 @@ NO emoji — all icons clean SVG. Tabular numbers throughout. Charts readable wi
 
 Photorealistic, implementation-friendly. Light mode. Premium fintech period-comparison mobile screen.`,
   },
+
+  // ─── INTEGRACIONES + NOTIFICACIONES ──────────────────────────────────────
+  {
+    id: 'integraciones',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app NOTIFICACIONES E INTEGRACIONES (pantalla de configuración).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9. Premium fintech settings screen, es-AR. ONE screen from status bar to bottom nav. No fake-data tells.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): left back-arrow icon (muted dark, 20px SVG). Center "Configuración" IBM Plex Sans 600 16px dark. Right: empty (no icons needed).
+
+2. INSTALAR LA APP — a double-bezel premium card (outer warm-white shell, inner core slightly contrasted, hairline border rgba(0,0,0,.06), radius 16px, padding 16px 20px). Content:
+   Top row: smartphone-download SVG icon (lime #65A30D, 20px) left + "Instalá mangui en tu pantalla de inicio" IBM Plex Sans 600 15px dark, single line. Right: chevron-right (muted, 14px).
+   Second row: "Funciona offline, abre al instante, sin App Store." IBM Plex Sans 400 13px muted stone, 55ch max. Left-offset inline with icon.
+   Bottom row: a full-width solid lime #65A30D button "Instalar app (PWA)" height 44px rounded-10 IBM Plex Sans 700 14px white. 4px top margin inside card.
+   Below button, inline: a small status indicator chip (rounded-full, hairline border, 8px padding horizontal, 4px vertical). If online: green dot (6px circle #16A34A) + "En línea" IBM Plex Sans 500 12px success-green. If offline placeholder: stone dot + "Sin conexión" muted. The chip sits left-aligned 4px below the install button.
+
+3. SECTION DIVIDER: "Notificaciones push" IBM Plex Sans 600 14px dark left, 16px top margin, 6px bottom margin. A hairline divider below this label (rgba(0,0,0,.06)).
+
+4. NOTIFICACIONES PUSH CARD — a single card (radius 14px, warm-white bg, hairline border rgba(0,0,0,.06), padding 0 — rows use internal padding 14px 16px). Contains stacked rows with hairline dividers between them:
+
+Row A — MASTER TOGGLE "Notificaciones push":
+  Left: bell SVG icon (lime #65A30D, 18px) + "Activar notificaciones" IBM Plex Sans 600 15px dark. Below label: "Recibí avisos en este dispositivo." IBM Plex Sans 300 12px muted stone.
+  Right: iOS-style toggle switch ON (lime, 32px height, ~52px width). The toggle is visually ON (lime track, white knob right).
+
+Row B — HORA DEL DÍA SELECTOR (sub-setting, 14px left indent from icon column):
+  Left: clock SVG icon (muted stone, 16px) + "Hora de avisos" IBM Plex Sans 500 14px dark. Below: "Zona horaria: Argentina (UTC-3)" IBM Plex Sans 300 11px muted.
+  Right: a compact time selector chip (hairline border rounded-8, padding 6px 12px): "09:00 hs" IBM Plex Mono 600 14px dark tabular-nums + chevron-down SVG (muted, 12px). Tappable.
+
+Row C — RECORDATORIO DE TARJETAS toggle:
+  Left: credit-card SVG icon (muted stone, 16px) + "Recordatorio de tarjetas" IBM Plex Sans 500 14px dark. Below: "Cierre y vencimiento de resúmenes." IBM Plex Sans 300 12px muted. Sub-badge "3 d antes del cierre" (stone bg, IBM Plex Sans 400 11px muted, rounded-full, padding 3px 8px) inline left below subtitle.
+  Right: iOS-style toggle switch ON (lime, 28px).
+
+Row D — PRÓXIMO VENCIMIENTO DE RESUMEN toggle:
+  Left: calendar-check SVG icon (muted stone, 16px) + "Próximo vencimiento de resumen" IBM Plex Sans 500 14px dark. Below: "Aviso el día del vencimiento." IBM Plex Sans 300 12px muted.
+  Right: iOS-style toggle switch ON (lime, 28px).
+
+Row E — TRANSACCIÓN PROGRAMADA toggle:
+  Left: calendar-clock SVG icon (muted stone, 16px) + "Transacción programada" IBM Plex Sans 500 14px dark. Below: "Cuando una programada está por ejecutarse." IBM Plex Sans 300 12px muted.
+  Right: iOS-style toggle switch ON (lime, 28px).
+
+Row F — OCURRENCIA DE RECURRENTE toggle:
+  Left: repeat SVG icon (muted stone, 16px) + "Ocurrencia de recurrente" IBM Plex Sans 500 14px dark. Below: "Cada vez que una recurrente requiere confirmación." IBM Plex Sans 300 12px muted.
+  Right: iOS-style toggle switch OFF (stone track, white knob left — disabled state visually distinct).
+
+5. SECTION DIVIDER: "Dispositivos suscritos" IBM Plex Sans 600 14px dark left, 16px top margin, 6px bottom margin. Hairline divider below.
+
+6. DISPOSITIVOS SUSCRITOS — a card (radius 14px, warm-white bg, hairline border rgba(0,0,0,.06), padding 0; rows 13px 16px internal). Two device rows visible, each with hairline divider between:
+
+Device Row 1:
+  Left: monitor SVG icon (lime, 18px, in a 34px lime-bg circle). Center: "Chrome · Mac" IBM Plex Sans 600 14px dark. Below: "Suscripto hace 3 días" IBM Plex Sans 300 12px muted. Right: active status dot (6px circle, #16A34A success-green).
+
+Device Row 2:
+  Left: smartphone SVG icon (muted stone, 18px, in a 34px stone circle). Center: "Safari · iPhone" IBM Plex Sans 600 14px dark. Below: "Suscripto hace 12 días" IBM Plex Sans 300 12px muted. Right: a "Revocar" text button IBM Plex Sans 500 12px #DC2626 red (destructive, text-only link style).
+
+Below the device rows (still inside the card, separated by a hairline): a note row: info SVG icon (muted, 14px) + "Podés revocar el acceso de cualquier dispositivo en cualquier momento." IBM Plex Sans 300 11px muted stone, padding 10px 16px.
+
+7. ESTADO DE CONEXIÓN — a compact row card (radius 12px, warm-white bg, hairline border rgba(0,0,0,.06), padding 12px 16px). Content: wifi SVG icon (lime, 18px) left + "Estado de conexión" IBM Plex Sans 500 14px dark center. Right: a status pill (rounded-full, lime bg #65A30D, white IBM Plex Sans 600 11px "En línea", 4px 10px padding). The pill communicates network status without color alone: it always shows text.
+
+8. BOTTOM NAV: fixed, 5 items (Inicio / Movimientos / Cuentas / Stats / Más). "Más" tab active (lime). Safe-area bottom padding.
+
+All icons are clean SVG — NO emoji. IBM Plex Sans throughout, IBM Plex Mono for times and tabular data. Hairline borders only (1px rgba(0,0,0,.06)). Toggle switches: ON = lime track + white knob right; OFF = stone track + white knob left — visually distinct from each other without relying solely on color (knob position conveys state). Cards use generous internal padding. NO nested box-in-box-in-box. NO glassmorphism. NO ghost cards. Light mode. One screen only.
+
+Photorealistic, implementation-friendly. Light mode. Premium fintech settings screen. es-AR copy throughout.`,
+  },
 ];
 
 // ---------------------------------------------------------------------------

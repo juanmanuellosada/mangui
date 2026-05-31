@@ -632,6 +632,60 @@ export type Database = {
           },
         ]
       }
+      notification_log: {
+        Row: {
+          channel: string
+          event_key: string
+          id: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          channel?: string
+          event_key: string
+          id?: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          event_key?: string
+          id?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1090,30 +1144,39 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          card_reminder_enabled: boolean
           created_at: string
           default_currency: Database["public"]["Enums"]["currency"]
           id: string
           manual_rate: number | null
+          notify_hour: number
+          push_enabled: boolean
           rate_type: Database["public"]["Enums"]["rate_type"]
           theme: Database["public"]["Enums"]["ui_theme"]
           updated_at: string
           user_id: string
         }
         Insert: {
+          card_reminder_enabled?: boolean
           created_at?: string
           default_currency?: Database["public"]["Enums"]["currency"]
           id?: string
           manual_rate?: number | null
+          notify_hour?: number
+          push_enabled?: boolean
           rate_type?: Database["public"]["Enums"]["rate_type"]
           theme?: Database["public"]["Enums"]["ui_theme"]
           updated_at?: string
           user_id: string
         }
         Update: {
+          card_reminder_enabled?: boolean
           created_at?: string
           default_currency?: Database["public"]["Enums"]["currency"]
           id?: string
           manual_rate?: number | null
+          notify_hour?: number
+          push_enabled?: boolean
           rate_type?: Database["public"]["Enums"]["rate_type"]
           theme?: Database["public"]["Enums"]["ui_theme"]
           updated_at?: string
