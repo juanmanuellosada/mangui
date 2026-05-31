@@ -2,80 +2,14 @@
 
 /**
  * IconPicker — bespoke icon selector modal for mangui account icons.
- * Tabs: Emojis (searchable catalog) | Íconos (lucide finance set) | Bancos AR | Subir imagen
- * Stores: emoji string | "lucide:<name>" | /icons/ar/… path | public image URL
+ * Tabs: Logos (AR fintech catalog) | Emojis (full catalog) | Subir imagen
+ * Stores: /icons/ar/… path | emoji string | public image URL
  */
 
 import * as React from "react"
-import { useState, useRef, useCallback } from "react"
-import { Search, Upload, X, Check } from "lucide-react"
+import { useState, useRef, useCallback, useEffect } from "react"
+import { Search, Upload, X, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { AR_FINTECH_ICONS, AR_ICON_CATEGORIES } from "@/lib/ar-fintech-icons"
-import {
-  // Finance / account icons
-  Landmark,
-  Building2,
-  Banknote,
-  TrendingUp,
-  TrendingDown,
-  CreditCard,
-  Smartphone,
-  Briefcase,
-  Wallet,
-  PiggyBank,
-  DollarSign,
-  Euro,
-  BadgeDollarSign,
-  CircleDollarSign,
-  Coins,
-  HandCoins,
-  Vault,
-  ReceiptText,
-  ShoppingCart,
-  ShoppingBag,
-  Store,
-  Package,
-  Home,
-  Building,
-  Car,
-  Plane,
-  Heart,
-  Star,
-  Zap,
-  Gift,
-  Coffee,
-  Utensils,
-  BookOpen,
-  GraduationCap,
-  Wrench,
-  Hammer,
-  Paintbrush,
-  Music,
-  Film,
-  Gamepad2,
-  Globe,
-  MapPin,
-  Clock,
-  Target,
-  BarChart2,
-  LineChart,
-  PieChart,
-  Wifi,
-  Laptop,
-  Monitor,
-  Phone,
-  Key,
-  Lock,
-  Shield,
-  Award,
-  Trophy,
-  Leaf,
-  Sun,
-  Umbrella,
-  Snowflake,
-  Flame,
-  Droplets,
-  type LucideIcon,
-} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EMOJI_CATALOG, searchEmojis, type EmojiCategory } from "@/lib/emoji-catalog"
 import { createClient } from "@/lib/supabase/client"
@@ -86,82 +20,122 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// ── Lucide icon set for finance/accounts ─────────────────────────────────────
+// ── Shared tile classes ───────────────────────────────────────────────────────
 
-interface LucideOption {
-  name: string
-  label: string
-  icon: LucideIcon
+const TILE_BASE = cn(
+  // Uniform rectangular tile with rounded corners
+  "aspect-square flex flex-col items-center justify-center rounded-xl border transition-colors duration-150 cursor-pointer",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+  "hover:bg-accent/20",
+  "bg-muted/30 border-border/50"
+)
+
+const TILE_SELECTED = "ring-2 ring-primary bg-primary/10 border-primary/40"
+
+// ── Category chip row with arrow navigation ───────────────────────────────────
+
+function CategoryChips({
+  categories,
+  active,
+  onSelect,
+}: {
+  categories: { id: string; label: string }[]
+  active: string
+  onSelect: (id: string) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 2)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    checkScroll()
+    el.addEventListener("scroll", checkScroll, { passive: true })
+    const ro = new ResizeObserver(checkScroll)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener("scroll", checkScroll)
+      ro.disconnect()
+    }
+  }, [checkScroll])
+
+  function scroll(dir: "left" | "right") {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir === "left" ? -120 : 120, behavior: "smooth" })
+  }
+
+  return (
+    <div className="flex items-center gap-1 min-w-0">
+      {/* Left arrow */}
+      <button
+        type="button"
+        onClick={() => scroll("left")}
+        aria-label="Desplazar categorías a la izquierda"
+        tabIndex={canScrollLeft ? 0 : -1}
+        className={cn(
+          "shrink-0 h-6 w-6 rounded-md flex items-center justify-center transition-opacity duration-150",
+          "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+      </button>
+
+      {/* Scrollable chip row */}
+      <div
+        ref={scrollRef}
+        className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none flex-1"
+      >
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => onSelect(cat.id)}
+            className={cn(
+              "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-150 whitespace-nowrap cursor-pointer",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              active === cat.id
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            )}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Right arrow */}
+      <button
+        type="button"
+        onClick={() => scroll("right")}
+        aria-label="Desplazar categorías a la derecha"
+        tabIndex={canScrollRight ? 0 : -1}
+        className={cn(
+          "shrink-0 h-6 w-6 rounded-md flex items-center justify-center transition-opacity duration-150",
+          "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+      </button>
+    </div>
+  )
 }
 
-const LUCIDE_FINANCE_ICONS: LucideOption[] = [
-  { name: "Landmark", label: "Banco", icon: Landmark },
-  { name: "Building2", label: "Edificio", icon: Building2 },
-  { name: "Banknote", label: "Billete", icon: Banknote },
-  { name: "TrendingUp", label: "Inversión", icon: TrendingUp },
-  { name: "TrendingDown", label: "Baja", icon: TrendingDown },
-  { name: "CreditCard", label: "Tarjeta", icon: CreditCard },
-  { name: "Smartphone", label: "Celular", icon: Smartphone },
-  { name: "Briefcase", label: "Maletín", icon: Briefcase },
-  { name: "Wallet", label: "Billetera", icon: Wallet },
-  { name: "PiggyBank", label: "Alcancía", icon: PiggyBank },
-  { name: "DollarSign", label: "Dólar", icon: DollarSign },
-  { name: "Euro", label: "Euro", icon: Euro },
-  { name: "BadgeDollarSign", label: "Insignia $", icon: BadgeDollarSign },
-  { name: "CircleDollarSign", label: "Círculo $", icon: CircleDollarSign },
-  { name: "Coins", label: "Monedas", icon: Coins },
-  { name: "HandCoins", label: "Dar dinero", icon: HandCoins },
-  { name: "Vault", label: "Caja fuerte", icon: Vault },
-  { name: "ReceiptText", label: "Recibo", icon: ReceiptText },
-  { name: "ShoppingCart", label: "Carrito", icon: ShoppingCart },
-  { name: "ShoppingBag", label: "Bolsa", icon: ShoppingBag },
-  { name: "Store", label: "Tienda", icon: Store },
-  { name: "Package", label: "Paquete", icon: Package },
-  { name: "Home", label: "Casa", icon: Home },
-  { name: "Building", label: "Edificio", icon: Building },
-  { name: "Car", label: "Auto", icon: Car },
-  { name: "Plane", label: "Avión", icon: Plane },
-  { name: "Heart", label: "Salud", icon: Heart },
-  { name: "Star", label: "Estrella", icon: Star },
-  { name: "Zap", label: "Energía", icon: Zap },
-  { name: "Gift", label: "Regalo", icon: Gift },
-  { name: "Coffee", label: "Café", icon: Coffee },
-  { name: "Utensils", label: "Comida", icon: Utensils },
-  { name: "BookOpen", label: "Educación", icon: BookOpen },
-  { name: "GraduationCap", label: "Estudio", icon: GraduationCap },
-  { name: "Wrench", label: "Herramienta", icon: Wrench },
-  { name: "Hammer", label: "Martillo", icon: Hammer },
-  { name: "Paintbrush", label: "Arte", icon: Paintbrush },
-  { name: "Music", label: "Música", icon: Music },
-  { name: "Film", label: "Cine", icon: Film },
-  { name: "Gamepad2", label: "Juegos", icon: Gamepad2 },
-  { name: "Globe", label: "Internet", icon: Globe },
-  { name: "MapPin", label: "Ubicación", icon: MapPin },
-  { name: "Clock", label: "Tiempo", icon: Clock },
-  { name: "Target", label: "Objetivo", icon: Target },
-  { name: "BarChart2", label: "Gráfico barras", icon: BarChart2 },
-  { name: "LineChart", label: "Gráfico línea", icon: LineChart },
-  { name: "PieChart", label: "Torta", icon: PieChart },
-  { name: "Wifi", label: "Internet", icon: Wifi },
-  { name: "Laptop", label: "Notebook", icon: Laptop },
-  { name: "Monitor", label: "Monitor", icon: Monitor },
-  { name: "Phone", label: "Teléfono", icon: Phone },
-  { name: "Key", label: "Llave", icon: Key },
-  { name: "Lock", label: "Candado", icon: Lock },
-  { name: "Shield", label: "Seguro", icon: Shield },
-  { name: "Award", label: "Premio", icon: Award },
-  { name: "Trophy", label: "Trofeo", icon: Trophy },
-  { name: "Leaf", label: "Natural", icon: Leaf },
-  { name: "Sun", label: "Sol", icon: Sun },
-  { name: "Umbrella", label: "Paraguas", icon: Umbrella },
-  { name: "Snowflake", label: "Nieve", icon: Snowflake },
-  { name: "Flame", label: "Fuego", icon: Flame },
-  { name: "Droplets", label: "Agua", icon: Droplets },
-]
+// ── Logos (Bancos AR) tab ─────────────────────────────────────────────────────
 
-// ── Bancos AR tab ─────────────────────────────────────────────────────────────
-
-function BancosArTab({
+function LogosTab({
   value,
   onSelect,
 }: {
@@ -210,26 +184,13 @@ function BancosArTab({
         )}
       </div>
 
-      {/* Category tabs (only when not searching) */}
+      {/* Category chips with arrows (only when not searching) */}
       {!search && (
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-          {AR_ICON_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              className={cn(
-                "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-150 whitespace-nowrap cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                activeCategory === cat.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
+        <CategoryChips
+          categories={AR_ICON_CATEGORIES}
+          active={activeCategory}
+          onSelect={setActiveCategory}
+        />
       )}
 
       {/* Icon grid */}
@@ -251,15 +212,12 @@ function BancosArTab({
                   aria-label={icon.title}
                   aria-pressed={isSelected}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 h-16 rounded-xl border transition-colors duration-150 cursor-pointer",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "hover:bg-accent/20",
-                    isSelected
-                      ? "bg-primary/15 border-primary/40"
-                      : "border-border/60"
+                    TILE_BASE,
+                    "gap-1 h-16",
+                    isSelected ? TILE_SELECTED : ""
                   )}
                 >
-                  {/* White/zinc chip so dark logos are visible in dark mode */}
+                  {/* White chip so colored logos read in dark mode */}
                   <div className="h-8 w-8 rounded-lg bg-white dark:bg-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -297,7 +255,7 @@ function BancosArTab({
 
 // ── Tab type ──────────────────────────────────────────────────────────────────
 
-type Tab = "emojis" | "iconos" | "bancos-ar" | "subir"
+type Tab = "logos" | "emojis" | "subir"
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -356,26 +314,13 @@ function EmojiTab({
         )}
       </div>
 
-      {/* Category tabs (only when not searching) */}
+      {/* Category chips with arrows (only when not searching) */}
       {!search && (
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-          {EMOJI_CATALOG.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              className={cn(
-                "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-150 whitespace-nowrap cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                activeCategory === cat.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
+        <CategoryChips
+          categories={EMOJI_CATALOG.map((c) => ({ id: c.id, label: c.label }))}
+          active={activeCategory}
+          onSelect={setActiveCategory}
+        />
       )}
 
       {/* Grid */}
@@ -400,7 +345,8 @@ function EmojiTab({
                     {cat.id === "search" ? `${emojis.length} resultados` : cat.label}
                   </p>
                 )}
-                <div className="grid grid-cols-8 gap-1">
+                {/* Uniform grid: same tile size as logos — 5 cols, h-16 */}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
                   {emojis.map((entry) => (
                     <button
                       key={entry.emoji}
@@ -408,13 +354,9 @@ function EmojiTab({
                       onClick={() => onSelect(entry.emoji)}
                       title={entry.keywords[0]}
                       className={cn(
-                        "h-9 w-full rounded-lg flex items-center justify-center text-xl",
-                        "transition-colors duration-100 cursor-pointer",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        "hover:bg-accent/20",
-                        value === entry.emoji
-                          ? "bg-primary/15 ring-1 ring-primary/40"
-                          : ""
+                        TILE_BASE,
+                        "h-14 text-2xl",
+                        value === entry.emoji ? TILE_SELECTED : ""
                       )}
                       aria-label={entry.keywords[0]}
                       aria-pressed={value === entry.emoji}
@@ -431,51 +373,6 @@ function EmojiTab({
             Sin resultados para &ldquo;{search}&rdquo;
           </p>
         )}
-      </div>
-    </div>
-  )
-}
-
-// ── Lucide icons tab ──────────────────────────────────────────────────────────
-
-function IconosTab({
-  value,
-  onSelect,
-}: {
-  value: string
-  onSelect: (v: string) => void
-}) {
-  return (
-    <div className="overflow-y-auto">
-      <div className="grid grid-cols-5 gap-2">
-        {LUCIDE_FINANCE_ICONS.map((opt) => {
-          const iconValue = `lucide:${opt.name}`
-          const isSelected = value === iconValue
-          const Icon = opt.icon
-          return (
-            <button
-              key={opt.name}
-              type="button"
-              onClick={() => onSelect(iconValue)}
-              title={opt.label}
-              aria-label={opt.label}
-              aria-pressed={isSelected}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 h-16 rounded-xl border transition-colors duration-150 cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                "hover:bg-accent/20",
-                isSelected
-                  ? "bg-primary/15 border-primary/40 text-primary"
-                  : "border-border/60 text-muted-foreground"
-              )}
-            >
-              <Icon className="h-5 w-5" aria-hidden />
-              <span className="text-[10px] font-medium leading-tight truncate w-full text-center px-1">
-                {opt.label}
-              </span>
-            </button>
-          )
-        })}
       </div>
     </div>
   )
@@ -518,7 +415,6 @@ function SubirTab({
       setError(null)
       setUploading(true)
 
-      // Preview locally while uploading
       const localUrl = URL.createObjectURL(file)
       setPreview(localUrl)
 
@@ -593,7 +489,7 @@ function SubirTab({
             <img
               src={preview}
               alt="Ícono seleccionado"
-              className="h-14 w-14 rounded-full object-cover border border-border/60"
+              className="h-14 w-14 rounded-xl object-cover border border-border/60"
             />
             <span className="text-xs text-muted-foreground">
               Hacé clic para cambiar
@@ -647,7 +543,7 @@ function SubirTab({
 // ── Main IconPicker ───────────────────────────────────────────────────────────
 
 export function IconPicker({ open, onClose, value, onChange, userId }: IconPickerProps) {
-  const [tab, setTab] = useState<Tab>("emojis")
+  const [tab, setTab] = useState<Tab>("logos")
 
   function handleSelect(v: string) {
     onChange(v)
@@ -655,9 +551,8 @@ export function IconPicker({ open, onClose, value, onChange, userId }: IconPicke
   }
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: "logos", label: "Logos" },
     { id: "emojis", label: "Emojis" },
-    { id: "iconos", label: "Íconos" },
-    { id: "bancos-ar", label: "Bancos AR" },
     { id: "subir", label: "Subir imagen" },
   ]
 
@@ -690,14 +585,11 @@ export function IconPicker({ open, onClose, value, onChange, userId }: IconPicke
 
         {/* Tab content */}
         <div className="flex-1 overflow-hidden px-4 pt-3 pb-4">
+          {tab === "logos" && (
+            <LogosTab value={value} onSelect={handleSelect} />
+          )}
           {tab === "emojis" && (
             <EmojiTab value={value} onSelect={handleSelect} />
-          )}
-          {tab === "iconos" && (
-            <IconosTab value={value} onSelect={handleSelect} />
-          )}
-          {tab === "bancos-ar" && (
-            <BancosArTab value={value} onSelect={handleSelect} />
           )}
           {tab === "subir" && (
             <SubirTab value={value} onSelect={handleSelect} userId={userId} />

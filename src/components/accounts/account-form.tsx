@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MangoSelect } from "@/components/ui/mango-select"
-import { CurrencySelect } from "@/components/ui/currency-select"
+import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { IconPicker } from "@/components/ui/icon-picker"
 import {
   ACCOUNT_TYPE_LABELS,
-  ACCOUNT_TYPE_ICON_COMPONENTS,
+  ACCOUNT_TYPE_EMOJIS,
   renderAccountIcon,
   type Account,
 } from "@/lib/accounts"
+import { cn } from "@/lib/utils"
 
 // Explicit type — avoids inference issues with z.coerce in zod v4
 export type AccountFormValues = {
@@ -88,12 +89,17 @@ const accountSchema = z
     }
   })
 
+// Account type options with emoji glyphs
 const ACCOUNT_TYPE_OPTIONS = Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => {
-  const IconComp = ACCOUNT_TYPE_ICON_COMPONENTS[value as keyof typeof ACCOUNT_TYPE_ICON_COMPONENTS]
+  const emoji = ACCOUNT_TYPE_EMOJIS[value as keyof typeof ACCOUNT_TYPE_EMOJIS]
   return {
     value,
     label,
-    leading: <IconComp className="h-4 w-4 text-muted-foreground" aria-hidden />,
+    leading: (
+      <span className="text-base leading-none select-none" aria-hidden>
+        {emoji}
+      </span>
+    ),
   }
 })
 
@@ -140,8 +146,12 @@ export function AccountForm({
 
   const selectedType = watch("type")
   const selectedIcon = watch("icon")
+  const selectedCurrency = watch("currency")
   const isHidden = watch("is_hidden")
   const isCreditCard = selectedType === "tarjeta_credito"
+
+  // Dynamic currency prefix for the balance input
+  const currencyPrefix = selectedCurrency === "USD" ? "US$" : "$"
 
   return (
     <>
@@ -194,29 +204,43 @@ export function AccountForm({
           )}
         </div>
 
-        {/* ── Moneda ───────────────────────────────────────── */}
+        {/* ── Moneda — segmented toggle ─────────────────────── */}
         <div className="space-y-1.5">
-          <Label htmlFor="account-currency">Moneda</Label>
-          <CurrencySelect
-            id="account-currency"
-            value={watch("currency")}
+          <Label>Moneda</Label>
+          <CurrencyToggle
+            value={selectedCurrency}
             onChange={(v) =>
-              setValue("currency", v as "ARS" | "USD", { shouldValidate: true })
+              setValue("currency", v, { shouldValidate: true })
             }
             className="w-full"
           />
         </div>
 
-        {/* ── Saldo inicial ─────────────────────────────────── */}
+        {/* ── Saldo inicial with dynamic currency prefix ────── */}
         <div className="space-y-1.5">
           <Label htmlFor="initial_balance">Saldo inicial</Label>
-          <Input
-            id="initial_balance"
-            type="number"
-            step="0.01"
-            {...register("initial_balance")}
-            aria-invalid={!!errors.initial_balance}
-          />
+          <div className="relative flex items-center">
+            {/* Currency prefix adornment */}
+            <span
+              className={cn(
+                "absolute left-3 select-none text-sm font-medium text-muted-foreground pointer-events-none z-10 tabular-nums",
+                "transition-opacity duration-100"
+              )}
+              aria-hidden
+            >
+              {currencyPrefix}
+            </span>
+            <Input
+              id="initial_balance"
+              type="number"
+              step="0.01"
+              style={{
+                paddingLeft: currencyPrefix === "US$" ? "2.75rem" : "2rem",
+              }}
+              {...register("initial_balance")}
+              aria-invalid={!!errors.initial_balance}
+            />
+          </div>
           {errors.initial_balance && (
             <p className="text-xs text-destructive">{errors.initial_balance.message}</p>
           )}

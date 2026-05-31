@@ -49,6 +49,17 @@ export const ACCOUNT_TYPE_ICONS: Record<AccountType, string> = {
   otro: "💼",
 }
 
+/** Emoji glyphs used in the account form type selector tiles */
+export const ACCOUNT_TYPE_EMOJIS: Record<AccountType, string> = {
+  caja_ahorro: "🏦",
+  cuenta_corriente: "💼",
+  efectivo: "💵",
+  inversion: "📈",
+  tarjeta_credito: "💳",
+  billetera_virtual: "📱",
+  otro: "🏷️",
+}
+
 export const CURRENCY_LABELS: Record<Currency, string> = {
   ARS: "Pesos (ARS)",
   USD: "Dólares (USD)",
