@@ -1,366 +1,279 @@
 import Image from "next/image";
 import Link from "next/link";
+import { BrandLockup } from "@/components/brand-lockup";
 import {
   ArrowRight,
-  Globe,
-  RefreshCcw,
-  Smartphone,
-  Zap,
-  Target,
+  Shield,
+  Download,
   Check,
   Star,
   CreditCard,
+  RefreshCcw,
+  Target,
+  Zap,
+  Smartphone,
+  Globe,
   TrendingUp,
-  Shield,
-  Download,
   ChevronRight,
-  BarChart3,
-  Wallet,
+  Play,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-const features = [
-  {
-    icon: Globe,
-    title: "Multimoneda ARS & USD",
-    description:
-      "Registrá gastos en pesos y dólares. Conversión automática con tipo de cambio real, oficial y MEP.",
-    accent: "primary",
-  },
-  {
-    icon: CreditCard,
-    title: "Tarjetas y cuotas",
-    description:
-      "Seguí tus compras en cuotas, resúmenes de tarjeta y vencimientos sin complicaciones.",
-    accent: "accent",
-  },
-  {
-    icon: RefreshCcw,
-    title: "Gastos recurrentes",
-    description:
-      "Configurá sueldos, alquileres, servicios y suscripciones. mangui los registra solo.",
-    accent: "primary",
-  },
-  {
-    icon: Target,
-    title: "Presupuestos y metas",
-    description:
-      "Fijá límites por categoría y metas de ahorro. Visualizá tu progreso en tiempo real.",
-    accent: "accent",
-  },
-  {
-    icon: Zap,
-    title: "Quick-add con IA",
-    description:
-      "Dictá o escribí en lenguaje natural: \"gasté 5k en el super hoy\" y mangui lo clasifica solo.",
-    accent: "primary",
-  },
-  {
-    icon: Smartphone,
-    title: "PWA — siempre disponible",
-    description:
-      "Instalala como app en tu celular. Funciona offline para consultas; sincroniza al volver.",
-    accent: "accent",
-  },
-];
-
-const steps = [
-  {
-    step: "01",
-    icon: Wallet,
-    title: "Creá tu cuenta",
-    description: "Registro gratuito en segundos. Sin tarjeta de crédito.",
-  },
-  {
-    step: "02",
-    icon: TrendingUp,
-    title: "Conectá tus fuentes",
-    description:
-      "Importá movimientos o empezá a registrar manualmente con nuestro quick-add.",
-  },
-  {
-    step: "03",
-    icon: BarChart3,
-    title: "Tomá el control",
-    description:
-      "Visualizá tu flujo de caja, ajustá presupuestos y alcanzá tus metas.",
-  },
-];
-
-const plans = [
-  {
-    name: "Gratis",
-    price: "ARS 0",
-    period: "para siempre",
-    description: "Para empezar a ordenar tus finanzas",
-    features: [
-      "Hasta 100 transacciones/mes",
-      "2 cuentas (ARS + USD)",
-      "Presupuestos básicos",
-      "Historial 3 meses",
-    ],
-    cta: "Empezar gratis",
-    href: "/register",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: "ARS 4.990",
-    period: "por mes",
-    description: "Para quienes toman en serio su plata",
-    features: [
-      "Transacciones ilimitadas",
-      "Cuentas ilimitadas",
-      "Quick-add con IA",
-      "Historial completo",
-      "Exportación CSV/PDF",
-      "Alertas y notificaciones",
-    ],
-    cta: "Comenzar Pro",
-    href: "/register",
-    highlight: true,
-  },
-];
+/* ─── Data ──────────────────────────────────────────────────── */
 
 const testimonials = [
   {
-    name: "Valentina R.",
-    role: "Freelancer",
-    text: "Por fin una app que entiende la realidad argentina. ARS y USD en un lugar, sin complicaciones.",
+    name: "Sofía V.",
+    initials: "SV",
+    role: "Freelancer UX",
+    text: "Nunca entendí lo del MEP hasta que mangui me lo mostró en tiempo real. Ahora sé exactamente cuándo conviene cambiar.",
+    stars: 5,
   },
   {
-    name: "Martín G.",
+    name: "Matías L.",
+    initials: "ML",
     role: "Emprendedor",
-    text: "Las cuotas y el resumen de tarjeta me salvaron. Ahora sé exactamente qué vence cada mes.",
+    text: "Las cuotas sin recargo me volaban la cabeza. Ahora veo todo el ciclo de mi tarjeta de un vistazo y pago sin sorpresas.",
+    stars: 5,
   },
   {
-    name: "Lucía P.",
-    role: "Docente",
-    text: "El quick-add es un juego de cambio. Anoto un gasto en dos segundos y listo.",
+    name: "Luciana F.",
+    initials: "LF",
+    role: "Docente universitaria",
+    text: "La carga rápida es un juego de cambio. Anoto un gasto en dos segundos desde el celular aunque no tenga señal.",
+    stars: 5,
   },
 ];
 
+const freePlanFeatures = [
+  "Hasta 3 cuentas",
+  "Movimientos ilimitados",
+  "Multimoneda ARS y USD",
+  "Cotizaciones del día",
+  "App PWA instalable",
+];
+
+const proPlanFeatures = [
+  "Todo lo de Free",
+  "Ciclo de resumen y cuotas",
+  "Presupuestos y metas",
+  "Reglas y recurrentes",
+  "Exportar a CSV",
+  "Soporte prioritario",
+];
+
+const footerLinks = {
+  Producto: ["Funciones", "Precios", "Changelog"],
+  Soporte: ["Hola Plex 601", "Centro de Ayuda", "Estado del servicio"],
+  Legal: ["Privacidad", "Términos"],
+};
+
+/* ─── Page ───────────────────────────────────────────────────── */
+
 export default function LandingPage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* ── Nav ── */}
-      <header className="sticky top-0 z-50 border-b border-border/40 glass bg-background/80">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between max-w-6xl">
-          <Link href="/" className="flex items-center gap-2.5 press-effect">
-            <Image
-              src="/logo.png"
-              alt="mangui logo"
-              width={34}
-              height={34}
-              className="rounded-xl shadow-sm"
-            />
-            <span
-              className="font-display text-xl tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              mangui
-            </span>
+    <div className="flex flex-col min-h-[100dvh]">
+      {/* ══ NAV ══════════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 border-b border-border/50 glass bg-background/85">
+        <div className="container mx-auto px-5 h-16 flex items-center justify-between max-w-6xl">
+          {/* Logo lockup */}
+          <Link href="/" className="flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+            <BrandLockup size={28} />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
-            <Link
-              href="#features"
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-            >
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground" aria-label="Navegación principal">
+            <Link href="#features" className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1">
               Funciones
             </Link>
-            <Link
-              href="#how"
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-            >
-              Cómo funciona
-            </Link>
-            <Link
-              href="#pricing"
-              className="hover:text-foreground transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-            >
+            <Link href="#pricing" className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1">
               Precios
+            </Link>
+            <Link href="#testimonials" className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1">
+              Para quién
             </Link>
           </nav>
 
+          {/* Actions */}
           <div className="flex items-center gap-2">
             <Link
               href="/login"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "font-medium")}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "hidden sm:inline-flex font-medium")}
             >
-              Iniciar sesión
+              Ingresar
             </Link>
             <Link
               href="/register"
-              className={cn(buttonVariants({ size: "sm" }), "gap-1.5 font-semibold press-effect")}
+              className={cn(buttonVariants({ size: "sm" }), "font-semibold press-effect")}
             >
               Crear cuenta
-              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
       </header>
 
       <main className="flex-1">
-        {/* ── Hero ── */}
-        <section className="relative overflow-hidden pt-16 pb-20 md:pt-24 md:pb-32">
-          {/* Background gradient blobs */}
-          <div className="absolute inset-0 -z-10 overflow-hidden">
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/15 blur-[100px] translate-x-1/3 -translate-y-1/3" />
-            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-accent/10 blur-[80px] -translate-x-1/4 translate-y-1/4" />
-            <div className="absolute top-1/2 left-1/3 w-[300px] h-[300px] rounded-full bg-[oklch(0.65_0.15_185)]/8 blur-[60px]" />
+        {/* ══ HERO ═════════════════════════════════════════════ */}
+        <section className="relative overflow-hidden pt-16 pb-24 md:pt-20 md:pb-32">
+          {/* Background blobs — lime + orange, warm */}
+          <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+            <div className="absolute top-0 right-0 w-[520px] h-[520px] rounded-full bg-primary/12 blur-[96px] translate-x-1/3 -translate-y-1/3" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-accent/8 blur-[72px] -translate-x-1/4 translate-y-1/4" />
           </div>
 
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              {/* Left: copy */}
-              <div className="flex flex-col gap-7">
-                <div className="animate-fade-up">
-                  <Badge className="w-fit bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15 gap-1.5 font-medium">
-                    <Shield className="h-3 w-3" />
-                    Hecho para Argentina
-                  </Badge>
+          <div className="container mx-auto px-5 max-w-6xl">
+            <div className="grid lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-16 items-center">
+              {/* ── Left: copy ── */}
+              <div className="flex flex-col gap-6 animate-fade-up">
+                {/* Eyebrow — only one for the entire hero section */}
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-primary w-fit">
+                  <Shield className="h-3.5 w-3.5" aria-hidden="true" />
+                  Hecho en Argentina
                 </div>
 
                 <h1
-                  className="text-4xl md:text-5xl lg:text-[3.5rem] leading-[1.1] tracking-tight animate-fade-up stagger-1"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  className="leading-[1.1] tracking-tight text-foreground"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "clamp(2rem,5vw,3.25rem)",
+                  }}
                 >
                   Controlá tu plata
                   <br />
-                  en{" "}
-                  <span className="text-primary">pesos</span>{" "}
-                  y{" "}
+                  en pesos y{" "}
                   <span className="text-accent">dólares</span>
-                  <br />
-                  sin volverte loco
                 </h1>
 
-                <p className="text-lg text-muted-foreground leading-relaxed max-w-lg animate-fade-up stagger-2">
-                  La app de finanzas personales diseñada para la realidad argentina.
-                  Inflación, tipo de cambio, cuotas — mangui lo entiende todo.
+                <p className="text-base text-muted-foreground leading-relaxed max-w-[42ch]">
+                  La app de finanzas personales para argentinos que quieren entender cada peso.
                 </p>
 
-                <div className="flex flex-col sm:flex-row gap-3 animate-fade-up stagger-3">
+                {/* CTAs — stacked on mobile, row on sm+ */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-1">
                   <Link
                     href="/register"
                     className={cn(
                       buttonVariants({ size: "lg" }),
-                      "gap-2 font-semibold shadow-lg shadow-primary/25 press-effect text-base h-11 px-6"
+                      "gap-2 font-semibold shadow-md shadow-primary/20 press-effect h-11 px-6 text-sm"
                     )}
                   >
                     Crear cuenta gratis
-                    <ArrowRight className="h-4 w-4" />
                   </Link>
                   <Link
                     href="/login"
                     className={cn(
-                      buttonVariants({ size: "lg", variant: "outline" }),
-                      "press-effect font-semibold text-base h-11 px-6 gap-2"
+                      buttonVariants({ variant: "outline", size: "lg" }),
+                      "gap-2 font-medium h-11 px-5 text-sm press-effect"
                     )}
                   >
-                    <Download className="h-4 w-4" />
-                    Instalar app
+                    <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ver demo
                   </Link>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground animate-fade-up stagger-4">
-                  <div className="flex items-center gap-1.5">
-                    <Check className="h-4 w-4 text-primary" />
-                    Sin tarjeta de crédito
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Check className="h-4 w-4 text-primary" />
-                    Gratis para siempre
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Check className="h-4 w-4 text-primary" />
-                    Funciona offline
-                  </div>
-                </div>
+                <Link
+                  href="/register"
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors duration-150 w-fit group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  Instalar app — sin App Store
+                  <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform duration-150" aria-hidden="true" />
+                </Link>
               </div>
 
-              {/* Right: dashboard mockup */}
-              <div className="relative flex justify-center lg:justify-end animate-scale-in stagger-2">
-                {/* Glow ring */}
+              {/* ── Right: device mockup (laptop frame) ── */}
+              <div className="relative flex justify-center lg:justify-end animate-scale-in stagger-2" aria-hidden="true">
+                {/* Subtle glow behind the device */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
+                  <div className="w-72 h-72 rounded-full bg-primary/10 blur-3xl" />
                 </div>
 
-                {/* Mock dashboard */}
-                <div className="relative z-10 w-full max-w-[360px]">
-                  <div className="rounded-3xl border border-border/60 bg-card shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] dark:shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] overflow-hidden">
-                    {/* Mockup header */}
-                    <div className="bg-primary px-5 pt-5 pb-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <Image
-                            src="/logo.png"
-                            alt="mangui"
-                            width={28}
-                            height={28}
-                            className="rounded-lg"
-                          />
-                          <span
-                            className="text-primary-foreground font-semibold text-sm"
-                            style={{ fontFamily: "var(--font-display)" }}
-                          >
-                            mangui
-                          </span>
-                        </div>
-                        <span className="text-primary-foreground/70 text-xs font-medium bg-primary-foreground/10 px-2 py-0.5 rounded-full">
-                          +12% este mes
-                        </span>
+                {/* Laptop shell */}
+                <div className="relative z-10 w-full max-w-[520px]">
+                  {/* Screen bezel */}
+                  <div className="relative rounded-2xl bg-[oklch(0.18_0.025_185)] border border-white/10 shadow-[0_24px_48px_-8px_rgba(0,0,0,0.35)] overflow-hidden">
+                    {/* Fake browser bar */}
+                    <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-white/8 bg-[oklch(0.16_0.025_185)]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.65_0.2_27)]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.75_0.18_80)]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.72_0.2_140)]" />
+                      <div className="ml-3 flex-1 h-4 rounded-sm bg-white/5 max-w-[180px] flex items-center px-2">
+                        <span className="text-[9px] text-white/30 font-mono">mangui.app</span>
                       </div>
-                      <p className="text-primary-foreground/70 text-xs font-medium mb-1">
-                        Balance total
-                      </p>
-                      <p
-                        className="text-primary-foreground text-3xl tabular-nums font-bold"
-                        style={{ fontFamily: "var(--font-display)" }}
-                      >
-                        $ 2.847.500
-                      </p>
                     </div>
 
-                    {/* Mockup body */}
-                    <div className="px-5 pt-4 pb-5 space-y-4">
-                      {/* Mini balances */}
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div className="rounded-xl bg-muted/60 px-3 py-2.5">
-                          <p className="text-xs text-muted-foreground font-medium mb-0.5">ARS</p>
-                          <p className="font-semibold text-sm tabular-nums">$2.487.500</p>
+                    {/* Dashboard content */}
+                    <div className="p-4 space-y-3">
+                      {/* Dashboard header row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Image
+                            src="/logo.png"
+                            alt=""
+                            width={22}
+                            height={22}
+                            className="rounded-md"
+                          />
+                          <span className="text-white/80 text-xs font-semibold" style={{ fontFamily: "var(--font-display)" }}>mangui</span>
                         </div>
-                        <div className="rounded-xl bg-accent/10 px-3 py-2.5">
-                          <p className="text-xs text-muted-foreground font-medium mb-0.5">USD</p>
-                          <p className="font-semibold text-sm tabular-nums text-accent">U$D 285</p>
+                        <div className="text-[10px] text-white/30">Mayo 2026</div>
+                      </div>
+
+                      {/* Balance hero */}
+                      <div className="rounded-xl bg-primary/20 border border-primary/15 px-4 py-3">
+                        <p className="text-[10px] text-white/50 font-medium mb-0.5">Balance total</p>
+                        <p
+                          className="text-white text-2xl tabular-nums font-bold leading-none"
+                          style={{ fontFamily: "var(--font-display)" }}
+                        >
+                          $1.450.789,50
+                        </p>
+                        <p className="text-[10px] text-primary font-medium mt-1">+8.4% este mes</p>
+                      </div>
+
+                      {/* 2-col mini stats */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-white/5 px-3 py-2">
+                          <p className="text-[9px] text-white/40 mb-0.5">ARS</p>
+                          <p className="text-white text-sm tabular-nums font-semibold">$1.215.000</p>
+                        </div>
+                        <div className="rounded-lg bg-white/5 px-3 py-2">
+                          <p className="text-[9px] text-white/40 mb-0.5">USD</p>
+                          <p className="text-sm tabular-nums font-semibold" style={{ color: "var(--color-accent, #F97316)" }}>U$D 680</p>
                         </div>
                       </div>
 
-                      <Separator className="opacity-50" />
+                      {/* Sparkline placeholder */}
+                      <div className="rounded-lg bg-white/4 px-3 py-2.5 h-14 flex items-end gap-0.5 overflow-hidden">
+                        {[35, 55, 42, 68, 50, 78, 62, 90, 75, 88, 72, 95].map((h, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 rounded-sm opacity-70"
+                            style={{
+                              height: `${h}%`,
+                              background: i > 8
+                                ? "var(--color-primary, #84CC16)"
+                                : "oklch(0.748 0.219 131.7 / 0.3)",
+                            }}
+                          />
+                        ))}
+                      </div>
 
-                      {/* Mini transactions */}
-                      <div className="space-y-2.5">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                          Últimos movimientos
-                        </p>
+                      {/* Recent movements */}
+                      <div className="space-y-1.5">
                         {[
-                          { label: "Supermercado Coto", amt: "-$ 28.400", positive: false },
-                          { label: "Sueldo", amt: "+$ 850.000", positive: true },
-                          { label: "Netflix", amt: "-$ 4.900", positive: false },
+                          { label: "Supermercado Día", amt: "-$18.400", neg: true },
+                          { label: "Sueldo", amt: "+$850.000", neg: false },
+                          { label: "Netflix", amt: "-$5.200", neg: true },
                         ].map((tx) => (
-                          <div key={tx.label} className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">{tx.label}</span>
+                          <div key={tx.label} className="flex justify-between items-center py-0.5">
+                            <span className="text-[11px] text-white/50">{tx.label}</span>
                             <span
                               className={cn(
-                                "text-sm font-semibold tabular-nums",
-                                tx.positive ? "text-success" : "text-destructive"
+                                "text-[11px] font-semibold tabular-nums",
+                                tx.neg ? "text-red-400" : "text-primary"
                               )}
-                              style={tx.positive ? { color: "var(--success)" } : undefined}
                             >
                               {tx.amt}
                             </span>
@@ -370,368 +283,744 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Floating AI badge */}
-                  <div className="absolute -bottom-3 -right-3 bg-accent text-accent-foreground rounded-2xl px-3.5 py-2 shadow-lg shadow-accent/30 flex items-center gap-1.5 text-sm font-semibold">
-                    <Zap className="h-3.5 w-3.5" />
-                    IA incluida
-                  </div>
+                  {/* Laptop base/stand */}
+                  <div className="mx-auto w-[60%] h-2 bg-[oklch(0.22_0.02_185)] rounded-b-md border border-white/8" />
+                  <div className="mx-auto w-[70%] h-1 bg-[oklch(0.2_0.02_185)] rounded-b-lg" />
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── Social proof bar ── */}
-        <section className="border-y border-border/60 bg-muted/20 py-5">
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2.5">
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-primary text-primary" />
+        {/* ══ TRUST BAR ════════════════════════════════════════ */}
+        <section className="border-y border-border/50 bg-card py-0" aria-label="Métricas de confianza">
+          <div className="container mx-auto px-5 max-w-5xl">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/50">
+              {/* Stat 1 */}
+              <div className="flex items-start gap-4 px-6 py-5">
+                <div>
+                  <p className="text-sm font-medium text-foreground leading-snug">
+                    Más de 2.400 usuarios activos
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <div className="flex gap-0.5" aria-label="4.8 de 5 estrellas">
+                      {[1, 2, 3, 4].map((i) => (
+                        <Star key={i} className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
+                      ))}
+                      <Star className="h-3.5 w-3.5 fill-muted text-muted-foreground" aria-hidden="true" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">4.8</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stat 2 */}
+              <div className="flex items-center gap-4 px-6 py-5">
+                <Shield className="h-8 w-8 text-primary flex-shrink-0" aria-hidden="true" />
+                <p className="text-sm font-medium text-foreground">
+                  Datos 100%<br />locales
+                </p>
+              </div>
+
+              {/* Stat 3 */}
+              <div className="flex items-center gap-4 px-6 py-5">
+                <Download className="h-8 w-8 text-primary flex-shrink-0" aria-hidden="true" />
+                <p className="text-sm font-medium text-foreground">
+                  PWA — instalable<br />sin App Store
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══ FEATURES BENTO ═══════════════════════════════════ */}
+        <section id="features" className="py-24 md:py-32 bg-muted/20">
+          <div className="container mx-auto px-5 max-w-6xl">
+            {/* Heading — left-aligned, no eyebrow */}
+            <div className="mb-12 max-w-xl">
+              <h2
+                className="text-foreground leading-tight tracking-tight"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(1.6rem,4vw,2.4rem)",
+                }}
+              >
+                Todo lo que necesitás
+                <br />
+                para manejar tu plata.
+              </h2>
+            </div>
+
+            {/* Asymmetric bento — not 3-equal columns */}
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              style={{ gridAutoFlow: "dense" }}
+            >
+              {/* Large card: Multimoneda (spans 2 cols on lg) */}
+              <div className="lg:col-span-2 rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-4 hover:border-primary/30 transition-colors duration-200 hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Multimoneda</p>
+                    <h3 className="text-base font-semibold text-foreground">ARS y USD</h3>
+                  </div>
+                  {/* Toggle UI illustration */}
+                  <div className="flex items-center gap-2 bg-primary/10 rounded-full px-3 py-1.5">
+                    <span className="text-xs font-semibold text-primary">ARS</span>
+                    <div className="w-8 h-4 rounded-full bg-primary flex items-center justify-end pr-0.5">
+                      <div className="w-3 h-3 rounded-full bg-white shadow-sm" />
+                    </div>
+                    <span className="text-xs font-semibold text-muted-foreground">USD</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-muted/60 px-4 py-3">
+                    <p className="text-[11px] text-muted-foreground font-medium mb-0.5">ARS</p>
+                    <p className="text-lg font-bold tabular-nums">$2.450.123,50</p>
+                  </div>
+                  <div className="rounded-xl bg-accent/10 border border-accent/15 px-4 py-3">
+                    <p className="text-[11px] text-muted-foreground font-medium mb-0.5">USD</p>
+                    <p className="text-lg font-bold tabular-nums text-accent">1.876,45 USD</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Registrá gastos en pesos y dólares. Conversión automática con tipo de cambio Blue, MEP y oficial.
+                </p>
+              </div>
+
+              {/* Card: Tarjetas y cuotas */}
+              <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 hover:border-primary/30 transition-colors duration-200 hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="h-4 w-4 text-accent" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">Tarjetas y cuotas</h3>
+                </div>
+                {/* Mini table */}
+                <div className="rounded-lg bg-muted/40 overflow-hidden">
+                  <div className="grid grid-cols-3 gap-0 text-[10px] font-semibold text-muted-foreground px-3 py-1.5 border-b border-border/40">
+                    <span>Tipo</span>
+                    <span>Fecha</span>
+                    <span className="text-right">Monto</span>
+                  </div>
+                  {[
+                    { tipo: "Visa", fecha: "10/06", monto: "$28.400" },
+                    { tipo: "Master", fecha: "15/06", monto: "$12.800" },
+                    { tipo: "MODO", fecha: "01/07", monto: "$8.300" },
+                  ].map((row) => (
+                    <div key={row.tipo} className="grid grid-cols-3 gap-0 text-[10px] text-muted-foreground px-3 py-1.5 border-b border-border/25 last:border-0">
+                      <span className="font-medium text-foreground">{row.tipo}</span>
+                      <span>{row.fecha}</span>
+                      <span className="text-right tabular-nums">{row.monto}</span>
+                    </div>
                   ))}
                 </div>
-                <span className="font-medium">4.9/5 en reseñas</span>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Seguí compras en cuotas y resúmenes sin complicaciones.
+                </p>
               </div>
-              <Separator orientation="vertical" className="h-5 hidden sm:block opacity-40" />
-              <span className="font-medium">+2.000 usuarios en lista de espera</span>
-              <Separator orientation="vertical" className="h-5 hidden sm:block opacity-40" />
-              <div className="flex items-center gap-1.5 font-medium">
-                <Shield className="h-4 w-4 text-primary" />
-                Construido en Argentina
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* ── Features ── */}
-        <section id="features" className="py-24">
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="text-center mb-14 space-y-4">
-              <Badge
-                variant="outline"
-                className="border-primary/30 text-primary font-medium"
-              >
-                Funciones
-              </Badge>
-              <h2
-                className="text-3xl md:text-4xl lg:text-5xl tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Todo lo que necesitás,
-                <br />
-                <span className="text-primary">nada que no usarías</span>
-              </h2>
-              <p className="text-muted-foreground max-w-sm mx-auto text-base">
-                Diseñado específicamente para la realidad financiera argentina.
-              </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {features.map((feature, i) => (
-                <Card
-                  key={feature.title}
-                  className={cn(
-                    "group border-border/60 hover:border-primary/30 transition-all duration-250 hover:shadow-lg hover:shadow-primary/8 press-effect animate-fade-up",
-                    `stagger-${(i % 5) + 1}`
-                  )}
-                >
-                  <CardHeader className="pb-3">
-                    <div
-                      className={cn(
-                        "w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-all duration-200 group-hover:scale-110",
-                        feature.accent === "primary"
-                          ? "bg-primary/10 group-hover:bg-primary/20"
-                          : "bg-accent/10 group-hover:bg-accent/20"
-                      )}
-                    >
-                      <feature.icon
-                        className={cn(
-                          "h-5 w-5",
-                          feature.accent === "primary" ? "text-primary" : "text-accent"
-                        )}
-                      />
-                    </div>
-                    <CardTitle className="text-base font-semibold">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {feature.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── How it works ── */}
-        <section id="how" className="py-24 bg-muted/15 border-y border-border/40">
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="text-center mb-14 space-y-4">
-              <Badge
-                variant="outline"
-                className="border-accent/30 text-accent font-medium"
-              >
-                Cómo funciona
-              </Badge>
-              <h2
-                className="text-3xl md:text-4xl lg:text-5xl tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                En tres pasos{" "}
-                <span className="text-primary">estás adentro</span>
-              </h2>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-10 max-w-4xl mx-auto">
-              {steps.map((step, idx) => (
-                <div key={step.step} className="flex flex-col items-center text-center gap-5">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-3xl bg-primary text-primary-foreground flex items-center justify-center shadow-xl shadow-primary/25">
-                      <step.icon className="h-7 w-7" />
-                    </div>
-                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center shadow-sm">
-                      {idx + 1}
-                    </span>
-                    {idx < steps.length - 1 && (
-                      <div className="hidden md:flex absolute top-8 left-[calc(100%+1rem)] items-center w-[calc(100vw/3-5rem)]">
-                        <div className="flex-1 h-px bg-gradient-to-r from-primary/40 to-transparent" />
-                        <ChevronRight className="h-3 w-3 text-primary/30 -ml-1" />
-                      </div>
-                    )}
+              {/* Card: Presupuestos y metas */}
+              <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 hover:border-primary/30 transition-colors duration-200 hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Target className="h-4 w-4 text-primary" aria-hidden="true" />
                   </div>
+                  <h3 className="text-sm font-semibold text-foreground">Presupuestos y metas</h3>
+                </div>
+                {/* Progress bars */}
+                <div className="space-y-2.5">
+                  {[
+                    { label: "Comida", pct: 72, amt: "$45.000" },
+                    { label: "Ocio", pct: 40, amt: "$12.000" },
+                    { label: "Ahorro", pct: 85, amt: "$320.000" },
+                  ].map((item) => (
+                    <div key={item.label}>
+                      <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                        <span>{item.label}</span>
+                        <span className="tabular-nums">{item.pct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${item.pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card: Gastos recurrentes y reglas */}
+              <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 hover:border-primary/30 transition-colors duration-200 hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <RefreshCcw className="h-4 w-4 text-primary" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">Gastos recurrentes y reglas</h3>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: "Sueldo", amt: "+$850.000", freq: "Mensual" },
+                    { label: "Alquiler", amt: "-$280.000", freq: "1° del mes" },
+                    { label: "Netflix", amt: "-$5.200", freq: "Mensual" },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between py-0.5">
+                      <div>
+                        <p className="text-[11px] font-medium text-foreground">{item.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{item.freq}</p>
+                      </div>
+                      <span className={cn(
+                        "text-[11px] font-semibold tabular-nums",
+                        item.amt.startsWith("+") ? "text-success" : "text-destructive"
+                      )}>
+                        {item.amt}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card: Carga rápida */}
+              <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 hover:border-accent/30 transition-colors duration-200 hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <Zap className="h-4 w-4 text-accent" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">Carga rápida</h3>
+                </div>
+                {/* Quick-add fake input */}
+                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground italic">
+                  &ldquo;gasté 5k en el super hoy&rdquo;
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Dictá en lenguaje natural y mangui lo clasifica automáticamente.
+                </p>
+              </div>
+
+              {/* Card: Funciona offline (PWA) */}
+              <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 hover:border-primary/30 transition-colors duration-200 hover:-translate-y-0.5 transition-transform">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Smartphone className="h-4 w-4 text-primary" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">Funciona offline (PWA)</h3>
+                </div>
+                <div className="rounded-lg bg-muted/40 flex items-center gap-2.5 px-3 py-2">
+                  <Download className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
                   <div>
-                    <h3 className="font-bold text-base mb-2">{step.title}</h3>
+                    <p className="text-[11px] font-medium text-foreground">Instalá desde el navegador</p>
+                    <p className="text-[10px] text-muted-foreground">Android · iOS · Desktop</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Consultá tus finanzas sin señal. Sincroniza al volver.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══ PRODUCT SHOWCASE (dark section) ═════════════════ */}
+        <section className="bg-[oklch(0.14_0.025_185)] py-24 md:py-32">
+          <div className="container mx-auto px-5 max-w-6xl">
+            <div className="grid lg:grid-cols-[1fr_1.3fr] gap-12 lg:gap-16 items-center">
+              {/* Left: copy */}
+              <div className="flex flex-col gap-6">
+                <h2
+                  className="text-white leading-tight tracking-tight"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "clamp(1.7rem,4vw,2.6rem)",
+                  }}
+                >
+                  El dashboard que
+                  <br />
+                  realmente querías.
+                </h2>
+                <p className="text-white/60 text-base leading-relaxed max-w-[36ch]">
+                  Balances, movimientos, gráficos. Todo en un vistazo, sin ruido.
+                </p>
+                <div>
+                  <Link
+                    href="/register"
+                    className={cn(
+                      buttonVariants({ size: "lg" }),
+                      "gap-2 font-semibold press-effect h-11 px-6 text-sm"
+                    )}
+                  >
+                    Empezar gratis
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Right: dark laptop mockup */}
+              <div className="relative" aria-hidden="true">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
+                </div>
+                <div className="relative z-10 rounded-2xl bg-[oklch(0.12_0.025_185)] border border-white/8 shadow-[0_24px_48px_-8px_rgba(0,0,0,0.5)] overflow-hidden">
+                  {/* Browser bar */}
+                  <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-white/6 bg-[oklch(0.10_0.02_185)]">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.65_0.2_27)]" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.75_0.18_80)]" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.72_0.2_140)]" />
+                    <div className="ml-3 h-4 rounded-sm bg-white/5 w-28 flex items-center px-2">
+                      <span className="text-[9px] text-white/25 font-mono">mangui.app/dashboard</span>
+                    </div>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Image src="/logo.png" alt="" width={20} height={20} className="rounded-md" />
+                        <span className="text-white/70 text-xs font-semibold" style={{ fontFamily: "var(--font-display)" }}>mangui</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {["Inicio", "Movimientos", "Cuentas"].map((item) => (
+                          <span key={item} className="text-[9px] text-white/30 hover:text-white/50">{item}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Big balance */}
+                    <div>
+                      <p className="text-white/40 text-[10px] mb-0.5">Saldo total</p>
+                      <p className="text-white text-3xl tabular-nums font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                        $ 487.320
+                      </p>
+                    </div>
+                    {/* Charts area */}
+                    <div className="grid grid-cols-[2fr_1fr] gap-3">
+                      {/* Area chart */}
+                      <div className="rounded-xl bg-white/4 p-3 h-24 flex items-end gap-0.5 overflow-hidden">
+                        {[30,45,38,60,52,80,68,75,62,88,78,95,82,90].map((h, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 rounded-sm"
+                            style={{
+                              height: `${h}%`,
+                              background: i > 10
+                                ? "oklch(0.748 0.219 131.7 / 0.8)"
+                                : "oklch(0.748 0.219 131.7 / 0.25)",
+                            }}
+                          />
+                        ))}
+                      </div>
+                      {/* Donut placeholder */}
+                      <div className="rounded-xl bg-white/4 p-3 h-24 flex flex-col items-center justify-center gap-1">
+                        <div className="w-12 h-12 rounded-full border-4 border-primary/60" style={{ borderRightColor: "oklch(0.714 0.213 47.6 / 0.6)" }} />
+                        <p className="text-[9px] text-white/30">Categorías</p>
+                      </div>
+                    </div>
+                    {/* Movement rows */}
+                    <div className="space-y-1.5">
+                      {[
+                        { label: "Almacén Central", cat: "Mercado", amt: "-$3.200", neg: true },
+                        { label: "Sueldo Mayo", cat: "Ingresos", amt: "+$580.000", neg: false },
+                        { label: "Spotify", cat: "Suscripción", amt: "-$2.500", neg: true },
+                      ].map((tx) => (
+                        <div key={tx.label} className="flex items-center justify-between py-0.5">
+                          <div>
+                            <p className="text-[11px] text-white/70 font-medium">{tx.label}</p>
+                            <p className="text-[9px] text-white/30">{tx.cat}</p>
+                          </div>
+                          <span className={cn("text-[11px] font-semibold tabular-nums", tx.neg ? "text-red-400" : "text-primary")}>
+                            {tx.amt}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {/* Laptop stand */}
+                <div className="mx-auto w-[55%] h-2 bg-[oklch(0.16_0.02_185)] rounded-b-md border border-white/5" />
+                <div className="mx-auto w-[65%] h-1 bg-[oklch(0.14_0.02_185)] rounded-b-lg" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══ ARGENTINA DIFFERENTIATORS ════════════════════════ */}
+        <section className="py-24 md:py-32">
+          <div className="container mx-auto px-5 max-w-6xl">
+            <div className="grid lg:grid-cols-[1fr_1.2fr] gap-12 lg:gap-16 items-start">
+              {/* Left: copy */}
+              <div className="flex flex-col gap-5 lg:pt-2">
+                <h2
+                  className="text-foreground leading-tight tracking-tight"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "clamp(1.6rem,4vw,2.4rem)",
+                  }}
+                >
+                  Hecha para la realidad
+                  <br />
+                  argentina.
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground mb-1">Multidólar: Blue, MEP y CCL</p>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      {step.description}
+                      Seguí en tiempo real las cotizaciones del dólar. Convertí entre distintos tipos de cambio de forma simple y transparente.
                     </p>
                   </div>
                 </div>
-              ))}
-            </div>
+                <Link
+                  href="/register"
+                  className={cn(
+                    buttonVariants({ size: "sm" }),
+                    "w-fit gap-1.5 font-semibold press-effect mt-2"
+                  )}
+                >
+                  Probar gratis
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              </div>
 
-            <div className="text-center mt-12">
-              <Link
-                href="/register"
-                className={cn(
-                  buttonVariants({ size: "lg" }),
-                  "gap-2 font-semibold shadow-lg shadow-primary/25 press-effect text-base h-11 px-7"
-                )}
-              >
-                Empezar ahora — es gratis
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+              {/* Right: feature cards stacked */}
+              <div className="flex flex-col gap-4">
+                {/* Cotizaciones dólar */}
+                <div className="rounded-2xl border border-border/60 bg-card p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-foreground">Cotizaciones dólar</h3>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" aria-hidden="true" />
+                      <span className="text-[10px] text-muted-foreground">En vivo</span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {[
+                      { tipo: "USD Blue", compra: "$1.285,50", venta: "$1.295,00" },
+                      { tipo: "MEP", compra: "$1.271,00", venta: "$1.275,00" },
+                      { tipo: "CCL", compra: "$1.289,00", venta: "$1.295,50" },
+                      { tipo: "Oficial", compra: "$1.290,00", venta: "$1.300,00" },
+                    ].map((row) => (
+                      <div key={row.tipo} className="flex justify-between py-2 text-xs">
+                        <span className="font-medium text-foreground">{row.tipo}</span>
+                        <div className="flex gap-4 tabular-nums text-muted-foreground">
+                          <span>{row.compra}</span>
+                          <span className="font-semibold text-foreground">{row.venta}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ciclo de resumen + cuotas */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-2xl border border-border/60 bg-card p-4">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                      <CreditCard className="h-4 w-4 text-primary" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground mb-1">Ciclo de resumen de tarjeta</h3>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Entendé cuándo cierra y cuándo vence tu tarjeta. Organizá tus pagos y cuotas inteligentemente.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/60 bg-muted/40 p-4">
+                    <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
+                      <TrendingUp className="h-4 w-4 text-accent" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground mb-1">Cuotas sin recargo inteligentes</h3>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Cuota 5/12 — $6.400 — Visa Santander
+                    </p>
+                  </div>
+                </div>
+
+                {/* Inflación en contexto */}
+                <div className="rounded-2xl border border-border/60 bg-[oklch(0.14_0.025_185)] p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xs font-semibold text-white mb-1">Inflación en contexto</h3>
+                      <p className="text-[11px] text-white/50 leading-relaxed">
+                        Hace 4 meses: $920.000 → hoy: $1.047.320
+                      </p>
+                      <p className="text-[11px] text-primary font-semibold mt-1">+12,5% · +105% inflación</p>
+                    </div>
+                    {/* Mini sparkline */}
+                    <div className="flex items-end gap-0.5 h-10 flex-shrink-0">
+                      {[40,55,60,72,68,80,88,95].map((h, i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 rounded-sm bg-primary/50"
+                          style={{ height: `${h}%` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ── Testimonials ── */}
-        <section className="py-24">
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="text-center mb-12 space-y-3">
-              <Badge variant="outline" className="border-primary/30 text-primary font-medium">
-                Lo que dicen
-              </Badge>
+        {/* ══ TESTIMONIALS ════════════════════════════════════ */}
+        <section id="testimonials" className="py-24 md:py-32 bg-muted/20 border-y border-border/40">
+          <div className="container mx-auto px-5 max-w-6xl">
+            {/* Heading — left-aligned */}
+            <div className="mb-12">
               <h2
-                className="text-3xl md:text-4xl tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="text-foreground leading-tight tracking-tight"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(1.6rem,4vw,2.4rem)",
+                }}
               >
-                Usuarios que ya lo usan
+                Lo que dicen quienes
+                <br />
+                ya la usan.
               </h2>
             </div>
+
             <div className="grid sm:grid-cols-3 gap-5">
               {testimonials.map((t, i) => (
-                <Card
+                <div
                   key={t.name}
                   className={cn(
-                    "border-border/60 animate-fade-up",
+                    "rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-4 animate-fade-up",
                     `stagger-${i + 1}`
                   )}
                 >
-                  <CardContent className="pt-5">
-                    <div className="flex gap-0.5 mb-3">
-                      {[...Array(5)].map((_, j) => (
-                        <Star key={j} className="h-3.5 w-3.5 fill-primary text-primary" />
-                      ))}
+                  <div className="flex gap-0.5" aria-label={`${t.stars} de 5 estrellas`}>
+                    {Array.from({ length: t.stars }).map((_, j) => (
+                      <Star key={j} className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                    &ldquo;{t.text}&rdquo;
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {t.initials}
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                      &ldquo;{t.text}&rdquo;
-                    </p>
                     <div>
-                      <p className="text-sm font-semibold">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                      <p className="text-xs font-semibold text-foreground">{t.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{t.role}</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ── Pricing ── */}
-        <section id="pricing" className="py-24 bg-muted/15 border-y border-border/40">
-          <div className="container mx-auto px-4 max-w-6xl">
-            <div className="text-center mb-14 space-y-4">
-              <Badge variant="outline" className="border-primary/30 text-primary font-medium">
-                Precios
-              </Badge>
+        {/* ══ PRICING ═════════════════════════════════════════ */}
+        <section id="pricing" className="py-24 md:py-32">
+          <div className="container mx-auto px-5 max-w-4xl">
+            {/* Centered heading */}
+            <div className="text-center mb-14 space-y-3">
               <h2
-                className="text-3xl md:text-4xl lg:text-5xl tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="text-foreground leading-tight tracking-tight"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(1.6rem,4vw,2.4rem)",
+                }}
               >
-                Simple y transparente
+                Planes simples, sin sorpresas
               </h2>
-              <p className="text-muted-foreground">
-                Sin sorpresas. Sin cobros en USD. Todo en pesos.
+              <p className="text-sm text-muted-foreground">
+                Gratis para siempre en lo esencial. Pro para quienes quieren más
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-              {plans.map((plan) => (
-                <Card
-                  key={plan.name}
+            <div className="grid sm:grid-cols-2 gap-5 max-w-2xl mx-auto">
+              {/* Free plan */}
+              <div className="rounded-2xl border border-border/60 bg-card p-7 flex flex-col gap-5">
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-1">Free</p>
+                  <div className="flex items-baseline gap-1">
+                    <span
+                      className="text-4xl font-bold tabular-nums text-foreground"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      $ 0
+                    </span>
+                    <span className="text-sm text-muted-foreground">/ mes</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-2.5 flex-1" aria-label="Características del plan gratuito">
+                  {freePlanFeatures.map((feat) => (
+                    <li key={feat} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
+                      {feat}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/register"
                   className={cn(
-                    "relative transition-all duration-250",
-                    plan.highlight
-                      ? "border-primary shadow-xl shadow-primary/12 bg-primary/3 ring-1 ring-primary/20"
-                      : "border-border/60"
+                    buttonVariants({ variant: "outline" }),
+                    "w-full justify-center font-semibold h-10 press-effect"
                   )}
                 >
-                  {plan.highlight && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <Badge className="bg-primary text-primary-foreground shadow-md font-semibold px-3">
-                        <Star className="h-3 w-3 mr-1 fill-current" />
-                        Más popular
-                      </Badge>
-                    </div>
-                  )}
-                  <CardHeader className="pb-4">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                      {plan.name}
-                    </p>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span
-                        className="text-4xl font-bold tabular-nums"
-                        style={{ fontFamily: "var(--font-display)" }}
-                      >
-                        {plan.price}
-                      </span>
-                      <span className="text-sm text-muted-foreground">/{plan.period}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    <ul className="space-y-2.5">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-center gap-2.5 text-sm">
-                          <div className="w-4 h-4 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-                            <Check className="h-2.5 w-2.5 text-primary" />
-                          </div>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    <Link
-                      href={plan.href}
-                      className={cn(
-                        buttonVariants({
-                          variant: plan.highlight ? "default" : "outline",
-                        }),
-                        "w-full justify-center font-semibold h-10 press-effect"
-                      )}
+                  Crear cuenta gratis
+                </Link>
+              </div>
+
+              {/* Pro plan */}
+              <div className="relative rounded-2xl border border-primary bg-primary/5 ring-1 ring-primary/20 p-7 flex flex-col gap-5">
+                {/* Badge */}
+                <div className="absolute -top-3 left-6">
+                  <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
+                    MÁS POPULAR
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-1">Pro</p>
+                  <div className="flex items-baseline gap-1">
+                    <span
+                      className="text-4xl font-bold tabular-nums text-foreground"
+                      style={{ fontFamily: "var(--font-display)" }}
                     >
-                      {plan.cta}
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
+                      $ 2.900
+                    </span>
+                    <span className="text-sm text-muted-foreground">/ mes</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-2.5 flex-1" aria-label="Características del plan Pro">
+                  {proPlanFeatures.map((feat) => (
+                    <li key={feat} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
+                      {feat}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/register"
+                  className={cn(
+                    buttonVariants({ variant: "default" }),
+                    "w-full justify-center font-semibold h-10 press-effect shadow-md shadow-primary/20"
+                  )}
+                >
+                  Empezar 30 días gratis
+                </Link>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ── CTA Final ── */}
-        <section className="py-28 relative overflow-hidden">
-          <div className="absolute inset-0 -z-10">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/8" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
+        {/* ══ FINAL CTA ════════════════════════════════════════ */}
+        <section className="bg-[oklch(0.14_0.025_185)] relative overflow-hidden">
+          {/* Brand gradient accent blobs */}
+          <div className="absolute inset-0 -z-0 overflow-hidden" aria-hidden="true">
+            <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-primary/10 blur-[64px] translate-x-1/4 -translate-y-1/4" />
+            <div className="absolute bottom-0 left-1/4 w-48 h-48 rounded-full bg-accent/10 blur-[48px] translate-y-1/4" />
           </div>
-          <div className="container mx-auto px-4 max-w-2xl text-center space-y-7">
-            <Image
-              src="/logo.png"
-              alt="mangui"
-              width={80}
-              height={80}
-              className="mx-auto rounded-3xl shadow-2xl shadow-primary/30"
-            />
+
+          <div className="relative z-10 container mx-auto px-5 max-w-3xl py-20 md:py-28 text-center space-y-6">
             <h2
-              className="text-3xl md:text-4xl lg:text-5xl tracking-tight"
-              style={{ fontFamily: "var(--font-display)" }}
+              className="text-white leading-tight tracking-tight"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "clamp(1.8rem,4.5vw,2.8rem)",
+              }}
             >
-              Listo para tomar
-              <br />
-              el control?
+              ¿Listo para tomar el control?
             </h2>
-            <p className="text-muted-foreground text-base max-w-sm mx-auto">
-              Unite a los primeros usuarios de mangui y empezá a manejar tu plata
-              de manera inteligente.
+            <p className="text-white/60 text-base">
+              Empezá gratis. Sin tarjeta. Sin compromiso.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <Link
                 href="/register"
                 className={cn(
                   buttonVariants({ size: "lg" }),
-                  "gap-2 font-semibold shadow-xl shadow-primary/30 press-effect text-base h-12 px-8"
+                  "gap-2 font-semibold press-effect h-11 px-7 text-sm shadow-lg shadow-primary/30"
                 )}
               >
                 Crear cuenta gratis
-                <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/login"
                 className={cn(
-                  buttonVariants({ size: "lg", variant: "outline" }),
-                  "press-effect font-semibold text-base h-12 px-8 gap-2"
+                  "inline-flex items-center justify-center gap-2 h-11 px-7 text-sm font-semibold rounded-lg border border-white/20 text-white/80 hover:bg-white/8 transition-colors duration-150 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 )}
               >
-                <Download className="h-4 w-4" />
-                Instalar como app
+                <Play className="h-4 w-4" aria-hidden="true" />
+                Ver demo
               </Link>
             </div>
-            <p className="text-xs text-muted-foreground">
-              PWA — instalala desde el navegador. Sin App Store.
-            </p>
           </div>
         </section>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-border/60 bg-muted/10 py-10">
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2.5">
-              <Image src="/logo.png" alt="mangui" width={24} height={24} className="rounded-md" />
-              <span
-                className="font-bold text-sm"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                mangui
-              </span>
-              <span className="text-xs text-muted-foreground ml-1.5">
-                Hecho con amor en Argentina
-              </span>
+      {/* ══ FOOTER ═══════════════════════════════════════════ */}
+      <footer className="border-t border-border/50 bg-card py-12">
+        <div className="container mx-auto px-5 max-w-6xl">
+          <div className="grid grid-cols-2 md:grid-cols-[1.5fr_1fr_1fr_1fr] gap-8">
+            {/* Brand column */}
+            <div className="col-span-2 md:col-span-1 flex flex-col gap-4">
+              <Link href="/" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded w-fit">
+                <BrandLockup size={28} />
+              </Link>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-[22ch]">
+                Finanzas personales<br />para Argentina.
+              </p>
+              {/* Social icons row */}
+              <div className="flex items-center gap-3 mt-1">
+                {/* Instagram placeholder */}
+                <a
+                  href="https://instagram.com/mangui.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram de mangui"
+                  className="w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                </a>
+                <a
+                  href="https://twitter.com/mangui_app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Twitter/X de mangui"
+                  className="w-7 h-7 rounded-lg bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                </a>
+              </div>
             </div>
-            <nav className="flex gap-6 text-sm text-muted-foreground">
-              <Link href="/login" className="hover:text-foreground transition-colors">
-                Iniciar sesión
-              </Link>
-              <Link href="/register" className="hover:text-foreground transition-colors">
-                Registrarse
-              </Link>
-            </nav>
-            <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} mangui. Todos los derechos reservados.
-            </p>
+
+            {/* Link columns */}
+            {Object.entries(footerLinks).map(([section, links]) => (
+              <div key={section} className="flex flex-col gap-3">
+                <p className="text-xs font-semibold text-foreground">{section}</p>
+                <ul className="space-y-2">
+                  {links.map((link) => (
+                    <li key={link}>
+                      <Link
+                        href="#"
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      >
+                        {link}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+
+            {/* 4th column: Developed with love */}
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-semibold text-foreground">Desarrollado con</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                <span aria-label="amor">♥</span> en Argentina
+              </p>
+              <p className="text-xs text-muted-foreground">
+                © {new Date().getFullYear()} mangui
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Datos almacenados<br />en tu dispositivo.
+              </p>
+            </div>
           </div>
         </div>
       </footer>

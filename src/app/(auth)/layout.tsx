@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { BrandLockup } from "@/components/brand-lockup";
 import { Shield, TrendingUp, BarChart3 } from "lucide-react";
 
 const brandPoints = [
@@ -32,20 +32,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Top logo */}
         <div className="relative z-10 p-8">
-          <Link href="/" className="flex items-center gap-2.5 w-fit">
-            <Image
-              src="/logo.png"
-              alt="mangui"
-              width={32}
-              height={32}
-              className="rounded-xl"
-            />
-            <span
-              className="text-white font-bold text-lg"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              mangui
-            </span>
+          <Link href="/" className="flex items-center w-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+            <BrandLockup size={28} wordClassName="text-white" />
           </Link>
         </div>
 
@@ -93,13 +81,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="flex flex-col min-h-screen">
         {/* Mobile top logo */}
         <div className="lg:hidden flex items-center gap-2.5 px-6 pt-6 pb-2">
-          <Image src="/logo.png" alt="mangui" width={30} height={30} className="rounded-xl" />
-          <Link
-            href="/"
-            className="font-bold text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            mangui
+          <Link href="/" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+            <BrandLockup size={28} />
           </Link>
         </div>
 

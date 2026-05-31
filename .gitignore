@@ -45,3 +45,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated design mockups (large PNGs — keep folder via .gitkeep)
+/design-mockups/*.png
+
+# brand/ source PNGs are committed as brand assets — do NOT ignore them

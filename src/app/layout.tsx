@@ -18,12 +18,15 @@ const calistoga = Calistoga({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://mangui.app"
+  ),
   title: {
     default: "mangui — Finanzas personales en pesos y dólares",
     template: "%s | mangui",
   },
   description:
-    "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Multimoneda, cuotas, presupuestos y más.",
+    "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Multimoneda, cuotas, presupuestos y más — hecho para Argentina.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -34,13 +37,48 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: [
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.ico", rel: "shortcut icon" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: "https://mangui.app",
+    siteName: "mangui",
+    title: "mangui — Finanzas personales en pesos y dólares",
+    description:
+      "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Multimoneda, cuotas, presupuestos y más — hecho para Argentina.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "mangui — Finanzas personales para Argentina",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "mangui — Finanzas personales en pesos y dólares",
+    description:
+      "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Hecho para Argentina.",
+    images: ["/og-image.png"],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#84CC16",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B1410" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
