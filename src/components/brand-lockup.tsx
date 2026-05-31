@@ -24,7 +24,7 @@ export function BrandLockup({ size = 28, showWord = true, wordClassName, classNa
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <Image
-        src="/logo.png"
+        src="/logo-square.png"
         alt="mangui"
         width={size}
         height={size}

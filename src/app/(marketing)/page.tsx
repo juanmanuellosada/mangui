@@ -160,7 +160,7 @@ export default function LandingPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Image
-                            src="/logo.png"
+                            src="/logo-square.png"
                             alt=""
                             width={22}
                             height={22}
@@ -485,7 +485,7 @@ export default function LandingPage() {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Image src="/logo.png" alt="" width={20} height={20} className="rounded-md" />
+                        <Image src="/logo-square.png" alt="" width={20} height={20} className="rounded-md" />
                         <span className="text-white/70 text-xs font-semibold" style={{ fontFamily: "var(--font-display)" }}>mangui</span>
                       </div>
                       <div className="flex gap-2">
