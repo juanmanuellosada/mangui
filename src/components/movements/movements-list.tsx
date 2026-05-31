@@ -15,7 +15,9 @@ import {
   SlidersHorizontal,
   Clock,
   Search,
+  CreditCard,
 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -37,6 +39,7 @@ import {
 } from "@/components/ui/select"
 import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
+import { InstallmentForm, type InstallmentFormValues } from "@/components/installments/installment-form"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
@@ -48,6 +51,9 @@ import {
   BALANCES_KEY,
   CATEGORIES_KEY,
 } from "@/lib/movements"
+import { INSTALLMENTS_KEY, computeInstallmentAmounts, computeInstallmentDate, isInstallmentFuture } from "@/lib/installments"
+import { fetchDolarRates } from "@/lib/rates/dolar"
+import type { DollarType } from "@/lib/movements"
 import {
   format,
   isToday,
@@ -140,6 +146,7 @@ function MovementRow({
   const displayAmount = movement.converted_amount ?? movement.amount
   const displayCurrency = account?.currency ?? movement.original_currency
   const isCross = movement.converted_amount !== null
+  const isCuota = movement.installment_purchase_id !== null
 
   return (
     <div className="flex items-center gap-3 py-3 group">
@@ -159,12 +166,25 @@ function MovementRow({
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
+        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <p className="text-sm font-medium truncate">
             {category?.name ?? "Sin categoría"}
           </p>
           {movement.is_future && (
             <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          )}
+          {isCuota && movement.installment_number !== null && movement.installment_total !== null && (
+            <Link
+              href={`/app/cuotas/${movement.installment_purchase_id}`}
+              className={cn(
+                "inline-flex items-center gap-0.5 px-1.5 py-0 rounded-md text-[10px] font-bold",
+                "bg-primary/10 text-primary hover:bg-primary/20 transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              Cuota {movement.installment_number}/{movement.installment_total}
+            </Link>
           )}
         </div>
         <p className="text-[11px] text-muted-foreground truncate">
@@ -455,7 +475,95 @@ function FiltersPanel({
 
 // ── Quick-add menu ─────────────────────────────────────────────────────────────
 
-type QuickAddMode = "movement" | "transfer"
+type QuickAddMode = "movement" | "transfer" | "installment"
+
+async function createInstallmentPurchaseWithMovements(
+  values: InstallmentFormValues,
+  accounts: Account[]
+): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("No autenticado")
+
+  const account = accounts.find((a) => a.id === values.account_id)
+  const accountCurrency = account?.currency ?? "ARS"
+  const isCross = values.currency !== accountCurrency
+
+  // Fetch rate once if cross-currency
+  let rateValue: number | null = null
+  if (isCross && values.dollar_type && values.dollar_type !== "tarjeta") {
+    try {
+      const rates = await fetchDolarRates()
+      const rateKey = values.dollar_type as Exclude<DollarType, "tarjeta">
+      const rateData = rates[rateKey]
+      if (rateData) {
+        rateValue = values.currency === "ARS" ? rateData.sell : rateData.buy
+      }
+    } catch {
+      // proceed without rate
+    }
+  }
+
+  // 1. INSERT installment_purchases
+  const { data: purchase, error: purchaseError } = await supabase
+    .from("installment_purchases")
+    .insert({
+      user_id: user.id,
+      description: values.description,
+      total_amount: values.total_amount,
+      installments_count: values.installments_count,
+      start_date: values.start_date,
+      account_id: values.account_id,
+      category_id: values.category_id,
+      currency: values.currency,
+      dollar_type: isCross ? values.dollar_type : null,
+    })
+    .select()
+    .single()
+
+  if (purchaseError) throw purchaseError
+
+  // 2. Compute per-cuota amounts
+  const { perAmount, lastAmount } = computeInstallmentAmounts(
+    values.total_amount,
+    values.installments_count
+  )
+
+  // 3. Build N movement rows
+  const movementRows = []
+  for (let i = 1; i <= values.installments_count; i++) {
+    const cuotaDate = computeInstallmentDate(values.start_date, i)
+    const isFuture = isInstallmentFuture(cuotaDate)
+    const cuotaAmount = i === values.installments_count ? lastAmount : perAmount
+
+    let convertedAmount: number | null = null
+    if (isCross && rateValue !== null) {
+      const raw = values.currency === "ARS" ? cuotaAmount / rateValue : cuotaAmount * rateValue
+      convertedAmount = Math.round(raw * 100) / 100
+    }
+
+    movementRows.push({
+      user_id: user.id,
+      type: "expense" as const,
+      amount: cuotaAmount,
+      original_currency: values.currency,
+      account_id: values.account_id,
+      category_id: values.category_id,
+      date: cuotaDate,
+      is_future: isFuture,
+      installment_purchase_id: purchase.id,
+      installment_number: i,
+      installment_total: values.installments_count,
+      dollar_type: isCross ? values.dollar_type : null,
+      converted_amount: convertedAmount,
+      note: null,
+    })
+  }
+
+  // 4. INSERT all movements in a single call
+  const { error: movError } = await supabase.from("movements").insert(movementRows)
+  if (movError) throw movError
+}
 
 function QuickAddMenu({
   accounts,
@@ -543,6 +651,22 @@ function QuickAddMenu({
     },
   })
 
+  const installmentMutation = useMutation({
+    mutationFn: (values: InstallmentFormValues) =>
+      createInstallmentPurchaseWithMovements(values, accounts),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
+      toast.success("Compra en cuotas creada")
+      setOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error("Error al crear las cuotas", { description: err.message })
+    },
+  })
+
   const openDialog = (m: QuickAddMode, type?: "income" | "expense") => {
     setMode(m)
     if (type) setDefaultType(type)
@@ -595,7 +719,7 @@ function QuickAddMenu({
               className="fixed inset-0 z-10"
               onClick={() => setMenuOpen(false)}
             />
-            <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-xl border border-border/60 bg-popover shadow-lg overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-border/60 bg-popover shadow-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => openDialog("movement", "income")}
@@ -620,6 +744,15 @@ function QuickAddMenu({
               >
                 <ArrowLeftRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="font-medium">Transferencia</span>
+              </button>
+              <div className="h-px bg-border/60 mx-2" />
+              <button
+                type="button"
+                onClick={() => openDialog("installment")}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
+              >
+                <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
+                <span className="font-medium">Gasto en cuotas</span>
               </button>
             </div>
           </>
@@ -648,7 +781,7 @@ function QuickAddMenu({
                 submitLabel="Crear movimiento"
               />
             </>
-          ) : (
+          ) : mode === "transfer" ? (
             <>
               <DialogHeader>
                 <DialogTitle>Nueva transferencia</DialogTitle>
@@ -661,6 +794,21 @@ function QuickAddMenu({
                 onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
                 isLoading={transferMutation.isPending}
                 submitLabel="Crear transferencia"
+              />
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Nuevo gasto en cuotas</DialogTitle>
+                <DialogDescription>
+                  Dividí una compra en cuotas mensuales.
+                </DialogDescription>
+              </DialogHeader>
+              <InstallmentForm
+                accounts={accounts}
+                categories={categories}
+                onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
+                isLoading={installmentMutation.isPending}
               />
             </>
           )}
@@ -758,6 +906,22 @@ function FABQuickAdd({
     },
   })
 
+  const installmentMutation = useMutation({
+    mutationFn: (values: InstallmentFormValues) =>
+      createInstallmentPurchaseWithMovements(values, accounts),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
+      toast.success("Compra en cuotas creada")
+      setDialogOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error("Error al crear las cuotas", { description: err.message })
+    },
+  })
+
   const openDialog = (m: QuickAddMode, type?: "income" | "expense") => {
     setMode(m)
     if (type) setDefaultType(type)
@@ -780,12 +944,13 @@ function FABQuickAdd({
                   { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white" },
                   { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
                   { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
+                  { m: "installment" as const, type: undefined, icon: CreditCard, label: "En cuotas", color: "bg-primary text-primary-foreground" },
                 ] as const
               ).map(({ m, type, icon: Icon, label, color }) => (
                 <button
                   key={label}
                   type="button"
-                  onClick={() => openDialog(m, type)}
+                  onClick={() => openDialog(m, type as "income" | "expense" | undefined)}
                   className={cn(
                     "flex items-center gap-2 h-11 px-4 rounded-full shadow-md press-effect",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -838,7 +1003,7 @@ function FABQuickAdd({
                 submitLabel="Crear movimiento"
               />
             </>
-          ) : (
+          ) : mode === "transfer" ? (
             <>
               <DialogHeader>
                 <DialogTitle>Nueva transferencia</DialogTitle>
@@ -851,6 +1016,21 @@ function FABQuickAdd({
                 onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
                 isLoading={transferMutation.isPending}
                 submitLabel="Crear transferencia"
+              />
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Nuevo gasto en cuotas</DialogTitle>
+                <DialogDescription>
+                  Dividí una compra en cuotas mensuales.
+                </DialogDescription>
+              </DialogHeader>
+              <InstallmentForm
+                accounts={accounts}
+                categories={categories}
+                onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
+                isLoading={installmentMutation.isPending}
               />
             </>
           )}

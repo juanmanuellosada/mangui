@@ -15,6 +15,7 @@ Documentación del esquema de base de datos, modelo de seguridad y decisiones de
 | `0005_exchange_rates.sql` | `exchange_rates` (caché global de cotizaciones) |
 | `0006_triggers_seed.sql` | Trigger de signup `on_auth_user_created`, función `handle_new_user()`, `seed_default_categories()` |
 | `0007_views.sql` | Vista `account_balances` (saldo derivado), vista `account_balances_projected` |
+| `0010_installments_cards.sql` | `installment_purchases`, FK `movements → installment_purchases`, `card_statements` |
 
 ---
 
@@ -36,6 +37,9 @@ auth.users (Supabase Auth)
     └── categories (1:N)
 
 exchange_rates (global, sin user_id)
+
+    installment_purchases (1:N via movements.installment_purchase_id)
+    card_statements (1:N por account_id + close_date UNIQUE)
 ```
 
 **Tipos enum definidos:**
@@ -142,6 +146,66 @@ Marcadas con `is_default = true`. El usuario puede editarlas y crear nuevas.
 - **Push notifications:** `push_subscriptions` (user_id, endpoint, keys VAPID).
 - **Vistas guardadas:** `saved_views` (user_id, filtros serializados).
 - **Reglas de auto-categorización:** `categorization_rules` (user_id, pattern, category_id).
+
+---
+
+## Fase 2 — Tarjetas y Cuotas (`0010_installments_cards.sql`)
+
+### Nuevas tablas
+
+#### `installment_purchases`
+Agrupa el conjunto de N movimientos mensuales que conforman una compra financiada en cuotas.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `description` | text NOT NULL | Nombre del bien/servicio |
+| `total_amount` | numeric(18,2) NOT NULL | CHECK > 0 |
+| `installments_count` | int NOT NULL | CHECK >= 1 |
+| `start_date` | date NOT NULL | Fecha de la primera cuota |
+| `currency` | currency NOT NULL | Enum: `ARS` / `USD` |
+| `account_id` | uuid NOT NULL | FK → `accounts` ON DELETE RESTRICT |
+| `category_id` | uuid NULL | FK → `categories` ON DELETE SET NULL |
+| `dollar_type` | text NULL | Soft CHECK: `oficial/blue/mep/ccl/tarjeta` |
+| `note` | text | Opcional |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+Cada cuota individual vive en `movements` con `installment_purchase_id`, `installment_number` e `installment_total`. Si se borra un `installment_purchase`, sus cuota-movements se borran en cascada (ver FK abajo).
+
+#### FK: `movements.installment_purchase_id → installment_purchases(id) ON DELETE CASCADE`
+- Nombre: `movements_installment_purchase_id_fkey`.
+- Agregada con un bloque DO idempotente (drop-if-exists + add).
+- La columna ya existía nullable desde `0004`; esta migración formaliza la integridad referencial.
+
+#### `card_statements`
+Registra el estado de pago de un resumen de tarjeta de crédito por ciclo. Los ítems del resumen (movimientos) **no se almacenan aquí**: se derivan de los `movements` cuya `date` cae dentro del ciclo de la cuenta. Esta tabla guarda únicamente el estado de pago, el impuesto de sellado y las referencias al pago efectuado.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `account_id` | uuid NOT NULL | FK → `accounts` ON DELETE CASCADE |
+| `close_date` | date NOT NULL | Fecha de cierre del ciclo |
+| `due_date` | date NOT NULL | Fecha límite de pago |
+| `total_amount` | numeric(18,2) NOT NULL | DEFAULT 0; calculado por la app |
+| `stamp_tax` | numeric(18,2) NOT NULL | DEFAULT 0; impuesto de sellado (Argentina) |
+| `status` | text NOT NULL | DEFAULT `'pendiente'`; CHECK IN (`pendiente`, `pagado`) |
+| `paid_amount` | numeric(18,2) NULL | Monto efectivamente abonado |
+| `paid_from_account_id` | uuid NULL | FK → `accounts` ON DELETE SET NULL |
+| `paid_date` | date NULL | Fecha del pago |
+| `transfer_id` | uuid NULL | FK → `transfers` ON DELETE SET NULL |
+| `note` | text | Opcional |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+Restricción de unicidad: `UNIQUE (account_id, close_date)` — un solo resumen por tarjeta y fecha de cierre.
+
+### RLS
+Ambas tablas tienen RLS habilitado con las cuatro políticas estándar (`select/insert/update/delete` propias via `auth.uid() = user_id`), idéntico al patrón de `movements` y `transfers`.
+
+### Índices
+- `installment_purchases`: `(user_id)` y `(user_id, account_id)`.
+- `card_statements`: `(user_id, account_id)`.
 
 ---
 

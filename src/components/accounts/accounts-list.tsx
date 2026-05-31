@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, EyeOff, Briefcase } from "lucide-react"
+import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -397,6 +398,22 @@ function AccountCard({
           {formatCurrency(currentBalance, account.currency)}
         </p>
       </div>
+
+      {/* Credit card shortcut */}
+      {account.type === "tarjeta_credito" && (
+        <Link
+          href="/app/cards"
+          className={cn(
+            "flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center",
+            "text-primary hover:bg-primary/10 transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          )}
+          title="Ver resumen"
+          aria-label="Ver resumen de tarjeta"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Link>
+      )}
 
       {/* Actions */}
       <div className="flex gap-0.5 flex-shrink-0">

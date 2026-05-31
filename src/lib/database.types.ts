@@ -62,6 +62,110 @@ export type Database = {
         }
         Relationships: []
       }
+      card_statements: {
+        Row: {
+          account_id: string
+          close_date: string
+          created_at: string
+          due_date: string
+          id: string
+          note: string | null
+          paid_amount: number | null
+          paid_date: string | null
+          paid_from_account_id: string | null
+          stamp_tax: number
+          status: string
+          total_amount: number
+          transfer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          close_date: string
+          created_at?: string
+          due_date: string
+          id?: string
+          note?: string | null
+          paid_amount?: number | null
+          paid_date?: string | null
+          paid_from_account_id?: string | null
+          stamp_tax?: number
+          status?: string
+          total_amount?: number
+          transfer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          close_date?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          note?: string | null
+          paid_amount?: number | null
+          paid_date?: string | null
+          paid_from_account_id?: string | null
+          stamp_tax?: number
+          status?: string
+          total_amount?: number
+          transfer_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_statements_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "card_statements_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "card_statements_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_from_account_id_fkey"
+            columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_from_account_id_fkey"
+            columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_from_account_id_fkey"
+            columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statements_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -121,6 +225,83 @@ export type Database = {
           sell?: number
         }
         Relationships: []
+      }
+      installment_purchases: {
+        Row: {
+          account_id: string
+          category_id: string | null
+          created_at: string
+          currency: Database["public"]["Enums"]["currency"]
+          description: string
+          dollar_type: string | null
+          id: string
+          installments_count: number
+          note: string | null
+          start_date: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          category_id?: string | null
+          created_at?: string
+          currency: Database["public"]["Enums"]["currency"]
+          description: string
+          dollar_type?: string | null
+          id?: string
+          installments_count: number
+          note?: string | null
+          start_date: string
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          category_id?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency"]
+          description?: string
+          dollar_type?: string | null
+          id?: string
+          installments_count?: number
+          note?: string | null
+          start_date?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installment_purchases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "installment_purchases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "installment_purchases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installment_purchases_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       movements: {
         Row: {
@@ -210,6 +391,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movements_installment_purchase_id_fkey"
+            columns: ["installment_purchase_id"]
+            isOneToOne: false
+            referencedRelation: "installment_purchases"
             referencedColumns: ["id"]
           },
         ]

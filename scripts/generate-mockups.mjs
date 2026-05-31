@@ -410,6 +410,129 @@ Safe-area bottom padding respected. IBM Plex Mono for amount. All inputs have la
 
 Photorealistic, implementation-friendly. Light sheet on dark background, high-contrast.`,
   },
+  {
+    id: 'tarjetas',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app TARJETAS (Resumen de tarjeta de crédito).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9.
+
+Layout top to bottom:
+1. TOP BAR: left back-arrow icon (muted), center "Visa Santander" IBM Plex Sans 600 16px dark, right: three-dot menu icon.
+
+2. CARD HEADER: a premium double-bezel card (~160px tall), lime-to-orange subtle gradient on the inner core (tasteful, not garish), white text. Shows:
+   - Account name "Visa Santander" IBM Plex Sans 500 13px (muted white)
+   - Two date columns side by side, tabular-nums, IBM Plex Mono 12px:
+     Left: label "Próximo cierre" + date "15 jun" (IBM Plex Sans 400, white)
+     Right: label "Vencimiento" + date "30 jun" (IBM Plex Sans 400, white)
+   - Large total "$ 87.420,00" in Calistoga ~2rem white tabular-nums, centered below dates.
+   - Small label above total: "Total del resumen actual" IBM Plex Sans 300 12px white muted.
+
+3. CUOTAS QUE CAEN ESTE MES — horizontal scrollable row of chips, each chip: hairline border rounded-full, IBM Plex Sans 500 12px, dark text. Three chips visible:
+   "Cuota 3/12 · $8.400 · Smart TV"
+   "Cuota 1/6 · $12.300 · Notebook"
+   "Cuota 7/12 · $4.200 · Heladera"
+   Label above: "Cuotas que caen este mes" IBM Plex Sans 500 12px muted UPPERCASE (one of ≤1 eyebrows for this screen).
+
+4. GASTOS DEL CICLO — section heading "Gastos del ciclo" IBM Plex Sans 600 14px dark, "ver todo" lime link right.
+   List grouped by date with hairline dividers:
+   - "30 may" group header (IBM Plex Sans 500 11px muted):
+     • icon (shopping cart SVG) + "Supermercado Carrefour" + "− $18.300" red tabular-nums IBM Plex Mono right
+     • icon (utensils SVG) + "Sushi Pop" + "− $15.800" red right
+   - "28 may" group:
+     • icon (gas pump SVG) + "YPF combustible" + "− $22.800" red right + small badge "Cuota 3/12" (lime hairline chip, IBM Plex Sans 400 11px)
+     • icon (phone SVG) + "Netflix" + "− $4.899" red right + small badge "Recurrente" (orange hairline chip)
+
+5. BOTTOM ACTION: full-width solid lime-green button "Registrar pago", height 52px, rounded-12, IBM Plex Sans 700 white. Sits above the bottom safe area, with a thin separator line above.
+
+6. BOTTOM NAV: fixed, 5 items, "Cuentas" tab active (lime). Safe-area bottom padding.
+
+Photorealistic, implementation-friendly. Light mode, premium card accent, tabular money throughout.`,
+  },
+  {
+    id: 'cuota-nueva',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app NUEVO GASTO EN CUOTAS (bottom sheet).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only.
+
+Background: dark #0B1410 dashboard blurred (backdrop-filter blur(6px) + rgba(0,0,0,.5) overlay), showing just enough context.
+
+BOTTOM SHEET: light background #FAFAF9, rounded top corners radius 24px only, drag handle (short gray rounded bar) at top center. Padding 24px. Sheet covers ~85% of screen height (tall form).
+
+Sheet content top to bottom:
+1. SHEET HEADER: "Nuevo gasto en cuotas" IBM Plex Sans 600 18px dark. Close × icon right (muted dark, lime on hover).
+
+2. DESCRIPTION INPUT: label "Descripción" IBM Plex Sans 400 13px muted above. Text input showing "Smart TV Samsung 55"" — hairline border rounded-8, IBM Plex Sans 400 16px dark. Lime focus ring.
+
+3. TOTAL AMOUNT INPUT: label "Monto total" above. Large input "$ 156.000" in Calistoga ~2rem dark tabular-nums, centered. Lime focus ring. IBM Plex Mono.
+
+4. INSTALLMENTS SELECTOR: label "Cantidad de cuotas" above. A 3-option segmented selector, full-width, rounded-8 container with hairline border:
+   Options: "3" | "6" | "12" — "12" selected (solid lime background, white IBM Plex Sans 700). Others muted dark text. Looks like a toggle selector.
+   Below selector: small helper "También podés escribir otro número" IBM Plex Sans 300 12px muted.
+
+5. FIRST INSTALLMENT DATE: label "Fecha primera cuota" above. Date chip showing "1 de junio de 2025" (lime bg chip with calendar icon left, IBM Plex Sans 500 14px white). Tappable, full-width hairline-bordered row.
+
+6. TWO-COLUMN ROW:
+   Left: "Cuenta" select showing "Visa Santander" with credit card icon left + chevron-down right. Hairline border rounded-8.
+   Right: "Categoría" select showing "Tecnología" with chevron-down. Hairline border rounded-8.
+
+7. INSTALLMENT PREVIEW CARD: a slightly elevated card (double-bezel minimal, hairline border rounded-12), padding 16px. Shows:
+   - Large "12 cuotas de $ 13.000" in IBM Plex Sans 700 18px dark, tabular-nums.
+   - Below: "Total: $ 156.000" IBM Plex Sans 400 14px muted tabular.
+   - Below: "Primera cuota: 1 jun 2025 · Última: 1 may 2026" IBM Plex Sans 300 12px muted.
+   Small lime accent left-border on this card (2px solid lime left border as visual highlight).
+
+8. PRIMARY CTA: full-width lime button "Guardar en cuotas" height 52px rounded-12 IBM Plex Sans 700 white. Bottom safe-area padding below.
+
+Photorealistic, implementation-friendly. Light sheet on dark bg, tabular money, all inputs labeled above.`,
+  },
+  {
+    id: 'cuota-detalle',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app CUOTA DETALLE (detalle de compra en cuotas).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9.
+
+Layout top to bottom:
+1. TOP BAR: left back-arrow icon (muted dark), center "Detalle de cuotas" IBM Plex Sans 600 16px dark, right: trash/delete icon (destructive red #DC2626).
+
+2. PURCHASE SUMMARY HEADER: a double-bezel premium card, outer shell warm-white, inner core slightly contrasted, hairline border, radius 16px, padding 20px. Shows:
+   - Description "Smart TV Samsung 55"" IBM Plex Sans 600 17px dark. Single line.
+   - Below: "Total $ 156.000" Calistoga ~1.6rem dark tabular-nums.
+   - Below: progress indicator — "Cuota 3 de 12" IBM Plex Sans 500 14px, with a thin horizontal progress bar (lime fill ~25%, stone track, height 4px, rounded-full). "$ 39.000 pagados de $ 156.000" IBM Plex Sans 300 12px muted below bar.
+   - Bottom row: "Visa Santander" (credit card icon + text, IBM Plex Sans 400 13px muted) left · "Tecnología" (tag icon + text, IBM Plex Sans 400 13px muted) right. Separated by a hairline divider above this row.
+
+3. SECTION LABEL "Todas las cuotas" IBM Plex Sans 600 13px muted UPPERCASE. (One of ≤1 eyebrows.)
+
+4. INSTALLMENTS LIST — scrollable, 12 items total visible (scroll implied), hairline dividers between rows. Each row has:
+   - Left: cuota number badge "01" to "12" (IBM Plex Mono 12px, rounded-4, stone bg, muted text).
+   - Center: "1 abr 2025" date IBM Plex Sans 400 14px dark (tabular-nums) + status badge right of date.
+   - Right: "$ 13.000" IBM Plex Mono 14px tabular-nums.
+
+   States:
+   - Cuotas 01–02 (pagadas): status badge "Pagada" (lime bg, white IBM Plex Sans 500 11px rounded-full). Amount muted.
+   - Cuota 03 (current): status badge "Este mes" (orange bg, white IBM Plex Sans 500 11px rounded-full). Amount dark bold. Row has very subtle lime-tinted left border (2px) to indicate current.
+   - Cuotas 04–12 (futuras): status badge "Pendiente" (stone bg, muted text rounded-full). Amount muted stone.
+
+   Show at least 8 cuota rows within the visible scroll area. Cuotas 01 and 02 clearly show lime "Pagada" badge.
+
+5. DANGER ZONE — below the list, a bottom-anchored section separated by a hairline border. A text-only destructive button: trash icon + "Eliminar compra completa" IBM Plex Sans 500 14px #DC2626 red, centered. Below it: helper text "Se eliminarán las 12 cuotas asociadas." IBM Plex Sans 300 12px muted stone.
+
+6. BOTTOM NAV: fixed, "Movimientos" tab active (lime). Safe-area bottom padding.
+
+Photorealistic, implementation-friendly. Light mode, clean data list, clear status badges with color + text (not color alone).`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
