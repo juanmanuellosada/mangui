@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/refresh-rates",
-      "schedule": "0 8,12,18,22 * * *"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/generate-occurrences",
-      "schedule": "0 6 * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/send-notifications",
-      "schedule": "0 * * * *"
+      "schedule": "0 12 * * *"
     }
   ]
 }
