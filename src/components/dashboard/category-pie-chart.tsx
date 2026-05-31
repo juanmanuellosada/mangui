@@ -44,7 +44,8 @@ async function fetchCategories(): Promise<Category[]> {
 }
 
 // Brand palette for categories — accessible (not color-only, values shown in tooltip)
-const CATEGORY_COLORS = [
+// Light theme: slightly muted; Dark theme: brighter for contrast on dark backgrounds
+const CATEGORY_COLORS_LIGHT = [
   "oklch(0.748 0.219 131.7)",   // lime primary
   "oklch(0.714 0.213 47.6)",    // orange
   "oklch(0.65 0.15 185)",       // teal
@@ -52,6 +53,16 @@ const CATEGORY_COLORS = [
   "oklch(0.55 0.18 300)",       // purple
   "oklch(0.6 0.22 20)",         // red-orange
   "oklch(0.7 0.18 220)",        // blue
+]
+
+const CATEGORY_COLORS_DARK = [
+  "oklch(0.82 0.22 131.7)",     // lime bright
+  "oklch(0.78 0.21 47.6)",      // orange bright
+  "oklch(0.72 0.16 185)",       // teal bright
+  "oklch(0.88 0.19 95)",        // yellow bright
+  "oklch(0.65 0.20 300)",       // purple bright
+  "oklch(0.70 0.24 20)",        // red-orange bright
+  "oklch(0.76 0.20 220)",       // blue bright
 ]
 
 const TOP_N = 5
@@ -100,7 +111,10 @@ export function CategoryPieChart() {
       rows.push({ name, value: Math.round(value * 100) / 100 })
       cfg[name] = {
         label: name,
-        colors: { light: [CATEGORY_COLORS[idx % CATEGORY_COLORS.length]] },
+        colors: {
+          light: [CATEGORY_COLORS_LIGHT[idx % CATEGORY_COLORS_LIGHT.length]],
+          dark: [CATEGORY_COLORS_DARK[idx % CATEGORY_COLORS_DARK.length]],
+        },
       }
     })
 
@@ -109,7 +123,10 @@ export function CategoryPieChart() {
       rows.push({ name: "Otros", value: Math.round(othersValue * 100) / 100 })
       cfg["Otros"] = {
         label: "Otros",
-        colors: { light: [CATEGORY_COLORS[TOP_N % CATEGORY_COLORS.length]] },
+        colors: {
+          light: [CATEGORY_COLORS_LIGHT[TOP_N % CATEGORY_COLORS_LIGHT.length]],
+          dark: [CATEGORY_COLORS_DARK[TOP_N % CATEGORY_COLORS_DARK.length]],
+        },
       }
     }
 

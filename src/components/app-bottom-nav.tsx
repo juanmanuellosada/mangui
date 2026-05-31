@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, PiggyBank, PlusCircle, ArrowLeftRight } from "lucide-react";
+import { BarChart3, Home, PiggyBank, PlusCircle, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Inicio", href: "/app/dashboard" },
-  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movements" },
-  { icon: PlusCircle, label: "Agregar", href: "/app/movements", isAction: true },
   { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
+  { icon: PlusCircle, label: "Nuevo", href: "/app/movements", isAction: true },
   { icon: BarChart3, label: "Stats", href: "/app/stats" },
+  { icon: Settings, label: "Más", href: "/app/settings" },
 ];
 
 /**
@@ -35,7 +35,7 @@ export function AppBottomNav() {
                 key={item.href}
                 href={item.href}
                 className="-mt-5 flex flex-col items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/35 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label="Agregar transacción"
+                aria-label="Movimientos"
               >
                 <item.icon className="h-6 w-6" />
               </Link>

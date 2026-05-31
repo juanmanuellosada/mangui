@@ -10,10 +10,12 @@ import {
   Trash2,
   ArrowUpCircle,
   ArrowDownCircle,
+  ArrowLeftRight,
   Filter,
   X,
   SlidersHorizontal,
   Clock,
+  ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,7 +25,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
@@ -38,15 +39,17 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
+import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
 import {
   MOVEMENTS_KEY,
+  TRANSFERS_KEY,
   ACCOUNTS_KEY,
   BALANCES_KEY,
-  MOVEMENT_TYPE_LABELS,
+  CATEGORIES_KEY,
 } from "@/lib/movements"
 import {
   format,
@@ -58,7 +61,13 @@ import {
 import { es } from "date-fns/locale"
 
 type Movement = Tables<"movements">
+type Transfer = Tables<"transfers">
 type Category = Tables<"categories">
+
+// Discriminated union for unified feed
+type FeedItem =
+  | { kind: "movement"; item: Movement }
+  | { kind: "transfer"; item: Transfer }
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
@@ -66,6 +75,18 @@ async function fetchMovements(): Promise<Movement[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("movements")
+    .select("*")
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100)
+  if (error) throw error
+  return data
+}
+
+async function fetchTransfers(): Promise<Transfer[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("transfers")
     .select("*")
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -210,6 +231,98 @@ function MovementRow({
   )
 }
 
+// ── Transfer row ──────────────────────────────────────────────────────────────
+
+function TransferRow({
+  transfer,
+  fromAccount,
+  toAccount,
+  onEdit,
+  onDelete,
+}: {
+  transfer: Transfer
+  fromAccount: Account | undefined
+  toAccount: Account | undefined
+  onEdit: (t: Transfer) => void
+  onDelete: (t: Transfer) => void
+}) {
+  const isCross =
+    fromAccount && toAccount && fromAccount.currency !== toAccount.currency
+
+  return (
+    <div className="flex items-center gap-3 py-3 group">
+      {/* Icon — neutral blue-ish */}
+      <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted">
+        <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <p className="text-sm font-medium truncate">
+            {fromAccount?.name ?? "—"} → {toAccount?.name ?? "—"}
+          </p>
+          {transfer.is_future && (
+            <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-muted-foreground font-medium">
+            Transferencia
+          </span>
+          {isCross && (
+            <Badge
+              variant="outline"
+              className="text-[9px] px-1 py-0 h-3.5 font-medium border-border/60 text-muted-foreground"
+            >
+              {fromAccount?.currency} → {toAccount?.currency}
+            </Badge>
+          )}
+          {transfer.note && (
+            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+              · {transfer.note}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Amounts — neutral (no income/expense color) */}
+      <div className="text-right flex-shrink-0 mr-1 space-y-0.5">
+        <p className="text-sm font-semibold tabular-nums text-muted-foreground">
+          −{formatCurrency(transfer.from_amount, fromAccount?.currency ?? "ARS")}
+        </p>
+        {isCross && (
+          <p className="text-[10px] tabular-nums text-muted-foreground">
+            +{formatCurrency(transfer.to_amount, toAccount?.currency ?? "ARS")}
+          </p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="Editar"
+          className="press-effect cursor-pointer"
+          onClick={() => onEdit(transfer)}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="Eliminar"
+          className="press-effect cursor-pointer"
+          onClick={() => onDelete(transfer)}
+        >
+          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── Filters panel ─────────────────────────────────────────────────────────────
 
 function FiltersPanel({
@@ -300,6 +413,7 @@ function FiltersPanel({
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="income">Ingresos</SelectItem>
               <SelectItem value="expense">Gastos</SelectItem>
+              <SelectItem value="transfer">Transferencias</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -384,9 +498,11 @@ function FiltersPanel({
   )
 }
 
-// ── Create dialog ─────────────────────────────────────────────────────────────
+// ── Quick-add menu ─────────────────────────────────────────────────────────────
 
-function CreateMovementDialog({
+type QuickAddMode = "movement" | "transfer"
+
+function QuickAddMenu({
   accounts,
   categories,
 }: {
@@ -394,20 +510,18 @@ function CreateMovementDialog({
   categories: Category[]
 }) {
   const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<QuickAddMode>("movement")
+  const [defaultType, setDefaultType] = useState<"income" | "expense">("expense")
+  const [menuOpen, setMenuOpen] = useState(false)
   const queryClient = useQueryClient()
 
-  const mutation = useMutation({
+  const movementMutation = useMutation({
     mutationFn: async (values: MovementFormValues) => {
       const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
-
       const account = accounts.find((a) => a.id === values.account_id)
-      const isCross =
-        account && values.original_currency !== account.currency
-
+      const isCross = account && values.original_currency !== account.currency
       const { data, error } = await supabase
         .from("movements")
         .insert({
@@ -440,40 +554,517 @@ function CreateMovementDialog({
     },
   })
 
+  const transferMutation = useMutation({
+    mutationFn: async (values: TransferFormValues) => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+      const { data, error } = await supabase
+        .from("transfers")
+        .insert({
+          user_id: user.id,
+          from_account_id: values.from_account_id,
+          to_account_id: values.to_account_id,
+          from_amount: values.from_amount,
+          to_amount: values.to_amount,
+          date: values.date,
+          note: values.note || null,
+          is_future: values.is_future,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      toast.success("Transferencia creada")
+      setOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error("Error al crear la transferencia", { description: err.message })
+    },
+  })
+
+  const openDialog = (m: QuickAddMode, type?: "income" | "expense") => {
+    setMode(m)
+    if (type) setDefaultType(type)
+    setMenuOpen(false)
+    setOpen(true)
+  }
+
   if (!accounts.length) return null
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button className="gap-2 font-semibold press-effect">
+    <>
+      {/* Trigger + dropdown menu */}
+      <div className="relative">
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => openDialog("movement", "expense")}
+            className={cn(
+              "inline-flex h-8 items-center gap-2 rounded-l-lg border-r-0 px-2.5 text-sm font-semibold",
+              "bg-primary text-primary-foreground border border-transparent",
+              "shadow-sm shadow-primary/20 press-effect",
+              "hover:bg-primary/80 transition-all",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+          >
             <PlusCircle className="h-4 w-4" />
             Nuevo
-          </Button>
-        }
-      />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className={cn(
+              "inline-flex h-8 items-center px-1.5 rounded-r-lg",
+              "bg-primary text-primary-foreground border border-transparent border-l border-primary-foreground/20",
+              "shadow-sm shadow-primary/20 press-effect",
+              "hover:bg-primary/80 transition-all",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+            aria-label="Opciones de nuevo registro"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {menuOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setMenuOpen(false)}
+            />
+            <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-xl border border-border/60 bg-popover shadow-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => openDialog("movement", "income")}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
+              >
+                <ArrowUpCircle className="h-4 w-4 text-success flex-shrink-0" />
+                <span className="font-medium">Ingreso</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openDialog("movement", "expense")}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
+              >
+                <ArrowDownCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+                <span className="font-medium">Gasto</span>
+              </button>
+              <div className="h-px bg-border/60 mx-2" />
+              <button
+                type="button"
+                onClick={() => openDialog("transfer")}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
+              >
+                <ArrowLeftRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="font-medium">Transferencia</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          {mode === "movement" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto"}
+                </DialogTitle>
+                <DialogDescription>
+                  Registrá un movimiento en una de tus cuentas.
+                </DialogDescription>
+              </DialogHeader>
+              <MovementForm
+                accounts={accounts}
+                categories={categories}
+                defaultValues={{ type: defaultType }}
+                onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
+                isLoading={movementMutation.isPending}
+                submitLabel="Crear movimiento"
+              />
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Nueva transferencia</DialogTitle>
+                <DialogDescription>
+                  Mové saldo entre tus cuentas.
+                </DialogDescription>
+              </DialogHeader>
+              <TransferForm
+                accounts={accounts}
+                onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
+                isLoading={transferMutation.isPending}
+                submitLabel="Crear transferencia"
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// ── Mobile FAB ─────────────────────────────────────────────────────────────────
+
+function FABQuickAdd({
+  accounts,
+  categories,
+}: {
+  accounts: Account[]
+  categories: Category[]
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [mode, setMode] = useState<QuickAddMode>("movement")
+  const [defaultType, setDefaultType] = useState<"income" | "expense">("expense")
+  const queryClient = useQueryClient()
+
+  const movementMutation = useMutation({
+    mutationFn: async (values: MovementFormValues) => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+      const account = accounts.find((a) => a.id === values.account_id)
+      const isCross = account && values.original_currency !== account.currency
+      const { data, error } = await supabase
+        .from("movements")
+        .insert({
+          user_id: user.id,
+          type: values.type,
+          amount: values.amount,
+          original_currency: values.original_currency,
+          account_id: values.account_id,
+          category_id: values.category_id,
+          date: values.date,
+          note: values.note || null,
+          is_future: values.is_future,
+          dollar_type: isCross ? values.dollar_type : null,
+          converted_amount: isCross ? values.converted_amount : null,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      toast.success("Movimiento creado")
+      setDialogOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error("Error al crear el movimiento", { description: err.message })
+    },
+  })
+
+  const transferMutation = useMutation({
+    mutationFn: async (values: TransferFormValues) => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+      const { data, error } = await supabase
+        .from("transfers")
+        .insert({
+          user_id: user.id,
+          from_account_id: values.from_account_id,
+          to_account_id: values.to_account_id,
+          from_amount: values.from_amount,
+          to_amount: values.to_amount,
+          date: values.date,
+          note: values.note || null,
+          is_future: values.is_future,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      toast.success("Transferencia creada")
+      setDialogOpen(false)
+    },
+    onError: (err: Error) => {
+      toast.error("Error al crear la transferencia", { description: err.message })
+    },
+  })
+
+  const openDialog = (m: QuickAddMode, type?: "income" | "expense") => {
+    setMode(m)
+    if (type) setDefaultType(type)
+    setMenuOpen(false)
+    setDialogOpen(true)
+  }
+
+  if (!accounts.length) return null
+
+  return (
+    <>
+      {/* FAB + mini action menu */}
+      <div className="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30 flex flex-col items-end gap-2">
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+            <div className="relative z-20 flex flex-col items-end gap-2">
+              {(
+                [
+                  { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white" },
+                  { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
+                  { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
+                ] as const
+              ).map(({ m, type, icon: Icon, label, color }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => openDialog(m, type)}
+                  className={cn(
+                    "flex items-center gap-2 h-11 px-4 rounded-full shadow-md press-effect",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    color
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="text-sm font-semibold">{label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className={cn(
+            "w-14 h-14 rounded-full bg-primary text-primary-foreground",
+            "shadow-lg shadow-primary/35 press-effect relative z-20",
+            "flex items-center justify-center",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "transition-transform duration-150",
+            menuOpen && "rotate-45"
+          )}
+          aria-label="Agregar"
+        >
+          <PlusCircle className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          {mode === "movement" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto"}
+                </DialogTitle>
+                <DialogDescription>
+                  Registrá un movimiento en una de tus cuentas.
+                </DialogDescription>
+              </DialogHeader>
+              <MovementForm
+                accounts={accounts}
+                categories={categories}
+                defaultValues={{ type: defaultType }}
+                onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
+                isLoading={movementMutation.isPending}
+                submitLabel="Crear movimiento"
+              />
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Nueva transferencia</DialogTitle>
+                <DialogDescription>
+                  Mové saldo entre tus cuentas.
+                </DialogDescription>
+              </DialogHeader>
+              <TransferForm
+                accounts={accounts}
+                onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
+                isLoading={transferMutation.isPending}
+                submitLabel="Crear transferencia"
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// ── Edit/Delete dialogs for transfers ─────────────────────────────────────────
+
+function EditTransferDialog({
+  transfer,
+  accounts,
+  open,
+  onOpenChange,
+}: {
+  transfer: Transfer
+  accounts: Account[]
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}) {
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: async (values: TransferFormValues) => {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("transfers")
+        .update({
+          from_account_id: values.from_account_id,
+          to_account_id: values.to_account_id,
+          from_amount: values.from_amount,
+          to_amount: values.to_amount,
+          date: values.date,
+          note: values.note || null,
+          is_future: values.is_future,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", transfer.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onMutate: async (values) => {
+      await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
+      const previous = queryClient.getQueryData<Transfer[]>(TRANSFERS_KEY)
+      queryClient.setQueryData<Transfer[]>(TRANSFERS_KEY, (old = []) =>
+        old.map((t) =>
+          t.id === transfer.id
+            ? {
+                ...t,
+                from_account_id: values.from_account_id,
+                to_account_id: values.to_account_id,
+                from_amount: values.from_amount,
+                to_amount: values.to_amount,
+                date: values.date,
+                note: values.note || null,
+                is_future: values.is_future,
+              }
+            : t
+        )
+      )
+      return { previous }
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(TRANSFERS_KEY, context.previous)
+      toast.error("Error al actualizar la transferencia", { description: err.message })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      toast.success("Transferencia actualizada")
+      onOpenChange(false)
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nuevo movimiento</DialogTitle>
-          <DialogDescription>
-            Registrá un ingreso o gasto en una de tus cuentas.
-          </DialogDescription>
+          <DialogTitle>Editar transferencia</DialogTitle>
+          <DialogDescription>Modificá los datos de la transferencia.</DialogDescription>
         </DialogHeader>
-        <MovementForm
+        <TransferForm
           accounts={accounts}
-          categories={categories}
-          onSubmit={async (v) => {
-            await mutation.mutateAsync(v)
-          }}
+          defaultValues={transferToFormValues(transfer)}
+          onSubmit={async (v) => { await mutation.mutateAsync(v) }}
           isLoading={mutation.isPending}
-          submitLabel="Crear movimiento"
+          submitLabel="Guardar cambios"
         />
       </DialogContent>
     </Dialog>
   )
 }
 
-// ── Edit dialog ───────────────────────────────────────────────────────────────
+function DeleteTransferDialog({
+  transfer,
+  open,
+  onOpenChange,
+}: {
+  transfer: Transfer
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}) {
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from("transfers")
+        .delete()
+        .eq("id", transfer.id)
+      if (error) throw error
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
+      const previous = queryClient.getQueryData<Transfer[]>(TRANSFERS_KEY)
+      queryClient.setQueryData<Transfer[]>(TRANSFERS_KEY, (old = []) =>
+        old.filter((t) => t.id !== transfer.id)
+      )
+      return { previous }
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(TRANSFERS_KEY, context.previous)
+      toast.error("Error al eliminar la transferencia", { description: err.message })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      toast.success("Transferencia eliminada")
+      onOpenChange(false)
+    },
+  })
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Eliminar transferencia</DialogTitle>
+          <DialogDescription>
+            ¿Estás seguro? Esta acción no se puede deshacer.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={mutation.isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className="press-effect"
+          >
+            {mutation.isPending ? "Eliminando…" : "Eliminar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Edit/Delete dialogs for movements ─────────────────────────────────────────
 
 function EditMovementDialog({
   movement,
@@ -494,9 +1085,7 @@ function EditMovementDialog({
     mutationFn: async (values: MovementFormValues) => {
       const supabase = createClient()
       const account = accounts.find((a) => a.id === values.account_id)
-      const isCross =
-        account && values.original_currency !== account.currency
-
+      const isCross = account && values.original_currency !== account.currency
       const { data, error } = await supabase
         .from("movements")
         .update({
@@ -541,9 +1130,7 @@ function EditMovementDialog({
       return { previous }
     },
     onError: (err: Error, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(MOVEMENTS_KEY, context.previous)
-      }
+      if (context?.previous) queryClient.setQueryData(MOVEMENTS_KEY, context.previous)
       toast.error("Error al actualizar", { description: err.message })
     },
     onSuccess: () => {
@@ -566,9 +1153,7 @@ function EditMovementDialog({
           accounts={accounts}
           categories={categories}
           defaultValues={movementToFormValues(movement)}
-          onSubmit={async (v) => {
-            await mutation.mutateAsync(v)
-          }}
+          onSubmit={async (v) => { await mutation.mutateAsync(v) }}
           isLoading={mutation.isPending}
           submitLabel="Guardar cambios"
         />
@@ -576,8 +1161,6 @@ function EditMovementDialog({
     </Dialog>
   )
 }
-
-// ── Delete dialog ─────────────────────────────────────────────────────────────
 
 function DeleteMovementDialog({
   movement,
@@ -608,9 +1191,7 @@ function DeleteMovementDialog({
       return { previous }
     },
     onError: (err: Error, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(MOVEMENTS_KEY, context.previous)
-      }
+      if (context?.previous) queryClient.setQueryData(MOVEMENTS_KEY, context.previous)
       toast.error("Error al eliminar", { description: err.message })
     },
     onSuccess: () => {
@@ -652,102 +1233,6 @@ function DeleteMovementDialog({
   )
 }
 
-// ── FAB ────────────────────────────────────────────────────────────────────────
-
-function FABCreateMovement({
-  accounts,
-  categories,
-}: {
-  accounts: Account[]
-  categories: Category[]
-}) {
-  const [open, setOpen] = useState(false)
-  const queryClient = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: async (values: MovementFormValues) => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-
-      const account = accounts.find((a) => a.id === values.account_id)
-      const isCross =
-        account && values.original_currency !== account.currency
-
-      const { data, error } = await supabase
-        .from("movements")
-        .insert({
-          user_id: user.id,
-          type: values.type,
-          amount: values.amount,
-          original_currency: values.original_currency,
-          account_id: values.account_id,
-          category_id: values.category_id,
-          date: values.date,
-          note: values.note || null,
-          is_future: values.is_future,
-          dollar_type: isCross ? values.dollar_type : null,
-          converted_amount: isCross ? values.converted_amount : null,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Movimiento creado")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear el movimiento", { description: err.message })
-    },
-  })
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(
-          "lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30",
-          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/35 press-effect",
-          "flex items-center justify-center",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        )}
-        aria-label="Nuevo movimiento"
-      >
-        <PlusCircle className="h-6 w-6" />
-      </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nuevo movimiento</DialogTitle>
-            <DialogDescription>
-              Registrá un ingreso o gasto en una de tus cuentas.
-            </DialogDescription>
-          </DialogHeader>
-          <MovementForm
-            accounts={accounts}
-            categories={categories}
-            onSubmit={async (v) => {
-              await mutation.mutateAsync(v)
-            }}
-            isLoading={mutation.isPending}
-            submitLabel="Crear movimiento"
-          />
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function MovementsList() {
@@ -755,10 +1240,17 @@ export function MovementsList() {
   const [showFilters, setShowFilters] = useState(false)
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
   const [deletingMovement, setDeletingMovement] = useState<Movement | null>(null)
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
+  const [deletingTransfer, setDeletingTransfer] = useState<Transfer | null>(null)
 
   const { data: movements, isLoading: loadingMovements } = useQuery({
     queryKey: MOVEMENTS_KEY,
     queryFn: fetchMovements,
+  })
+
+  const { data: transfers, isLoading: loadingTransfers } = useQuery({
+    queryKey: TRANSFERS_KEY,
+    queryFn: fetchTransfers,
   })
 
   const { data: accounts = [] } = useQuery({
@@ -767,7 +1259,7 @@ export function MovementsList() {
   })
 
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
+    queryKey: CATEGORIES_KEY,
     queryFn: fetchCategories,
   })
 
@@ -780,10 +1272,10 @@ export function MovementsList() {
     [categories]
   )
 
-  // ── Apply filters from URL params ─────────────────────────────────────────
-  const filteredMovements = useMemo(() => {
-    if (!movements) return []
+  const isLoading = loadingMovements || loadingTransfers
 
+  // ── Apply filters to unified feed ─────────────────────────────────────────
+  const filteredFeed = useMemo<FeedItem[]>(() => {
     const typeFilter = searchParams.get("type")
     const accountFilter = searchParams.get("account")
     const categoryFilter = searchParams.get("category")
@@ -791,27 +1283,52 @@ export function MovementsList() {
     const toFilter = searchParams.get("to")
     const searchFilter = searchParams.get("q")?.toLowerCase()
 
-    return movements.filter((m) => {
-      if (typeFilter && m.type !== typeFilter) return false
-      if (accountFilter && m.account_id !== accountFilter) return false
-      if (categoryFilter && m.category_id !== categoryFilter) return false
-      if (fromFilter && m.date < fromFilter) return false
-      if (toFilter && m.date > toFilter) return false
-      if (searchFilter && !(m.note ?? "").toLowerCase().includes(searchFilter)) return false
-      return true
-    })
-  }, [movements, searchParams])
+    const movementItems: FeedItem[] = (movements ?? [])
+      .filter((m) => {
+        if (typeFilter === "transfer") return false
+        if (typeFilter && typeFilter !== "transfer" && m.type !== typeFilter) return false
+        if (accountFilter && m.account_id !== accountFilter) return false
+        if (categoryFilter && m.category_id !== categoryFilter) return false
+        if (fromFilter && m.date < fromFilter) return false
+        if (toFilter && m.date > toFilter) return false
+        if (searchFilter && !(m.note ?? "").toLowerCase().includes(searchFilter)) return false
+        return true
+      })
+      .map((item) => ({ kind: "movement", item }) as FeedItem)
+
+    const transferItems: FeedItem[] = (transfers ?? [])
+      .filter((t) => {
+        if (typeFilter && typeFilter !== "transfer" && typeFilter !== "all") return false
+        if (
+          accountFilter &&
+          t.from_account_id !== accountFilter &&
+          t.to_account_id !== accountFilter
+        ) return false
+        if (categoryFilter) return false // transfers have no category
+        if (fromFilter && t.date < fromFilter) return false
+        if (toFilter && t.date > toFilter) return false
+        if (searchFilter && !(t.note ?? "").toLowerCase().includes(searchFilter)) return false
+        return true
+      })
+      .map((item) => ({ kind: "transfer", item }) as FeedItem)
+
+    return [...movementItems, ...transferItems]
+  }, [movements, transfers, searchParams])
 
   // ── Group by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
-    const map = new Map<string, Movement[]>()
-    for (const m of filteredMovements) {
-      const day = startOfDay(parseISO(m.date)).toISOString()
+    const map = new Map<string, FeedItem[]>()
+    for (const fi of filteredFeed) {
+      const date = fi.kind === "movement" ? fi.item.date : fi.item.date
+      const day = startOfDay(parseISO(date)).toISOString()
       if (!map.has(day)) map.set(day, [])
-      map.get(day)!.push(m)
+      map.get(day)!.push(fi)
     }
-    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]))
-  }, [filteredMovements])
+    // Sort items within each day: movements/transfers by created_at desc (they come pre-sorted from DB)
+    return [...map.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, items]) => [key, items] as [string, FeedItem[]])
+  }, [filteredFeed])
 
   const hasActiveFilters =
     searchParams.get("type") ||
@@ -820,6 +1337,8 @@ export function MovementsList() {
     searchParams.get("from") ||
     searchParams.get("to") ||
     searchParams.get("q")
+
+  const totalItems = filteredFeed.length
 
   return (
     <div className="space-y-5 max-w-3xl animate-fade-in">
@@ -830,10 +1349,10 @@ export function MovementsList() {
             className="text-2xl md:text-3xl tracking-tight"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Movimientos
+            Actividad
           </h1>
           <p className="text-sm text-muted-foreground">
-            Registrá ingresos y gastos
+            Movimientos y transferencias
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -853,7 +1372,10 @@ export function MovementsList() {
             )}
           </Button>
           <div className="hidden lg:block">
-            <CreateMovementDialog accounts={accounts} categories={categories} />
+            <QuickAddMenu
+              accounts={accounts}
+              categories={categories}
+            />
           </div>
         </div>
       </div>
@@ -868,7 +1390,7 @@ export function MovementsList() {
       )}
 
       {/* Loading skeleton */}
-      {loadingMovements && (
+      {isLoading && (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="space-y-2">
@@ -889,7 +1411,7 @@ export function MovementsList() {
       )}
 
       {/* Empty state */}
-      {!loadingMovements && filteredMovements.length === 0 && (
+      {!isLoading && totalItems === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <ArrowDownCircle className="h-8 w-8 text-primary" />
@@ -906,36 +1428,45 @@ export function MovementsList() {
             <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
               {hasActiveFilters
                 ? "Intentá con otros filtros o limpiá la búsqueda."
-                : "Agregá un ingreso o gasto para empezar a trackear tus finanzas."}
+                : "Agregá un ingreso, gasto o transferencia para empezar."}
             </p>
           </div>
-          {!hasActiveFilters && accounts.length > 0 && (
-            <CreateMovementDialog accounts={accounts} categories={categories} />
-          )}
         </div>
       )}
 
-      {/* Grouped movements */}
-      {!loadingMovements && grouped.length > 0 && (
+      {/* Grouped feed */}
+      {!isLoading && grouped.length > 0 && (
         <div className="space-y-4">
-          {grouped.map(([dayKey, dayMovements]) => {
-            const dayStr = dayMovements[0].date
+          {grouped.map(([dayKey, dayItems]) => {
+            const firstDate = dayItems[0].kind === "movement"
+              ? dayItems[0].item.date
+              : dayItems[0].item.date
             return (
               <div key={dayKey}>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1">
-                  {formatDayLabel(dayStr)}
+                  {formatDayLabel(firstDate)}
                 </p>
                 <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/40">
-                  {dayMovements.map((m, idx) => (
-                    <div key={m.id} className="px-4">
-                      <MovementRow
-                        movement={m}
-                        account={accountMap.get(m.account_id)}
-                        category={m.category_id ? categoryMap.get(m.category_id) : undefined}
-                        onEdit={setEditingMovement}
-                        onDelete={setDeletingMovement}
-                      />
-                      {idx < dayMovements.length - 1 && (
+                  {dayItems.map((fi, idx) => (
+                    <div key={fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`} className="px-4">
+                      {fi.kind === "movement" ? (
+                        <MovementRow
+                          movement={fi.item}
+                          account={accountMap.get(fi.item.account_id)}
+                          category={fi.item.category_id ? categoryMap.get(fi.item.category_id) : undefined}
+                          onEdit={setEditingMovement}
+                          onDelete={setDeletingMovement}
+                        />
+                      ) : (
+                        <TransferRow
+                          transfer={fi.item}
+                          fromAccount={accountMap.get(fi.item.from_account_id)}
+                          toAccount={accountMap.get(fi.item.to_account_id)}
+                          onEdit={setEditingTransfer}
+                          onDelete={setDeletingTransfer}
+                        />
+                      )}
+                      {idx < dayItems.length - 1 && (
                         <Separator className="opacity-40" />
                       )}
                     </div>
@@ -947,19 +1478,19 @@ export function MovementsList() {
         </div>
       )}
 
-      {/* Load more hint when exactly 100 results */}
-      {!loadingMovements && filteredMovements.length === 100 && (
+      {/* Load more hint */}
+      {!isLoading && totalItems >= 100 && (
         <p className="text-xs text-center text-muted-foreground pt-2">
-          Mostrando los últimos 100 movimientos. Usá los filtros de fecha para ver más.
+          Mostrando los últimos 100 registros. Usá los filtros de fecha para ver más.
         </p>
       )}
 
       {/* Mobile FAB */}
       {accounts.length > 0 && (
-        <FABCreateMovement accounts={accounts} categories={categories} />
+        <FABQuickAdd accounts={accounts} categories={categories} />
       )}
 
-      {/* Edit dialog */}
+      {/* Edit dialogs */}
       {editingMovement && (
         <EditMovementDialog
           movement={editingMovement}
@@ -969,13 +1500,28 @@ export function MovementsList() {
           onOpenChange={(v) => { if (!v) setEditingMovement(null) }}
         />
       )}
+      {editingTransfer && (
+        <EditTransferDialog
+          transfer={editingTransfer}
+          accounts={accounts}
+          open={!!editingTransfer}
+          onOpenChange={(v) => { if (!v) setEditingTransfer(null) }}
+        />
+      )}
 
-      {/* Delete dialog */}
+      {/* Delete dialogs */}
       {deletingMovement && (
         <DeleteMovementDialog
           movement={deletingMovement}
           open={!!deletingMovement}
           onOpenChange={(v) => { if (!v) setDeletingMovement(null) }}
+        />
+      )}
+      {deletingTransfer && (
+        <DeleteTransferDialog
+          transfer={deletingTransfer}
+          open={!!deletingTransfer}
+          onOpenChange={(v) => { if (!v) setDeletingTransfer(null) }}
         />
       )}
     </div>

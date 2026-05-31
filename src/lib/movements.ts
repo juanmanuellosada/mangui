@@ -22,5 +22,7 @@ export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
 
 /** Query keys for TanStack Query cache invalidation */
 export const MOVEMENTS_KEY = ["movements"] as const
+export const TRANSFERS_KEY = ["transfers"] as const
 export const ACCOUNTS_KEY = ["accounts"] as const
 export const BALANCES_KEY = ["account_balances"] as const
+export const CATEGORIES_KEY = ["categories"] as const
