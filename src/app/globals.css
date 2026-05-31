@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Spacing tokens */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+  /* Shadow tokens */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.12);
+}
+
+/* ============================================================
+   MANGUI BRAND THEME
+   Primary: Lime green (#84CC16 family)
+   Secondary/Accent: Orange (#F97316 family)
+   Teal accents: background depth
+   ============================================================ */
+
+:root {
+  /* Backgrounds */
+  --background: oklch(0.985 0.005 145);       /* near-white with a hint of green */
+  --foreground: oklch(0.18 0.02 145);          /* deep green-tinted black */
+
+  /* Cards & Popovers */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 145);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 145);
+
+  /* Primary: Lime green #84CC16 → oklch(0.748 0.219 131.7) */
+  --primary: oklch(0.748 0.219 131.7);
+  --primary-foreground: oklch(0.1 0.04 145);
+
+  /* Secondary: soft lime tint */
+  --secondary: oklch(0.94 0.06 131.7);
+  --secondary-foreground: oklch(0.25 0.08 145);
+
+  /* Muted */
+  --muted: oklch(0.95 0.01 145);
+  --muted-foreground: oklch(0.52 0.04 145);
+
+  /* Accent: Orange #F97316 → oklch(0.714 0.213 47.6) */
+  --accent: oklch(0.714 0.213 47.6);
+  --accent-foreground: oklch(1 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.577 0.245 27.325);
+
+  /* Success / positive */
+  --success: oklch(0.62 0.19 145);
+
+  /* Borders & Inputs */
+  --border: oklch(0.89 0.03 145);
+  --input: oklch(0.89 0.03 145);
+  --ring: oklch(0.748 0.219 131.7);
+
+  /* Charts: brand palette extended */
+  --chart-1: oklch(0.748 0.219 131.7);   /* lime primary */
+  --chart-2: oklch(0.714 0.213 47.6);    /* orange */
+  --chart-3: oklch(0.65 0.15 185);       /* teal */
+  --chart-4: oklch(0.82 0.18 95);        /* yellow */
+  --chart-5: oklch(0.55 0.18 300);       /* purple contrast */
+
+  /* Radius: slightly rounder for the fun brand feel */
+  --radius: 0.75rem;
+
+  /* Sidebar */
+  --sidebar: oklch(0.97 0.025 145);
+  --sidebar-foreground: oklch(0.18 0.02 145);
+  --sidebar-primary: oklch(0.748 0.219 131.7);
+  --sidebar-primary-foreground: oklch(0.1 0.04 145);
+  --sidebar-accent: oklch(0.94 0.06 131.7);
+  --sidebar-accent-foreground: oklch(0.25 0.08 145);
+  --sidebar-border: oklch(0.89 0.03 145);
+  --sidebar-ring: oklch(0.748 0.219 131.7);
+}
+
+.dark {
+  /* Backgrounds: deep teal-tinted dark */
+  --background: oklch(0.14 0.025 185);
+  --foreground: oklch(0.96 0.01 145);
+
+  /* Cards */
+  --card: oklch(0.19 0.025 185);
+  --card-foreground: oklch(0.96 0.01 145);
+  --popover: oklch(0.19 0.025 185);
+  --popover-foreground: oklch(0.96 0.01 145);
+
+  /* Primary: slightly brighter lime in dark */
+  --primary: oklch(0.78 0.22 131.7);
+  --primary-foreground: oklch(0.1 0.04 145);
+
+  /* Secondary */
+  --secondary: oklch(0.25 0.04 145);
+  --secondary-foreground: oklch(0.96 0.01 145);
+
+  /* Muted */
+  --muted: oklch(0.22 0.03 185);
+  --muted-foreground: oklch(0.65 0.04 145);
+
+  /* Accent: orange stays vibrant */
+  --accent: oklch(0.73 0.21 47.6);
+  --accent-foreground: oklch(0.1 0.02 47.6);
+
+  /* Destructive */
+  --destructive: oklch(0.704 0.191 22.216);
+
+  /* Success / positive */
+  --success: oklch(0.72 0.2 145);
+
+  /* Borders */
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.78 0.22 131.7);
+
+  /* Charts */
+  --chart-1: oklch(0.78 0.22 131.7);
+  --chart-2: oklch(0.73 0.21 47.6);
+  --chart-3: oklch(0.68 0.16 185);
+  --chart-4: oklch(0.84 0.19 95);
+  --chart-5: oklch(0.6 0.2 300);
+
+  /* Sidebar */
+  --sidebar: oklch(0.19 0.025 185);
+  --sidebar-foreground: oklch(0.96 0.01 145);
+  --sidebar-primary: oklch(0.78 0.22 131.7);
+  --sidebar-primary-foreground: oklch(0.1 0.04 145);
+  --sidebar-accent: oklch(0.25 0.04 145);
+  --sidebar-accent-foreground: oklch(0.96 0.01 145);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.78 0.22 131.7);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), system-ui, sans-serif;
+  }
+  html {
+    font-family: var(--font-sans), system-ui, sans-serif;
+  }
+  /* Headings use Calistoga (display font) */
+  .font-display {
+    font-family: var(--font-display), Georgia, serif;
+  }
+}
+
+/* ============================================================
+   MANGUI ANIMATION UTILITIES
+   ============================================================ */
+
+@layer utilities {
+  /* Respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-fade-up {
+      animation: fade-up 0.4s ease-out both;
+    }
+    .animate-fade-in {
+      animation: fade-in 0.3s ease-out both;
+    }
+    .animate-scale-in {
+      animation: scale-in 0.25s ease-out both;
+    }
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Stagger helpers */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+
+  /* Active press micro-interaction */
+  .press-effect {
+    transition: transform 150ms ease;
+  }
+  .press-effect:active {
+    transform: scale(0.97);
+  }
+
+  /* Tabular numbers — always use on financial figures */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Glass effect */
+  .glass {
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+  }
+
+  /* Safe area bottom padding for PWA */
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
+}
+
+/* ============================================================
+   CURSOR POINTER on all interactive elements
+   ============================================================ */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  select:not(:disabled),
+  [tabindex]:not([tabindex="-1"]) {
+    cursor: pointer;
+  }
+}
