@@ -6,13 +6,7 @@ import { Plus, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -143,35 +137,26 @@ function ConditionRow({ cond, accounts, onChange, onRemove, canRemove }: Conditi
       {/* Field */}
       <div className="flex-1 min-w-0 space-y-1">
         <Label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Campo</Label>
-        <Select value={cond.field} onValueChange={(v) => v && handleFieldChange(v as RuleField)}>
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(["note", "amount", "account", "type"] as RuleField[]).map((f) => (
-              <SelectItem key={f} value={f} className="text-xs">
-                {FIELD_LABELS[f]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MangoSelect
+          value={cond.field}
+          onChange={(v) => v && handleFieldChange(v as RuleField)}
+          options={(["note", "amount", "account", "type"] as RuleField[]).map((f) => ({
+            value: f,
+            label: FIELD_LABELS[f],
+          }))}
+          triggerClassName="h-8 text-xs"
+        />
       </div>
 
       {/* Operator */}
       <div className="flex-1 min-w-0 space-y-1">
         <Label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Operador</Label>
-        <Select value={cond.operator} onValueChange={(v) => v && handleOperatorChange(v as RuleOperator)}>
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {allowedOps.map((op) => (
-              <SelectItem key={op} value={op} className="text-xs">
-                {OPERATOR_LABELS[op]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MangoSelect
+          value={cond.operator}
+          onChange={(v) => v && handleOperatorChange(v as RuleOperator)}
+          options={allowedOps.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+          triggerClassName="h-8 text-xs"
+        />
       </div>
 
       {/* Value */}
@@ -223,37 +208,29 @@ function ConditionRow({ cond, accounts, onChange, onRemove, canRemove }: Conditi
           </div>
         )}
         {cond.field === "account" && (
-          <Select
+          <MangoSelect
             value={cond.value_text || "none"}
-            onValueChange={(v) => onChange({ ...cond, value_text: !v || v === "none" ? "" : v })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Cuenta" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" className="text-xs">– Seleccionar –</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id} className="text-xs">
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => onChange({ ...cond, value_text: !v || v === "none" ? "" : v })}
+            options={[
+              { value: "none", label: "– Seleccionar –" },
+              ...accounts.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+            triggerClassName="h-8 text-xs"
+            placeholder="Cuenta"
+          />
         )}
         {cond.field === "type" && (
-          <Select
+          <MangoSelect
             value={cond.value_text || "none"}
-            onValueChange={(v) => onChange({ ...cond, value_text: !v || v === "none" ? "" : v })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" className="text-xs">– Seleccionar –</SelectItem>
-              <SelectItem value="expense" className="text-xs">Gasto</SelectItem>
-              <SelectItem value="income" className="text-xs">Ingreso</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => onChange({ ...cond, value_text: !v || v === "none" ? "" : v })}
+            options={[
+              { value: "none", label: "– Seleccionar –" },
+              { value: "expense", label: "Gasto" },
+              { value: "income", label: "Ingreso" },
+            ]}
+            triggerClassName="h-8 text-xs"
+            placeholder="Tipo"
+          />
         )}
       </div>
 
@@ -481,42 +458,28 @@ export function RuleForm({
 
         <div className="space-y-1.5">
           <Label className="text-[11px] text-muted-foreground">Categoría (opcional)</Label>
-          <Select
+          <MangoSelect
             value={actionCategoryId ?? "none"}
-            onValueChange={(v) => setActionCategoryId(!v || v === "none" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="– Sin cambio –" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">– Sin cambio –</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setActionCategoryId(!v || v === "none" ? null : v)}
+            options={[
+              { value: "none", label: "– Sin cambio –" },
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            placeholder="– Sin cambio –"
+          />
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-[11px] text-muted-foreground">Cuenta (opcional)</Label>
-          <Select
+          <MangoSelect
             value={actionAccountId ?? "none"}
-            onValueChange={(v) => setActionAccountId(!v || v === "none" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="– Sin cambio –" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">– Sin cambio –</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setActionAccountId(!v || v === "none" ? null : v)}
+            options={[
+              { value: "none", label: "– Sin cambio –" },
+              ...accounts.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+            placeholder="– Sin cambio –"
+          />
         </div>
       </div>
 

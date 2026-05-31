@@ -9,13 +9,7 @@ import { Sparkles, TrendingDown, TrendingUp, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn, formatCurrency } from "@/lib/utils"
 import {
   computeSavingProgress,
@@ -284,18 +278,16 @@ export function GoalForm({
                   aria-invalid={!!errors.target_amount}
                 />
               </div>
-              <Select
+              <MangoSelect
                 value={watchedValues.currency}
-                onValueChange={(v) => setValue("currency", v as "ARS" | "USD")}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ARS">ARS</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => setValue("currency", v as "ARS" | "USD")}
+                options={[
+                  { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+                  { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+                ]}
+                className="w-28"
+                aria-label="Moneda"
+              />
             </div>
             {errors.target_amount && (
               <p className="text-xs text-destructive">{errors.target_amount.message}</p>
@@ -305,39 +297,31 @@ export function GoalForm({
           {/* Category (optional) */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-category">Categoría (opcional)</Label>
-            <Select
+            <MangoSelect
+              id="goal-category"
               value={watchedValues.category_id ?? "__none__"}
-              onValueChange={(v) => setValue("category_id", v === "__none__" ? null : v)}
-            >
-              <SelectTrigger id="goal-category">
-                <SelectValue placeholder="Sin filtro" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin filtro</SelectItem>
-                {categories.filter(c => c.type === "income" || c.type === "expense").map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => setValue("category_id", v === "__none__" ? null : v)}
+              options={[
+                { value: "__none__", label: "Sin filtro" },
+                ...categories.filter(c => c.type === "income" || c.type === "expense").map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder="Sin filtro"
+            />
           </div>
 
           {/* Account (optional) */}
           <div className="space-y-1.5">
             <Label htmlFor="goal-account">Cuenta (opcional)</Label>
-            <Select
+            <MangoSelect
+              id="goal-account"
               value={watchedValues.account_id ?? "__none__"}
-              onValueChange={(v) => setValue("account_id", v === "__none__" ? null : v)}
-            >
-              <SelectTrigger id="goal-account">
-                <SelectValue placeholder="Todas las cuentas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Todas las cuentas</SelectItem>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => setValue("account_id", v === "__none__" ? null : v)}
+              options={[
+                { value: "__none__", label: "Todas las cuentas" },
+                ...accounts.map((a) => ({ value: a.id, label: a.name })),
+              ]}
+              placeholder="Todas las cuentas"
+            />
           </div>
 
           {/* Deadline (optional) */}
@@ -359,20 +343,16 @@ export function GoalForm({
           {/* Category (key for reduction) */}
           <div className="space-y-1.5">
             <Label htmlFor="red-category">Categoría</Label>
-            <Select
+            <MangoSelect
+              id="red-category"
               value={watchedValues.category_id ?? "__none__"}
-              onValueChange={(v) => setValue("category_id", v === "__none__" ? null : v)}
-            >
-              <SelectTrigger id="red-category">
-                <SelectValue placeholder="Seleccioná una categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Todas (sin filtro)</SelectItem>
-                {categories.filter(c => c.type === "expense").map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => setValue("category_id", v === "__none__" ? null : v)}
+              options={[
+                { value: "__none__", label: "Todas (sin filtro)" },
+                ...categories.filter(c => c.type === "expense").map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              placeholder="Seleccioná una categoría"
+            />
           </div>
 
           {/* Baseline */}
@@ -451,18 +431,16 @@ export function GoalForm({
                   {...register("target_amount")}
                 />
               </div>
-              <Select
+              <MangoSelect
                 value={watchedValues.currency}
-                onValueChange={(v) => setValue("currency", v as "ARS" | "USD")}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ARS">ARS</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(v) => setValue("currency", v as "ARS" | "USD")}
+                options={[
+                  { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+                  { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+                ]}
+                className="w-28"
+                aria-label="Moneda"
+              />
             </div>
           </div>
 

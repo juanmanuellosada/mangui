@@ -30,13 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -477,18 +471,17 @@ function CreateScheduledDialog({
                 aria-invalid={!!errors.amount}
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Select
+                <MangoSelect
                   value={currency}
-                  onValueChange={(v) => setValue("currency", v as "ARS" | "USD")}
-                >
-                  <SelectTrigger className="w-20 h-8 text-xs font-bold border-border/60 bg-muted/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ARS">ARS</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setValue("currency", v as "ARS" | "USD")}
+                  options={[
+                    { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+                    { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+                  ]}
+                  className="w-28"
+                  triggerClassName="h-8 text-xs font-bold border-border/60 bg-muted/50"
+                  aria-label="Moneda"
+                />
               </div>
             </div>
             {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
@@ -499,20 +492,13 @@ function CreateScheduledDialog({
             <Label className="text-xs text-muted-foreground font-medium">
               {isTransfer ? "Cuenta origen" : "Cuenta"}
             </Label>
-            <Select
+            <MangoSelect
               value={accountId}
-              onValueChange={(v) => v && setValue("account_id", v)}
-            >
-              <SelectTrigger className="w-full"><SelectValue placeholder="Seleccioná cuenta" /></SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                    <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">{a.currency}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => v && setValue("account_id", v)}
+              options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+              placeholder="Seleccioná cuenta"
+              aria-invalid={!!errors.account_id}
+            />
             {errors.account_id && <p className="text-xs text-destructive">{errors.account_id.message}</p>}
           </div>
 
@@ -521,20 +507,16 @@ function CreateScheduledDialog({
             <>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground font-medium">Cuenta destino</Label>
-                <Select
+                <MangoSelect
                   value={toAccountId ?? ""}
-                  onValueChange={(v) => v && setValue("to_account_id", v)}
-                >
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Seleccioná cuenta destino" /></SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id} disabled={a.id === accountId}>
-                        {a.name}
-                        <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">{a.currency}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => v && setValue("to_account_id", v)}
+                  options={accounts.map((a) => ({
+                    value: a.id,
+                    label: `${a.name} (${a.currency})`,
+                    disabled: a.id === accountId,
+                  }))}
+                  placeholder="Seleccioná cuenta destino"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="sc-to-amount" className="text-xs text-muted-foreground font-medium">Monto destino</Label>
@@ -556,18 +538,15 @@ function CreateScheduledDialog({
           {!isTransfer && (
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
-              <Select
+              <MangoSelect
                 value={watch("category_id") ?? "none"}
-                onValueChange={(v) => setValue("category_id", v === "none" ? null : v)}
-              >
-                <SelectTrigger className="w-full"><SelectValue placeholder="Sin categoría" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin categoría</SelectItem>
-                  {filteredCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => setValue("category_id", v === "none" ? null : v)}
+                options={[
+                  { value: "none", label: "Sin categoría" },
+                  ...filteredCategories.map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                placeholder="Sin categoría"
+              />
             </div>
           )}
 

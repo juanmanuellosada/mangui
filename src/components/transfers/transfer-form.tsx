@@ -7,13 +7,7 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
@@ -166,24 +160,16 @@ export function TransferForm({
       {/* From account */}
       <div className="space-y-1.5">
         <Label>Cuenta origen</Label>
-        <Select
+        <MangoSelect
           value={fromAccountId}
-          onValueChange={(v) => v && setValue("from_account_id", v, { shouldValidate: true })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleccioná cuenta origen" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-                <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">
-                  {a.currency}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(v) => v && setValue("from_account_id", v, { shouldValidate: true })}
+          options={accounts.map((a) => ({
+            value: a.id,
+            label: `${a.name} (${a.currency})`,
+          }))}
+          placeholder="Seleccioná cuenta origen"
+          aria-invalid={!!errors.from_account_id}
+        />
         {errors.from_account_id && (
           <p className="text-xs text-destructive">{errors.from_account_id.message}</p>
         )}
@@ -192,28 +178,17 @@ export function TransferForm({
       {/* To account */}
       <div className="space-y-1.5">
         <Label>Cuenta destino</Label>
-        <Select
+        <MangoSelect
           value={toAccountId}
-          onValueChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleccioná cuenta destino" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem
-                key={a.id}
-                value={a.id}
-                disabled={a.id === fromAccountId}
-              >
-                {a.name}
-                <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">
-                  {a.currency}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
+          options={accounts.map((a) => ({
+            value: a.id,
+            label: `${a.name} (${a.currency})`,
+            disabled: a.id === fromAccountId,
+          }))}
+          placeholder="Seleccioná cuenta destino"
+          aria-invalid={!!errors.to_account_id}
+        />
         {errors.to_account_id && (
           <p className="text-xs text-destructive">{errors.to_account_id.message}</p>
         )}

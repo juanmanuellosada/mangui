@@ -17,13 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/client"
@@ -492,24 +486,17 @@ export default function IntegracionesPage() {
           {loadingPrefs ? (
             <Skeleton className="h-9 w-28" />
           ) : (
-            <Select
+            <MangoSelect
               value={String(prefs?.notify_hour ?? 9)}
-              onValueChange={(v) =>
+              onChange={(v) =>
                 updatePrefsMutation.mutate({ notify_hour: parseInt(v ?? "9", 10) })
               }
+              options={HOURS.map((h) => ({ value: String(h), label: hourLabel(h) }))}
               disabled={!prefs?.push_enabled || updatePrefsMutation.isPending}
-            >
-              <SelectTrigger className="w-28 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {HOURS.map((h) => (
-                  <SelectItem key={h} value={String(h)} className="text-xs">
-                    {hourLabel(h)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              className="w-28"
+              triggerClassName="h-8 text-xs"
+              aria-label="Hora de notificación"
+            />
           )}
         </Row>
       </Section>

@@ -31,13 +31,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { InstallmentForm, type InstallmentFormValues } from "@/components/installments/installment-form"
@@ -395,43 +389,29 @@ function FiltersPanel({
         {/* Account */}
         <div className="space-y-1.5">
           <Label className="text-xs">Cuenta</Label>
-          <Select
+          <MangoSelect
             value={accountValue}
-            onValueChange={(v) => updateParam("account", v === "all" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => updateParam("account", v === "all" ? null : v)}
+            options={[
+              { value: "all", label: "Todas" },
+              ...accounts.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+            aria-label="Filtrar por cuenta"
+          />
         </div>
 
         {/* Category */}
         <div className="space-y-1.5">
           <Label className="text-xs">Categoría</Label>
-          <Select
+          <MangoSelect
             value={categoryValue}
-            onValueChange={(v) => updateParam("category", v === "all" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => updateParam("category", v === "all" ? null : v)}
+            options={[
+              { value: "all", label: "Todas" },
+              ...categories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            aria-label="Filtrar por categoría"
+          />
         </div>
 
         {/* Date from */}

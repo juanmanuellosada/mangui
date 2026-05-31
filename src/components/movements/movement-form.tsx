@@ -9,13 +9,7 @@ import { Zap, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
@@ -307,21 +301,20 @@ export function MovementForm({
           />
           {/* Currency select inline */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Select
+            <MangoSelect
               value={originalCurrency}
-              onValueChange={(v) => {
+              onChange={(v) => {
                 setValue("original_currency", v as "ARS" | "USD", { shouldValidate: true })
                 setValue("converted_amount", null)
               }}
-            >
-              <SelectTrigger className="w-20 h-8 text-xs font-bold border-border/60 bg-muted/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ARS">ARS</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
+              options={[
+                { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+                { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+              ]}
+              className="w-28 h-8"
+              triggerClassName="h-8 text-xs font-bold border-border/60 bg-muted/50"
+              aria-label="Moneda del monto"
+            />
           </div>
         </div>
         {errors.amount && (
@@ -336,21 +329,13 @@ export function MovementForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Cuenta</Label>
-          <Select
+          <MangoSelect
             value={accountId}
-            onValueChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Cuenta" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder="Cuenta"
+            aria-invalid={!!errors.account_id}
+          />
           {errors.account_id && (
             <p className="text-xs text-destructive">{errors.account_id.message}</p>
           )}
@@ -366,26 +351,20 @@ export function MovementForm({
               </span>
             )}
           </div>
-          <Select
+          <MangoSelect
             value={categoryId ?? "none"}
-            onValueChange={(v) => {
+            onChange={(v) => {
               userSetCategory.current = true
               setRuleHint(null)
               setValue("category_id", v === "none" ? null : v)
             }}
-          >
-            <SelectTrigger className={cn("w-full", ruleHint && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20")}>
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sin categoría</SelectItem>
-              {filteredCategories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            options={[
+              { value: "none", label: "Sin categoría" },
+              ...filteredCategories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            placeholder="Categoría"
+            triggerClassName={cn(ruleHint && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20")}
+          />
         </div>
       </div>
 

@@ -9,13 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
@@ -281,18 +275,17 @@ export function RecurringForm({
             aria-invalid={!!errors.amount}
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Select
+            <MangoSelect
               value={currency}
-              onValueChange={(v) => setValue("currency", v as "ARS" | "USD", { shouldValidate: true })}
-            >
-              <SelectTrigger className="w-20 h-8 text-xs font-bold border-border/60 bg-muted/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ARS">ARS</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
+              onChange={(v) => setValue("currency", v as "ARS" | "USD", { shouldValidate: true })}
+              options={[
+                { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+                { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+              ]}
+              className="w-28"
+              triggerClassName="h-8 text-xs font-bold border-border/60 bg-muted/50"
+              aria-label="Moneda"
+            />
           </div>
         </div>
         {errors.amount && (
@@ -305,24 +298,13 @@ export function RecurringForm({
         <Label className="text-xs text-muted-foreground font-medium">
           {isTransfer ? "Cuenta origen" : "Cuenta"}
         </Label>
-        <Select
+        <MangoSelect
           value={accountId}
-          onValueChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleccioná cuenta" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-                <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">
-                  {a.currency}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
+          options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+          placeholder="Seleccioná cuenta"
+          aria-invalid={!!errors.account_id}
+        />
         {errors.account_id && (
           <p className="text-xs text-destructive">{errors.account_id.message}</p>
         )}
@@ -333,24 +315,17 @@ export function RecurringForm({
         <>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground font-medium">Cuenta destino</Label>
-            <Select
+            <MangoSelect
               value={toAccountId ?? ""}
-              onValueChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccioná cuenta destino" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id} disabled={a.id === accountId}>
-                    {a.name}
-                    <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">
-                      {a.currency}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
+              options={accounts.map((a) => ({
+                value: a.id,
+                label: `${a.name} (${a.currency})`,
+                disabled: a.id === accountId,
+              }))}
+              placeholder="Seleccioná cuenta destino"
+              aria-invalid={!!errors.to_account_id}
+            />
             {errors.to_account_id && (
               <p className="text-xs text-destructive">{errors.to_account_id.message}</p>
             )}
@@ -423,22 +398,15 @@ export function RecurringForm({
       {!isTransfer && (
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
-          <Select
+          <MangoSelect
             value={watch("category_id") ?? "none"}
-            onValueChange={(v) => setValue("category_id", v === "none" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Sin categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sin categoría</SelectItem>
-              {filteredCategories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setValue("category_id", v === "none" ? null : v)}
+            options={[
+              { value: "none", label: "Sin categoría" },
+              ...filteredCategories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            placeholder="Sin categoría"
+          />
         </div>
       )}
 
@@ -471,21 +439,12 @@ export function RecurringForm({
       {showDayOfWeek && (
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Día de la semana</Label>
-          <Select
+          <MangoSelect
             value={String(dayOfWeek ?? 1)}
-            onValueChange={(v) => v != null && setValue("day_of_week", parseInt(v))}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(DAY_OF_WEEK_LABELS).map(([k, label]) => (
-                <SelectItem key={k} value={k}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => v != null && setValue("day_of_week", parseInt(v))}
+            options={Object.entries(DAY_OF_WEEK_LABELS).map(([k, label]) => ({ value: k, label }))}
+            aria-label="Día de la semana"
+          />
         </div>
       )}
 
@@ -495,21 +454,12 @@ export function RecurringForm({
           {frequency === "annual" && (
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground font-medium">Mes</Label>
-              <Select
+              <MangoSelect
                 value={String(monthOfYear ?? 1)}
-                onValueChange={(v) => v != null && setValue("month_of_year", parseInt(v))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(MONTH_OF_YEAR_LABELS).map(([k, label]) => (
-                    <SelectItem key={k} value={k}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => v != null && setValue("month_of_year", parseInt(v))}
+                options={Object.entries(MONTH_OF_YEAR_LABELS).map(([k, label]) => ({ value: k, label }))}
+                aria-label="Mes del año"
+              />
             </div>
           )}
           <div className="space-y-1.5">

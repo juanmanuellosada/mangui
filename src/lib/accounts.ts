@@ -1,3 +1,4 @@
+import * as React from "react"
 import {
   Landmark,
   Building2,
@@ -8,6 +9,7 @@ import {
   Briefcase,
 } from "lucide-react"
 import type { Enums, Tables } from "@/lib/database.types"
+import { LUCIDE_ICON_REGISTRY } from "@/lib/lucide-registry"
 
 export type AccountType = Enums<"account_type">
 export type Currency = Enums<"currency">
@@ -71,3 +73,39 @@ export const COLOR_OPTIONS = [
   "#3b82f6", // blue
   "#64748b", // slate
 ]
+
+/**
+ * renderAccountIcon — resolves an account icon value to a React element.
+ *   - URL (starts with "http" or "/"): renders a rounded <img>
+ *   - "lucide:<name>": renders a Lucide icon via dynamic lookup
+ *   - otherwise: renders the text/emoji in a <span>
+ *
+ * Pass `size` to control dimensions (default "h-5 w-5").
+ */
+export function renderAccountIcon(
+  icon: string | null | undefined,
+  opts: { size?: string; className?: string } = {}
+): React.ReactElement {
+  const { size = "h-5 w-5", className = "" } = opts
+  if (!icon) {
+    return React.createElement(Briefcase, { className: `${size} ${className}` })
+  }
+  if (icon.startsWith("http") || icon.startsWith("/")) {
+    return React.createElement("img", {
+      src: icon,
+      alt: "Ícono",
+      className: `${size} rounded-full object-cover ${className}`,
+    })
+  }
+  if (icon.startsWith("lucide:")) {
+    const name = icon.slice(7)
+    const Comp = (LUCIDE_ICON_REGISTRY[name] as React.ElementType) ?? Briefcase
+    return React.createElement(Comp, { className: `${size} ${className}` })
+  }
+  // Emoji or plain text
+  return React.createElement(
+    "span",
+    { className: `text-xl leading-none select-none ${className}`, "aria-hidden": true },
+    icon
+  )
+}

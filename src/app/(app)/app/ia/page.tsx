@@ -21,13 +21,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
@@ -250,21 +244,12 @@ export default function IASettingsPage() {
             {/* Model select */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground font-medium">Modelo</Label>
-              <Select
+              <MangoSelect
                 value={model}
-                onValueChange={(v) => v && setValue("model", v, { shouldDirty: true })}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MODELS[provider].map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => v && setValue("model", v, { shouldDirty: true })}
+                options={MODELS[provider].map((m) => ({ value: m.value, label: m.label }))}
+                aria-label="Modelo de IA"
+              />
               <p className="text-[11px] text-muted-foreground">
                 {MODELS[provider][0].value} es el modelo recomendado para esta función.
               </p>

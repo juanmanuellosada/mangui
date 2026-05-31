@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -19,10 +19,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AccountForm, accountToFormValues, type AccountFormValues } from "./account-form"
 import {
   ACCOUNT_TYPE_LABELS,
-  ACCOUNT_TYPE_ICON_COMPONENTS,
+  renderAccountIcon,
   type Account,
   type AccountBalance,
-  type AccountType,
 } from "@/lib/accounts"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -52,12 +51,6 @@ async function fetchBalances(): Promise<AccountBalance[]> {
   return data
 }
 
-// ── Account icon component ────────────────────────────────────
-function AccountTypeIcon({ type, className }: { type: AccountType; className?: string }) {
-  const Icon = ACCOUNT_TYPE_ICON_COMPONENTS[type] ?? Briefcase
-  return <Icon className={cn("h-5 w-5", className)} />
-}
-
 // ── Sub-components ────────────────────────────────────────────
 
 function AccountCardSkeleton() {
@@ -74,7 +67,7 @@ function AccountCardSkeleton() {
 }
 
 // ── Create dialog ─────────────────────────────────────────────
-function CreateAccountDialog({ asIconButton = false }: { asIconButton?: boolean }) {
+function CreateAccountDialog({ asIconButton = false, userId }: { asIconButton?: boolean; userId?: string }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -151,6 +144,7 @@ function CreateAccountDialog({ asIconButton = false }: { asIconButton?: boolean 
           onSubmit={async (values) => { await mutation.mutateAsync(values) }}
           isLoading={mutation.isPending}
           submitLabel="Crear cuenta"
+          userId={userId}
         />
       </DialogContent>
     </Dialog>
@@ -158,7 +152,7 @@ function CreateAccountDialog({ asIconButton = false }: { asIconButton?: boolean 
 }
 
 // ── Edit dialog ───────────────────────────────────────────────
-function EditAccountDialog({ account }: { account: Account }) {
+function EditAccountDialog({ account, userId }: { account: Account; userId?: string }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -241,6 +235,7 @@ function EditAccountDialog({ account }: { account: Account }) {
           onSubmit={async (values) => { await mutation.mutateAsync(values) }}
           isLoading={mutation.isPending}
           submitLabel="Guardar cambios"
+          userId={userId}
         />
       </DialogContent>
     </Dialog>
@@ -330,9 +325,11 @@ function DeleteAccountDialog({ account }: { account: Account }) {
 function AccountCard({
   account,
   balance,
+  userId,
 }: {
   account: Account
   balance: AccountBalance | undefined
+  userId?: string
 }) {
   const currentBalance = balance?.current_balance ?? account.initial_balance
 
@@ -345,22 +342,8 @@ function AccountCard({
       )}
     >
       {/* Icon */}
-      <div
-        className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{
-          backgroundColor: account.color
-            ? account.color + "22"
-            : "var(--muted)",
-        }}
-      >
-        {account.icon && account.icon !== ACCOUNT_TYPE_ICON_FALLBACK(account.type) ? (
-          <span className="text-xl leading-none">{account.icon}</span>
-        ) : (
-          <AccountTypeIcon
-            type={account.type}
-            className="h-5 w-5 text-muted-foreground"
-          />
-        )}
+      <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60">
+        {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground" })}
       </div>
 
       {/* Info */}
@@ -417,25 +400,11 @@ function AccountCard({
 
       {/* Actions */}
       <div className="flex gap-0.5 flex-shrink-0">
-        <EditAccountDialog account={account} />
+        <EditAccountDialog account={account} userId={userId} />
         <DeleteAccountDialog account={account} />
       </div>
     </div>
   )
-}
-
-/** Returns the default emoji for the account type — used to detect "no custom icon" */
-function ACCOUNT_TYPE_ICON_FALLBACK(type: AccountType): string {
-  const MAP: Record<AccountType, string> = {
-    caja_ahorro: "🏦",
-    cuenta_corriente: "🏛️",
-    efectivo: "💵",
-    inversion: "📈",
-    tarjeta_credito: "💳",
-    billetera_virtual: "📱",
-    otro: "💼",
-  }
-  return MAP[type]
 }
 
 // ── Patrimonio total hero card ────────────────────────────────
@@ -508,6 +477,13 @@ export function AccountsList() {
     queryFn: fetchBalances,
   })
 
+  const [userId, setUserId] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      if (data.user) setUserId(data.user.id)
+    })
+  }, [])
+
   const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
 
   const visible = accounts?.filter((a) => !a.is_hidden) ?? []
@@ -523,7 +499,7 @@ export function AccountsList() {
         >
           Cuentas
         </h1>
-        <CreateAccountDialog asIconButton />
+        <CreateAccountDialog asIconButton userId={userId} />
       </div>
 
       {/* Patrimonio hero */}
@@ -557,7 +533,7 @@ export function AccountsList() {
               Agregá tu primera cuenta bancaria, billetera o efectivo para empezar.
             </p>
           </div>
-          <CreateAccountDialog />
+          <CreateAccountDialog userId={userId} />
         </div>
       )}
 
@@ -573,6 +549,7 @@ export function AccountsList() {
                 key={account.id}
                 account={account}
                 balance={balanceMap.get(account.id) ?? undefined}
+                userId={userId}
               />
             ))}
           </div>
@@ -591,6 +568,7 @@ export function AccountsList() {
                 key={account.id}
                 account={account}
                 balance={balanceMap.get(account.id) ?? undefined}
+                userId={userId}
               />
             ))}
           </div>
@@ -599,7 +577,7 @@ export function AccountsList() {
 
       {/* Add account dashed button */}
       {!loadingAccounts && accounts && accounts.length > 0 && (
-        <CreateAccountDialog />
+        <CreateAccountDialog userId={userId} />
       )}
     </div>
   )

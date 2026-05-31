@@ -23,13 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
@@ -227,22 +221,15 @@ function RegisterPaymentDialog({
               <Label className="text-xs text-muted-foreground font-medium">
                 Pagado desde
               </Label>
-              <Select
+              <MangoSelect
                 value={paidFromAccountId}
-                onValueChange={(v) => setPaidFromAccountId(v ?? "")}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Cuenta origen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none-selected">Sin especificar</SelectItem>
-                  {otherAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => setPaidFromAccountId(v ?? "")}
+                options={[
+                  { value: "none-selected", label: "Sin especificar" },
+                  ...otherAccounts.map((a) => ({ value: a.id, label: a.name })),
+                ]}
+                placeholder="Cuenta origen"
+              />
             </div>
           )}
 

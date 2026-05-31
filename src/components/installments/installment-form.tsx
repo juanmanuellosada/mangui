@@ -7,13 +7,7 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
@@ -182,21 +176,20 @@ export function InstallmentForm({
           />
           {/* Currency select */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Select
+            <MangoSelect
               value={currency}
-              onValueChange={(v) => {
+              onChange={(v) => {
                 setValue("currency", v as "ARS" | "USD", { shouldValidate: true })
                 setValue("dollar_type", null)
               }}
-            >
-              <SelectTrigger className="w-20 h-8 text-xs font-bold border-border/60 bg-muted/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ARS">ARS</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
+              options={[
+                { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+                { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+              ]}
+              className="w-28"
+              triggerClassName="h-8 text-xs font-bold border-border/60 bg-muted/50"
+              aria-label="Moneda"
+            />
           </div>
         </div>
         {errors.total_amount && (
@@ -261,21 +254,13 @@ export function InstallmentForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Cuenta</Label>
-          <Select
+          <MangoSelect
             value={accountId}
-            onValueChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Cuenta" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder="Cuenta"
+            aria-invalid={!!errors.account_id}
+          />
           {errors.account_id && (
             <p className="text-xs text-destructive">{errors.account_id.message}</p>
           )}
@@ -283,22 +268,15 @@ export function InstallmentForm({
 
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
-          <Select
+          <MangoSelect
             value={watch("category_id") ?? "none"}
-            onValueChange={(v) => setValue("category_id", v === "none" ? null : v)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sin categoría</SelectItem>
-              {expenseCategories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={(v) => setValue("category_id", v === "none" ? null : v)}
+            options={[
+              { value: "none", label: "Sin categoría" },
+              ...expenseCategories.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+            placeholder="Categoría"
+          />
         </div>
       </div>
 

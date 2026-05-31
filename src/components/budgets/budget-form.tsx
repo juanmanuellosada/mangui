@@ -10,13 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { cn, formatCurrency } from "@/lib/utils"
 import {
   periodLabel,
@@ -223,18 +217,16 @@ export function BudgetForm({
               aria-invalid={!!errors.limit_amount}
             />
           </div>
-          <Select
+          <MangoSelect
             value={watchedValues.currency}
-            onValueChange={(v) => setValue("currency", v as "ARS" | "USD")}
-          >
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ARS">ARS</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => setValue("currency", v as "ARS" | "USD")}
+            options={[
+              { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
+              { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
+            ]}
+            className="w-28"
+            aria-label="Moneda"
+          />
         </div>
         {errors.limit_amount && (
           <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
