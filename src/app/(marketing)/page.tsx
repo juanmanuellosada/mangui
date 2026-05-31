@@ -5,8 +5,6 @@ import {
   ArrowRight,
   Shield,
   Download,
-  Check,
-  Star,
   CreditCard,
   RefreshCcw,
   Target,
@@ -22,50 +20,9 @@ import { cn } from "@/lib/utils";
 
 /* ─── Data ──────────────────────────────────────────────────── */
 
-const testimonials = [
-  {
-    name: "Sofía V.",
-    initials: "SV",
-    role: "Freelancer UX",
-    text: "Nunca entendí lo del MEP hasta que mangui me lo mostró en tiempo real. Ahora sé exactamente cuándo conviene cambiar.",
-    stars: 5,
-  },
-  {
-    name: "Matías L.",
-    initials: "ML",
-    role: "Emprendedor",
-    text: "Las cuotas sin recargo me volaban la cabeza. Ahora veo todo el ciclo de mi tarjeta de un vistazo y pago sin sorpresas.",
-    stars: 5,
-  },
-  {
-    name: "Luciana F.",
-    initials: "LF",
-    role: "Docente universitaria",
-    text: "La carga rápida es un juego de cambio. Anoto un gasto en dos segundos desde el celular aunque no tenga señal.",
-    stars: 5,
-  },
-];
-
-const freePlanFeatures = [
-  "Hasta 3 cuentas",
-  "Movimientos ilimitados",
-  "Multimoneda ARS y USD",
-  "Cotizaciones del día",
-  "App PWA instalable",
-];
-
-const proPlanFeatures = [
-  "Todo lo de Free",
-  "Ciclo de resumen y cuotas",
-  "Presupuestos y metas",
-  "Reglas y recurrentes",
-  "Exportar a CSV",
-  "Soporte prioritario",
-];
-
 const footerLinks = {
-  Producto: ["Funciones", "Precios", "Changelog"],
-  Soporte: ["Hola Plex 601", "Centro de Ayuda", "Estado del servicio"],
+  Producto: ["Funciones", "Changelog"],
+  Soporte: ["Contacto", "Centro de Ayuda", "Estado del servicio"],
   Legal: ["Privacidad", "Términos"],
 };
 
@@ -86,12 +43,6 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground" aria-label="Navegación principal">
             <Link href="#features" className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1">
               Funciones
-            </Link>
-            <Link href="#pricing" className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1">
-              Precios
-            </Link>
-            <Link href="#testimonials" className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1">
-              Para quién
             </Link>
           </nav>
 
@@ -287,47 +238,6 @@ export default function LandingPage() {
                   <div className="mx-auto w-[60%] h-2 bg-[oklch(0.22_0.02_185)] rounded-b-md border border-white/8" />
                   <div className="mx-auto w-[70%] h-1 bg-[oklch(0.2_0.02_185)] rounded-b-lg" />
                 </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ══ TRUST BAR ════════════════════════════════════════ */}
-        <section className="border-y border-border/50 bg-card py-0" aria-label="Métricas de confianza">
-          <div className="container mx-auto px-5 max-w-5xl">
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/50">
-              {/* Stat 1 */}
-              <div className="flex items-start gap-4 px-6 py-5">
-                <div>
-                  <p className="text-sm font-medium text-foreground leading-snug">
-                    Más de 2.400 usuarios activos
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <div className="flex gap-0.5" aria-label="4.8 de 5 estrellas">
-                      {[1, 2, 3, 4].map((i) => (
-                        <Star key={i} className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
-                      ))}
-                      <Star className="h-3.5 w-3.5 fill-muted text-muted-foreground" aria-hidden="true" />
-                    </div>
-                    <span className="text-sm font-semibold text-foreground tabular-nums">4.8</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stat 2 */}
-              <div className="flex items-center gap-4 px-6 py-5">
-                <Shield className="h-8 w-8 text-primary flex-shrink-0" aria-hidden="true" />
-                <p className="text-sm font-medium text-foreground">
-                  Datos 100%<br />locales
-                </p>
-              </div>
-
-              {/* Stat 3 */}
-              <div className="flex items-center gap-4 px-6 py-5">
-                <Download className="h-8 w-8 text-primary flex-shrink-0" aria-hidden="true" />
-                <p className="text-sm font-medium text-foreground">
-                  PWA — instalable<br />sin App Store
-                </p>
               </div>
             </div>
           </div>
@@ -753,156 +663,6 @@ export default function LandingPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ══ TESTIMONIALS ════════════════════════════════════ */}
-        <section id="testimonials" className="py-24 md:py-32 bg-muted/20 border-y border-border/40">
-          <div className="container mx-auto px-5 max-w-6xl">
-            {/* Heading — left-aligned */}
-            <div className="mb-12">
-              <h2
-                className="text-foreground leading-tight tracking-tight"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "clamp(1.6rem,4vw,2.4rem)",
-                }}
-              >
-                Lo que dicen quienes
-                <br />
-                ya la usan.
-              </h2>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-5">
-              {testimonials.map((t, i) => (
-                <div
-                  key={t.name}
-                  className={cn(
-                    "rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-4 animate-fade-up",
-                    `stagger-${i + 1}`
-                  )}
-                >
-                  <div className="flex gap-0.5" aria-label={`${t.stars} de 5 estrellas`}>
-                    {Array.from({ length: t.stars }).map((_, j) => (
-                      <Star key={j} className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden="true" />
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                    &ldquo;{t.text}&rdquo;
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {t.initials}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-foreground">{t.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{t.role}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ══ PRICING ═════════════════════════════════════════ */}
-        <section id="pricing" className="py-24 md:py-32">
-          <div className="container mx-auto px-5 max-w-4xl">
-            {/* Centered heading */}
-            <div className="text-center mb-14 space-y-3">
-              <h2
-                className="text-foreground leading-tight tracking-tight"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "clamp(1.6rem,4vw,2.4rem)",
-                }}
-              >
-                Planes simples, sin sorpresas
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Gratis para siempre en lo esencial. Pro para quienes quieren más
-              </p>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-5 max-w-2xl mx-auto">
-              {/* Free plan */}
-              <div className="rounded-2xl border border-border/60 bg-card p-7 flex flex-col gap-5">
-                <div>
-                  <p className="text-sm font-semibold text-foreground mb-1">Free</p>
-                  <div className="flex items-baseline gap-1">
-                    <span
-                      className="text-4xl font-bold tabular-nums text-foreground"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      $ 0
-                    </span>
-                    <span className="text-sm text-muted-foreground">/ mes</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-2.5 flex-1" aria-label="Características del plan gratuito">
-                  {freePlanFeatures.map((feat) => (
-                    <li key={feat} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href="/register"
-                  className={cn(
-                    buttonVariants({ variant: "outline" }),
-                    "w-full justify-center font-semibold h-10 press-effect"
-                  )}
-                >
-                  Crear cuenta gratis
-                </Link>
-              </div>
-
-              {/* Pro plan */}
-              <div className="relative rounded-2xl border border-primary bg-primary/5 ring-1 ring-primary/20 p-7 flex flex-col gap-5">
-                {/* Badge */}
-                <div className="absolute -top-3 left-6">
-                  <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm">
-                    MÁS POPULAR
-                  </span>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-foreground mb-1">Pro</p>
-                  <div className="flex items-baseline gap-1">
-                    <span
-                      className="text-4xl font-bold tabular-nums text-foreground"
-                      style={{ fontFamily: "var(--font-display)" }}
-                    >
-                      $ 2.900
-                    </span>
-                    <span className="text-sm text-muted-foreground">/ mes</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-2.5 flex-1" aria-label="Características del plan Pro">
-                  {proPlanFeatures.map((feat) => (
-                    <li key={feat} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-primary flex-shrink-0" aria-hidden="true" />
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href="/register"
-                  className={cn(
-                    buttonVariants({ variant: "default" }),
-                    "w-full justify-center font-semibold h-10 press-effect shadow-md shadow-primary/20"
-                  )}
-                >
-                  Empezar 30 días gratis
-                </Link>
               </div>
             </div>
           </div>
