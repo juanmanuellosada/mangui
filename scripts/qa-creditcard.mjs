@@ -1,0 +1,23 @@
+import { chromium } from "playwright";
+import { mkdirSync } from "node:fs";
+const BASE = "https://mangui-rho.vercel.app";
+mkdirSync("design-mockups/qa", { recursive: true });
+const b = await chromium.launch({ headless: true });
+const p = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await p.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+await p.fill('input[type="email"]', "qa@mangui.app");
+await p.fill('input[type="password"]', "ManguiQA-2026!");
+await p.getByRole("button", { name: /ingresar|entrar/i }).first().click();
+await p.waitForURL(/\/app\//, { timeout: 30000 }).catch(() => {});
+await p.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+await p.waitForTimeout(1200);
+await p.getByRole("button", { name: /nueva cuenta|agregar cuenta|primera cuenta/i }).first().click().catch(()=>{});
+await p.waitForTimeout(1000);
+// open Tipo de cuenta select (the MangoSelect trigger showing "Caja de ahorro")
+await p.getByText(/caja de ahorro/i).first().click().catch(()=>{});
+await p.waitForTimeout(700);
+await p.getByText(/tarjeta de cr/i).first().click().catch(()=>{});
+await p.waitForTimeout(1200);
+await p.screenshot({ path: "design-mockups/qa/07-creditcard.png", fullPage: true });
+console.log("📸 07-creditcard.png");
+await b.close();

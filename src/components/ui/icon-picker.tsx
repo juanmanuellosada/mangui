@@ -186,7 +186,12 @@ function LogoCell({
         <img
           src={icon.path}
           alt={icon.title}
-          className="w-10 h-10 rounded-lg object-cover shrink-0"
+          className={cn(
+            "w-10 h-10 rounded-lg shrink-0",
+            icon.path.startsWith("/icons/crypto/")
+              ? "object-contain p-0.5"
+              : "object-cover"
+          )}
           loading="lazy"
         />
         <span className="text-[9px] font-medium leading-tight truncate w-full text-center px-1 text-muted-foreground">
