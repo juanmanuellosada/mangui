@@ -684,6 +684,196 @@ Hairline dividers between rows. Amount column uses IBM Plex Mono tabular-nums th
 
 Photorealistic, implementation-friendly. Light mode. NO emoji as icons — clean SVG vector icons. Tabular numbers on ALL amounts and dates. Clear status badge differentiation: Pendiente (stone) / Ejecutada (lime) / Rechazada (red). Inbox items visually distinct from the main list via the colored left-border accent and shadow.`,
   },
+  // ─── PRESUPUESTOS + METAS ────────────────────────────────────────────────
+  {
+    id: 'presupuestos',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app PRESUPUESTOS (lista de presupuestos).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9. Premium fintech mobile screen, es-AR.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): "Presupuestos" IBM Plex Sans 600 16px dark centered. Left: back-arrow icon (muted dark). Right: search icon (muted dark).
+
+2. RESUMEN DEL MES — a compact double-bezel summary card (outer warm-white shell, inner slightly contrasted core, hairline border rgba(0,0,0,.06), radius 16px, padding 16px 20px). Shows:
+   Label "Mayo 2025" IBM Plex Sans 300 12px muted uppercase.
+   Row: "3 presupuestos activos" IBM Plex Sans 600 14px dark left · "1 excedido" IBM Plex Sans 500 13px #DC2626 red right.
+   Below: a thin aggregate progress bar (full width, 6px height, rounded-full): segments lime (en curso), orange (cerca del límite), red (excedido). Stone track bg. No bezel — just the bar inside the card inner core.
+
+3. LISTA DE PRESUPUESTOS — flat list, 3 budget cards visible, hairline divider between each (rgba(0,0,0,.06)). Each budget card: radius 12px, padding 16px, warm-white bg slightly elevated over #FAFAF9, hairline border. Internal structure:
+
+Card A — "Supermercado" (en curso, 62% usado):
+  Top row: name "Supermercado" IBM Plex Sans 600 15px dark left · period chip "Mensual" (stone bg, IBM Plex Sans 500 11px rounded-full, muted dark) right · status dot lime (6px circle) far right.
+  Scope chips row: "Supermercados" chip (stone hairline rounded-full, IBM Plex Sans 400 12px muted dark, 8px 10px padding) · "Mercados" chip. Left-aligned, small gap.
+  Progress bar: full width, 8px height, rounded-full. Lime fill at ~62%. Stone track. Aria-style, no label inside bar.
+  Amounts row: "$ 31.000 gastados" IBM Plex Mono 500 13px dark tabular-nums left · "límite $ 50.000" IBM Plex Mono 400 12px muted right. Below amounts: "62% usado" IBM Plex Sans 500 12px lime #65A30D left.
+
+Card B — "Comida afuera" (cerca del límite, 84% usado):
+  Top row: "Comida afuera" IBM Plex Sans 600 15px dark left · "Mensual" chip · status dot orange #F97316 far right.
+  Scope chips: "Restaurantes" · "Delivery".
+  Progress bar: ~84% fill, color orange #F97316. Stone track.
+  Amounts: "$ 16.800 gastados" IBM Plex Mono tabular left · "límite $ 20.000" muted right. "84% usado" IBM Plex Sans 500 12px orange #F97316 left. Small warning icon (triangle SVG, orange, 12px) inline left of the percentage text.
+
+Card C — "Transporte" (excedido, 118% usado):
+  Top row: "Transporte" IBM Plex Sans 600 15px dark left · "Quincenal" chip · status dot red #DC2626 far right.
+  Scope chips: "Global" (a single chip with text "Global" IBM Plex Sans 400 12px, stone hairline).
+  Progress bar: full bar in #DC2626 red, 8px height, with a tiny red triangle marker at 100% mark. Stone track (bar overflows visually at 100%, capped at container edge). Subtle red glow/tint bg on the card (very faint, rgba(220,38,38,.04)).
+  Amounts: "$ 14.160 gastados" IBM Plex Mono 500 13px #DC2626 tabular left · "límite $ 12.000" muted right. "118% — Excedido" IBM Plex Sans 600 12px #DC2626 red left with exclamation-circle SVG icon (red, 12px) inline left.
+
+4. CARD VACÍA (dashed) — after the 3 cards, a dashed-border placeholder card (hairline dashed rgba(101,163,13,.5), radius 12px, height ~60px, warm-white bg). Centered content: "+" icon SVG (lime, 18px) + "Agregar presupuesto" IBM Plex Sans 500 14px lime. Single row, tappable.
+
+5. FAB "Nuevo presupuesto": floating action button, bottom-right, solid lime #65A30D, 56px circle, white "+" SVG icon 24px, warm-tinted lime shadow (0 8px 16px rgba(101,163,13,.3)). 24px from right edge, 80px above bottom nav.
+
+6. BOTTOM NAV: fixed, 5 items, appropriate tab active (lime). Safe-area bottom padding.
+
+NO emoji icons — all icons are clean SVG. Tabular numbers throughout. Progress bar colors convey state with text label too (never color alone). No glassmorphism. Light mode. Clean vertical rhythm 12–14px between cards.
+
+Photorealistic, implementation-friendly. Light mode. Premium fintech mobile screen.`,
+  },
+  {
+    id: 'presupuesto-nuevo',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app PRESUPUESTO NUEVO (alta de presupuesto — form sheet).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only.
+
+Background: dark #0B1410 dashboard blurred (backdrop-filter blur(6px) + rgba(0,0,0,.5) overlay), just enough visible to indicate context (budget list partially visible behind blur).
+
+BOTTOM SHEET: light background #FAFAF9, rounded top corners only (radius 24px top-left/top-right), drag handle (short gray rounded bar, 36px wide × 4px tall, stone color) at top center. Padding 24px. Sheet covers ~95% of screen height (tall scrollable form). Premium fintech mobile screen, es-AR.
+
+Sheet content top to bottom:
+
+1. SHEET HEADER: "Nuevo presupuesto" IBM Plex Sans 600 18px dark left. Close × icon right (muted dark, 20px).
+
+2. NOMBRE INPUT: label "Nombre" IBM Plex Sans 400 13px muted above. Text input showing "Supermercado" — hairline border rounded-8, IBM Plex Sans 400 16px dark, lime focus ring 3px.
+
+3. LÍMITE + MONEDA ROW: two side-by-side fields.
+   Left (~65% width): label "Límite" IBM Plex Sans 400 13px muted above. Large input "$ 50.000" Calistoga ~1.8rem dark tabular-nums, lime focus ring, rounded-8 hairline border. IBM Plex Mono digits.
+   Right (~33% width): label "Moneda" above. Select "ARS" with chevron-down, hairline border rounded-8, IBM Plex Sans 500 14px dark.
+
+4. PERÍODO — label "Período" IBM Plex Sans 400 13px muted above. A 5-option horizontal segmented selector, full-width, rounded-8 container with hairline border. Options: "Semanal" | "Quincenal" | "Mensual" | "Trimestral" | "Anual". "Mensual" selected (solid lime bg #65A30D, white IBM Plex Sans 600 12px). Others: stone bg, muted IBM Plex Sans 400 12px. Height 40px.
+
+5. ALCANCE (SCOPE) — label "Alcance" IBM Plex Sans 400 13px muted above. A tappable full-width row with hairline border rounded-8, padding 12px 14px. Left icon: tag SVG (lime, 16px). Center: multi-select summary showing selected chips inline:
+   "Supermercados" chip (lime hairline rounded-full, IBM Plex Sans 500 12px lime, 6px 10px padding) · "Mercados" chip (same style) · "+ Agregar" text (lime IBM Plex Sans 500 13px). Chevron-down right. The chips represent selected categories/accounts.
+   Below this row: helper text IBM Plex Sans 300 11px muted: "Dejá vacío para incluir todos los movimientos." One line.
+
+6. RECURRENTE TOGGLE ROW: full-width row, hairline divider above. Padding 14px 0. Left: "Renovar automáticamente" IBM Plex Sans 500 14px dark + below "Al vencer el período, se reinicia el límite." IBM Plex Sans 300 12px muted. Right: iOS-style toggle switch ON (lime, 28px).
+
+7. PREVIEW CARD — a compact elevated card (hairline border rounded-12, padding 14px 16px, warm-white bg, light tinted shadow, 2px solid lime left-border accent). Shows the current spend in the current window:
+   Top row: pie-chart SVG icon (lime, 16px) inline + "Gasto actual en esta ventana" IBM Plex Sans 500 13px dark.
+   Big amount row: "$ 28.400" IBM Plex Mono 700 18px dark tabular-nums left · "de $ 50.000 límite" IBM Plex Sans 300 13px muted right, vertically centered.
+   Progress bar: ~57% fill, lime color, 6px height, rounded-full, full width inside card. Stone track.
+   Below bar: "57% del límite · ventana: 1–31 may 2025" IBM Plex Sans 300 11px muted.
+
+8. PRIMARY CTA: full-width solid lime #65A30D button "Guardar presupuesto" height 52px rounded-12 IBM Plex Sans 700 white. Bottom safe-area padding below.
+
+All labels ABOVE inputs, never as placeholders. Lime focus ring on active field. Hairline borders throughout. Tabular numbers on all amounts. NO nested box-in-box-in-box. NO glassmorphism. NO emoji — clean SVG vector icons.
+
+Photorealistic, implementation-friendly. Light sheet on dark blurred background. Clean vertical rhythm 14–16px between form sections.`,
+  },
+  {
+    id: 'metas',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app METAS (lista de metas).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9. Premium fintech mobile screen, es-AR.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): "Metas" IBM Plex Sans 600 16px dark centered. Left: back-arrow icon (muted dark). Right: filter icon (muted dark, 20px SVG).
+
+2. FILTER CHIPS: horizontal scrollable row below top bar. "Todas" active (lime bg, white IBM Plex Sans 500 12px rounded-full). Others: "Ahorro" · "Reducción" · "Activas" · "Completadas" (stone hairline chips, muted IBM Plex Sans 400 12px, rounded-full). 12px gap between chips.
+
+3. META CARDS LIST — 2 saving goal cards and 1 reduction goal card visible before scroll. Each card: radius 14px, warm-white bg, hairline border rgba(0,0,0,.06), padding 18px 20px, subtle tinted shadow. 12px vertical gap between cards.
+
+CARD A — Meta de Ahorro "Fondo de emergencia" (activa):
+  Top row: save/piggy-bank SVG icon (lime, 20px, in a 36px lime-bg circle) left · "Fondo de emergencia" IBM Plex Sans 600 16px dark · "Ahorro" badge (lime hairline rounded-full, IBM Plex Sans 500 11px lime, 4px 8px) top-right.
+  Status row below name: "Activa" IBM Plex Sans 400 13px muted · "Vence 31 dic 2025" IBM Plex Sans 400 12px muted, calendar icon (12px muted SVG) inline left.
+  Progress amount row: "USD 320" IBM Plex Mono 700 22px dark tabular-nums left · "/ USD 500" IBM Plex Mono 400 15px muted right. All on same baseline, clearly tabular-spaced.
+  Progress bar: ~64% fill, lime #65A30D, 8px height, rounded-full, full width. Stone track.
+  Below bar: "64% alcanzado" IBM Plex Sans 600 12px lime left · "faltan USD 180" IBM Plex Sans 300 12px muted right.
+  Tiny sparkline below the bar (last 4 months of snapshots): 4 thin vertical bars in stone/lime colors, very small (~24px tall), representing monthly accumulation trend. IBM Plex Sans 300 10px muted month labels "F M A M" below bars.
+
+CARD B — Meta de Ahorro "Vacaciones en Bariloche" (activa):
+  Icon: plane SVG (orange #F97316, 20px, in 36px orange-bg circle) left · "Vacaciones en Bariloche" IBM Plex Sans 600 16px dark · "Ahorro" badge (orange hairline, IBM Plex Sans 500 11px orange).
+  Status: "Activa" · "Vence 1 dic 2025".
+  Progress: "$ 45.000" IBM Plex Mono 700 20px dark · "/ $ 120.000" muted. Progress bar ~37% orange fill. "37% alcanzado" orange · "faltan $ 75.000" muted.
+  Sparkline (stone/orange bars, 3 months visible).
+
+CARD C — Meta de Reducción "Reducir salidas" (activa):
+  Icon: trending-down SVG (white, in 36px #DC2626 red-bg circle) left · "Reducir salidas" IBM Plex Sans 600 16px dark · "Reducción" badge (red hairline, IBM Plex Sans 500 11px #DC2626).
+  Status: "Activa" · "Vence 30 jun 2025".
+  Reduction metric row: "− 18%" IBM Plex Mono 700 20px success green tabular-nums left · "vs base $ 24.000" IBM Plex Sans 300 13px muted right. The −18% is the achieved reduction, shown in green since it's positive progress.
+  Progress bar: ~18% fill, success green #16A34A, 8px height, rounded-full. Track shows the target (30%) with a tiny goal marker tick at 30%. Stone track.
+  Below: "Meta: −30% · Gasto este mes: $ 19.700" IBM Plex Sans 300 12px muted. "Tendencia: ↓ mejorando" IBM Plex Sans 500 12px success green, with a small trending-down SVG icon (success green, 12px) inline left.
+
+4. CARD VACÍA (dashed) — after the cards, dashed-border placeholder (hairline dashed rgba(101,163,13,.5), radius 12px, height ~60px). Center: "+" SVG (lime, 18px) + "Crear meta" IBM Plex Sans 500 14px lime.
+
+5. FAB "Nueva meta": floating action button, bottom-right, solid lime #65A30D, 56px circle, white "+" SVG icon 24px, warm-tinted lime shadow (0 8px 16px rgba(101,163,13,.3)). 24px from right, 80px above bottom nav.
+
+6. BOTTOM NAV: fixed, 5 items, appropriate tab active (lime). Safe-area bottom padding.
+
+NO emoji icons — all icons are clean SVG. Tabular numbers throughout. Color + text + icon for state (never color alone). No glassmorphism. Light mode.
+
+Photorealistic, implementation-friendly. Light mode. Premium fintech mobile screen.`,
+  },
+  {
+    id: 'meta-nueva',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app META NUEVA (alta de meta — form sheet).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only.
+
+Background: dark #0B1410 dashboard blurred (backdrop-filter blur(6px) + rgba(0,0,0,.5) overlay), just enough visible to indicate context (goals list behind blur).
+
+BOTTOM SHEET: light background #FAFAF9, rounded top corners only (radius 24px top-left/top-right), drag handle (short gray rounded bar, 36px wide × 4px tall, stone color) at top center. Padding 24px. Sheet covers ~96% of screen height (tall scrollable form). Premium fintech mobile screen, es-AR.
+
+Sheet content top to bottom:
+
+1. SHEET HEADER: "Nueva meta" IBM Plex Sans 600 18px dark left. Close × icon right (muted dark, 20px).
+
+2. TIPO SELECTOR — label "Tipo de meta" IBM Plex Sans 400 13px muted above. A 2-option segmented toggle, full-width, rounded-10 container, hairline border. Options: "Ahorro" | "Reducción". "Ahorro" selected (solid lime bg #65A30D, white IBM Plex Sans 700 14px, save/piggy-bank SVG icon 16px inline left of label). "Reducción" option: stone bg, muted IBM Plex Sans 500 14px, trending-down SVG icon 16px muted inline left. Height 46px. The toggle communicates both label and icon for each type.
+
+3. NOMBRE INPUT: label "Nombre de la meta" IBM Plex Sans 400 13px muted above. Text input "Fondo de emergencia" — hairline border rounded-8, IBM Plex Sans 400 16px dark, lime focus ring 3px.
+
+SECTION LABEL (only for Ahorro type, shown because Ahorro is selected): "Objetivo de ahorro" IBM Plex Sans 600 14px dark left. Hairline divider above this label, 8px top margin.
+
+4. MONTO OBJETIVO + MONEDA (Ahorro fields):
+   Left (~65%): label "Monto objetivo" above. Large input "USD 500" Calistoga ~1.8rem dark tabular-nums, lime focus ring rounded-8. IBM Plex Mono digits.
+   Right (~33%): label "Moneda" above. Select "USD" with chevron-down, hairline rounded-8.
+
+5. CATEGORÍA / CUENTA SCOPE ROW: two side-by-side optional select fields.
+   Left: label "Categoría (opcional)" above. Select showing "— Sin filtro —" IBM Plex Sans 400 14px muted, tag SVG muted left, chevron-down right, hairline rounded-8.
+   Right: label "Cuenta (opcional)" above. Select showing "Cuenta dólares" IBM Plex Sans 400 14px dark, wallet SVG muted left, chevron-down right, hairline rounded-8.
+
+6. PLAZO ROW: label "Fecha límite (opcional)" above. Full-width tappable row: calendar SVG (lime, 16px) left + date chip "31 dic 2025" (lime bg, white IBM Plex Sans 500 13px, rounded-8, padding 8px 12px) + "Cambiar" text link (lime IBM Plex Sans 500 13px) right. Hairline border rounded-8 around the whole row.
+
+7. PREVIEW CARD — a compact elevated card (hairline border rounded-12, padding 14px 16px, warm-white bg, subtle tinted shadow, 2px solid lime left-border accent). Shows the current progress snapshot:
+   Top row: chart-bar SVG icon (lime, 16px) inline + "Progreso actual" IBM Plex Sans 500 13px dark.
+   Amount row: "USD 0" IBM Plex Mono 700 18px dark tabular left · "de USD 500 objetivo" IBM Plex Sans 300 13px muted right.
+   Progress bar: 0% fill (stone track full width, 6px height, rounded-full) — empty state showing starting point.
+   Below bar: "0% alcanzado · 214 días restantes" IBM Plex Sans 300 11px muted. "Para alcanzar el objetivo: USD 2,34 / día" IBM Plex Sans 300 11px lime.
+
+8. PRIMARY CTA: full-width solid lime #65A30D button "Crear meta" height 52px rounded-12 IBM Plex Sans 700 white. Bottom safe-area padding below.
+
+All labels ABOVE inputs, never as placeholders. Lime focus ring on active field. Hairline borders throughout. Tabular numbers on ALL amounts and dates. The Reducción fields (target_percent, baseline_amount) are hidden because Ahorro type is selected — the toggle communicates that switching types reveals different fields. NO nested box-in-box-in-box. NO glassmorphism. NO emoji — clean SVG vector icons.
+
+Photorealistic, implementation-friendly. Light sheet on dark blurred background. Clean vertical rhythm 14–16px between form sections.`,
+  },
+
   // ─── REGLAS AUTOMÁTICAS ───────────────────────────────────────────────────
   {
     id: 'reglas',

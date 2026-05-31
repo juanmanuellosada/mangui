@@ -15,6 +15,8 @@ import {
   Repeat,
   CalendarClock,
   Zap,
+  Wallet,
+  Target,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
@@ -29,6 +31,8 @@ const navItems = [
   { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
   { icon: CalendarClock, label: "Programadas", href: "/app/programadas" },
   { icon: Zap, label: "Reglas", href: "/app/reglas" },
+  { icon: Wallet, label: "Presupuestos", href: "/app/presupuestos" },
+  { icon: Target, label: "Metas", href: "/app/metas" },
 ];
 
 interface AppSidebarProps {

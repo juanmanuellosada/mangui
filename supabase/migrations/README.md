@@ -429,6 +429,117 @@ auth.users (Supabase Auth)
 
 ---
 
+## Fase 5 — Presupuestos y Metas (`0013_budgets_goals.sql`)
+
+### Nuevos enums
+
+| Enum | Valores |
+|---|---|
+| `budget_period` | `weekly`, `biweekly`, `monthly`, `quarterly`, `annual` |
+| `budget_status` | `active`, `paused` |
+| `goal_type` | `saving`, `reduction` |
+| `goal_status` | `active`, `completed` |
+
+Todos creados con `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` (idempotente).
+
+### Nuevas tablas
+
+#### `budgets`
+Define un límite de gasto sobre una ventana de tiempo (semanal, quincenal, mensual, trimestral o anual). El gasto acumulado **no se almacena** — se deriva en runtime desde `movements` cuyos `account_id` / `category_id` caen dentro del alcance configurado y dentro de la ventana activa.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `name` | text NOT NULL | Nombre descriptivo del presupuesto |
+| `limit_amount` | numeric(18,2) NOT NULL | CHECK > 0 |
+| `currency` | currency NOT NULL | Enum `ARS` / `USD` |
+| `period` | budget_period NOT NULL | Duración de la ventana |
+| `is_recurring` | boolean NOT NULL | DEFAULT `true`. `false` = presupuesto puntual (una sola ventana). |
+| `status` | budget_status NOT NULL | DEFAULT `active` |
+| `start_date` | date NOT NULL | DEFAULT `CURRENT_DATE`. Ancla del inicio de la primera ventana. |
+| `category_ids` | uuid[] NOT NULL | DEFAULT `'{}'`. Vacío = todas las categorías. Sin FK de array (ver nota). |
+| `account_ids` | uuid[] NOT NULL | DEFAULT `'{}'`. Vacío = todas las cuentas. Sin FK de array (ver nota). |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**Nota de diseño — scope por arrays:** `category_ids` y `account_ids` son `uuid[]` sin FK declaradas (PostgreSQL no soporta FK sobre arrays). La aplicación valida que los uuid pertenezcan al usuario al crear/editar. Si una categoría o cuenta referenciada se borra, simplemente deja de coincidir con nuevos movimientos; los presupuestos históricos quedan intactos con el uuid huérfano en el array.
+
+**Índice:** `(user_id, status)`.
+
+#### `goals`
+Meta financiera de tipo **Ahorro** (acumular un monto target) o **Reducción** (gastar menos en una categoría/cuenta respecto de un baseline).
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `name` | text NOT NULL | Nombre de la meta |
+| `type` | goal_type NOT NULL | `saving` o `reduction` |
+| `target_amount` | numeric(18,2) NULL | CHECK > 0. Ahorro: monto a alcanzar (requerido). Reducción: monto máximo deseado (opcional). |
+| `target_percent` | numeric(5,2) NULL | CHECK > 0 AND ≤ 100. Solo Reducción: % de reducción sobre baseline. |
+| `baseline_amount` | numeric(18,2) NULL | CHECK ≥ 0. Solo Reducción: gasto histórico de referencia. NULL = la app lo calcula. |
+| `currency` | currency NOT NULL | Enum `ARS` / `USD` |
+| `category_id` | uuid NULL | FK → `categories(id)` ON DELETE SET NULL. NULL = sin filtro de categoría. |
+| `account_id` | uuid NULL | FK → `accounts(id)` ON DELETE SET NULL. NULL = sin filtro de cuenta. |
+| `deadline` | date NULL | Fecha límite opcional |
+| `status` | goal_status NOT NULL | DEFAULT `active` |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**CHECK `chk_goal_target`:** `(type='saving' AND target_amount IS NOT NULL) OR (type='reduction' AND (target_percent IS NOT NULL OR target_amount IS NOT NULL))` — garantiza que cada tipo tenga al menos una métrica objetivo.
+
+**Índice:** `(user_id, status)`.
+
+#### `goal_snapshots`
+Captura mensual del progreso de una meta. Poblada opcionalmente por la app o por un cron job. Para metas de Ahorro: `amount` = monto acumulado ese mes. Para Reducción: `amount` = gasto medido ese mes.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `goal_id` | uuid NOT NULL | FK → `goals(id)` ON DELETE CASCADE |
+| `month` | date NOT NULL | Primer día del mes (ej: `2025-05-01`). Enforced por convención de app. |
+| `amount` | numeric(18,2) NOT NULL | DEFAULT 0. Valor acumulado/medido para ese mes. |
+| `created_at` | timestamptz NOT NULL | DEFAULT `now()`. Sin `updated_at` — snapshots son inmutables; recálculo vía upsert on conflict. |
+
+**UNIQUE:** `(goal_id, month)` — una sola snapshot por meta y mes.
+
+**Índice:** `(user_id, goal_id)`.
+
+### RLS
+
+Las tres tablas tienen RLS habilitado con las cuatro políticas estándar (`select`/`insert`/`update`/`delete` propias via `auth.uid() = user_id`), idéntico al patrón de `movements`, `transfers`, `recurring_transactions`, etc.
+
+### Diagrama de relaciones (adición)
+
+```
+auth.users
+    │
+    ├── budgets (1:N)
+    │       scope: category_ids uuid[] → categories (sin FK; app valida ownership)
+    │       scope: account_ids  uuid[] → accounts   (sin FK; app valida ownership)
+    │
+    └── goals (1:N)
+            │
+            ├── category_id → categories (nullable, SET NULL al borrar)
+            ├── account_id  → accounts   (nullable, SET NULL al borrar)
+            │
+            └── goal_snapshots (1:N → goals)
+```
+
+### Diagrama de entidades (actualización)
+
+```
+auth.users (Supabase Auth)
+    │
+    ├── budgets (1:N)
+    │
+    └── goals (1:N)
+            │
+            └── goal_snapshots (N:1 → goals)
+```
+
+---
+
 ## Cómo aplicar las migraciones
 
 ```bash

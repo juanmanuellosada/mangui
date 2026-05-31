@@ -255,6 +255,140 @@ export type Database = {
           },
         ]
       }
+      budgets: {
+        Row: {
+          account_ids: string[]
+          category_ids: string[]
+          created_at: string
+          currency: Database["public"]["Enums"]["currency"]
+          id: string
+          is_recurring: boolean
+          limit_amount: number
+          name: string
+          period: Database["public"]["Enums"]["budget_period"]
+          start_date: string
+          status: Database["public"]["Enums"]["budget_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_ids?: string[]
+          category_ids?: string[]
+          created_at?: string
+          currency: Database["public"]["Enums"]["currency"]
+          id?: string
+          is_recurring?: boolean
+          limit_amount: number
+          name: string
+          period: Database["public"]["Enums"]["budget_period"]
+          start_date?: string
+          status?: Database["public"]["Enums"]["budget_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_ids?: string[]
+          category_ids?: string[]
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency"]
+          id?: string
+          is_recurring?: boolean
+          limit_amount?: number
+          name?: string
+          period?: Database["public"]["Enums"]["budget_period"]
+          start_date?: string
+          status?: Database["public"]["Enums"]["budget_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      goals: {
+        Row: {
+          account_id: string | null
+          baseline_amount: number | null
+          category_id: string | null
+          created_at: string
+          currency: Database["public"]["Enums"]["currency"]
+          deadline: string | null
+          id: string
+          name: string
+          status: Database["public"]["Enums"]["goal_status"]
+          target_amount: number | null
+          target_percent: number | null
+          type: Database["public"]["Enums"]["goal_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          baseline_amount?: number | null
+          category_id?: string | null
+          created_at?: string
+          currency: Database["public"]["Enums"]["currency"]
+          deadline?: string | null
+          id?: string
+          name: string
+          status?: Database["public"]["Enums"]["goal_status"]
+          target_amount?: number | null
+          target_percent?: number | null
+          type: Database["public"]["Enums"]["goal_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          baseline_amount?: number | null
+          category_id?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency"]
+          deadline?: string | null
+          id?: string
+          name?: string
+          status?: Database["public"]["Enums"]["goal_status"]
+          target_amount?: number | null
+          target_percent?: number | null
+          type?: Database["public"]["Enums"]["goal_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      goal_snapshots: {
+        Row: {
+          amount: number
+          created_at: string
+          goal_id: string
+          id: string
+          month: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          goal_id: string
+          id?: string
+          month: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          goal_id?: string
+          id?: string
+          month?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_snapshots_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -1002,8 +1136,12 @@ export type Database = {
         | "tarjeta_credito"
         | "billetera_virtual"
         | "otro"
+      budget_period: "weekly" | "biweekly" | "monthly" | "quarterly" | "annual"
+      budget_status: "active" | "paused"
       category_type: "income" | "expense"
       currency: "ARS" | "USD"
+      goal_status: "active" | "completed"
+      goal_type: "saving" | "reduction"
       movement_type: "income" | "expense"
       occurrence_status: "pending" | "confirmed" | "skipped"
       rate_type: "oficial" | "blue" | "mep" | "ccl" | "manual"
@@ -1164,8 +1302,12 @@ export const Constants = {
         "billetera_virtual",
         "otro",
       ],
+      budget_period: ["weekly", "biweekly", "monthly", "quarterly", "annual"],
+      budget_status: ["active", "paused"],
       category_type: ["income", "expense"],
       currency: ["ARS", "USD"],
+      goal_status: ["active", "completed"],
+      goal_type: ["saving", "reduction"],
       movement_type: ["income", "expense"],
       occurrence_status: ["pending", "confirmed", "skipped"],
       rate_type: ["oficial", "blue", "mep", "ccl", "manual"],
