@@ -182,16 +182,11 @@ function LogoCell({
           isSelected ? TILE_SELECTED : ""
         )}
       >
-        {/* Logo tile — uniform aspect-square rounded-xl bg-muted/50 container.
-            Banks/AR logos: object-cover fills the rounded square.
-            Crypto coins (transparent round PNGs): object-contain with padding so
-            the round coin sits centred on the same square-tile surface. */}
+        {/* Logo tile — full-bleed square tile with rounded corners.
+            Both bank/AR logos and crypto tiles are full-bleed squares (object-cover). */}
         <div
           className={cn(
             "w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center aspect-square",
-            // Solid rounded-square chip so every tile reads as a square w/ rounded
-            // corners. Bank/AR logos cover it (object-cover); crypto round coins sit
-            // centred on this visible chip so they match the same square-tile shape.
             "bg-muted border border-border/60"
           )}
         >
@@ -199,12 +194,7 @@ function LogoCell({
           <img
             src={icon.path}
             alt={icon.title}
-            className={cn(
-              "w-full h-full",
-              icon.path.startsWith("/icons/crypto/")
-                ? "object-contain p-1.5"
-                : "object-cover"
-            )}
+            className="w-full h-full object-cover"
             loading="lazy"
           />
         </div>

@@ -3,6 +3,8 @@
  *
  * Fetches cryptocurrency icons from the CC0-licensed spothq/cryptocurrency-icons repo.
  * Downloads color SVGs to public/icons/crypto/<SYMBOL>.svg.
+ * Each SVG is transformed into a full-bleed square tile (circle → rect) so it
+ * matches the bank-logo app-icon look (rounded corners are applied in CSS).
  * Appends crypto entries to src/lib/ar-fintech-icons.ts.
  * Writes public/icons/crypto/NOTICE.md.
  *
@@ -56,6 +58,93 @@ async function runBatched(items, concurrency, fn) {
   return results
 }
 
+// ── SVG squareification ───────────────────────────────────────────────────────
+//
+// Transforms a round-coin SVG into a full-bleed square tile:
+//   (a) If a background <circle> is detected (cx≈half, cy≈half, r≈half of viewBox),
+//       replace it with <rect x="0" y="0" width="W" height="H" fill="<circle fill>"/>
+//   (b) Otherwise, prepend a backmost <rect> using the manifest color (fallback #1F2937)
+//       as the first child inside the root <svg> (or first outermost <g>).
+//
+// Returns { svg: string, method: "circle-replace" | "color-rect-prepend" | "parse-error" }
+
+function squareifySvg(svgText, manifestColor) {
+  const fallbackColor = manifestColor || "#1F2937"
+
+  // Parse viewBox — default to "0 0 32 32"
+  const vbMatch = svgText.match(/viewBox=["']([^"']+)["']/)
+  let vbw = 32, vbh = 32
+  if (vbMatch) {
+    const parts = vbMatch[1].trim().split(/\s+/)
+    if (parts.length === 4) {
+      vbw = parseFloat(parts[2]) || 32
+      vbh = parseFloat(parts[3]) || 32
+    }
+  }
+
+  const halfW = vbw / 2
+  const halfH = vbh / 2
+  // Allow 10% tolerance for "approximately half"
+  const toleranceW = halfW * 0.1
+  const toleranceH = halfH * 0.1
+
+  // Try to detect and replace the background circle.
+  // Match a <circle .../> that isn't self-closing with whitespace variations.
+  // We look for cx, cy, r attributes (in any order) that match the full-background circle.
+  const circleRegex = /<circle([^>]*?)\/>/g
+  let match
+  let replaced = false
+  let resultSvg = svgText
+
+  while ((match = circleRegex.exec(svgText)) !== null) {
+    const attrs = match[1]
+
+    const cxM = attrs.match(/\bcx=["']([^"']+)["']/)
+    const cyM = attrs.match(/\bcy=["']([^"']+)["']/)
+    const rM  = attrs.match(/\br=["']([^"']+)["']/)
+
+    if (!cxM || !cyM || !rM) continue
+
+    const cx = parseFloat(cxM[1])
+    const cy = parseFloat(cyM[1])
+    const r  = parseFloat(rM[1])
+
+    // Check it's a full-background circle
+    const isCenterX = Math.abs(cx - halfW) <= toleranceW
+    const isCenterY = Math.abs(cy - halfH) <= toleranceH
+    const isFullRadius = Math.abs(r - halfW) <= toleranceW || Math.abs(r - halfH) <= toleranceH
+
+    if (!isCenterX || !isCenterY || !isFullRadius) continue
+
+    // Extract the fill color from this circle's attributes
+    const fillM = attrs.match(/\bfill=["']([^"']+)["']/)
+    const circleFill = fillM ? fillM[1] : fallbackColor
+
+    const rect = `<rect x="0" y="0" width="${vbw}" height="${vbh}" fill="${circleFill}"/>`
+    resultSvg = svgText.slice(0, match.index) + rect + svgText.slice(match.index + match[0].length)
+    replaced = true
+    break
+  }
+
+  if (replaced) {
+    return { svg: resultSvg, method: "circle-replace" }
+  }
+
+  // Fallback: prepend a backmost rect as the first child inside <svg> or first <g>
+  const rect = `<rect x="0" y="0" width="${vbw}" height="${vbh}" fill="${fallbackColor}"/>`
+
+  // Try inserting after the opening <svg ...> tag
+  const svgTagMatch = svgText.match(/<svg[^>]*>/)
+  if (svgTagMatch) {
+    const insertPos = svgTagMatch.index + svgTagMatch[0].length
+    resultSvg = svgText.slice(0, insertPos) + rect + svgText.slice(insertPos)
+    return { svg: resultSvg, method: "color-rect-prepend" }
+  }
+
+  // Couldn't transform — return original with a warning flag
+  return { svg: svgText, method: "parse-error" }
+}
+
 // ── Step 1: fetch manifest ────────────────────────────────────────────────────
 
 console.log("[1/4] Fetching manifest.json …")
@@ -77,6 +166,12 @@ if (deduped.length < manifest.length) {
 }
 manifest.splice(0, manifest.length, ...deduped)
 
+// Build symbol → color map for the fallback rect
+const colorMap = {}
+for (const entry of manifest) {
+  colorMap[entry.symbol.toUpperCase()] = entry.color || null
+}
+
 // ── Step 2: ensure output directory ──────────────────────────────────────────
 
 fs.mkdirSync(PUBLIC_CRYPTO, { recursive: true })
@@ -87,6 +182,9 @@ console.log("[2/4] Downloading SVGs …")
 
 let downloaded = 0
 let skipped = 0
+let squareCircleReplace = 0
+let squareColorPrepend = 0
+let squareParseError = 0
 
 const successfulEntries = [] // { symbol, name }
 
@@ -102,27 +200,41 @@ const results = await runBatched(manifest, CONCURRENCY, async (entry) => {
     return { ok: false, symbol: symbolUpper }
   }
 
-  const svg = await res.text()
+  const rawSvg = await res.text()
   // Basic sanity: must look like SVG
-  if (!svg.trim().startsWith("<") || !svg.includes("svg")) {
+  if (!rawSvg.trim().startsWith("<") || !rawSvg.includes("svg")) {
     console.warn(`    SKIP ${symbolUpper}: response doesn't look like SVG`)
     return { ok: false, symbol: symbolUpper }
   }
 
+  const { svg, method } = squareifySvg(rawSvg, colorMap[symbolUpper])
+
+  if (method === "parse-error") {
+    console.error(`    PARSE-ERROR ${symbolUpper}: could not squareify — writing original`)
+  }
+
   fs.writeFileSync(destPath, svg, "utf8")
-  return { ok: true, symbol: symbolUpper, name: entry.name }
+  return { ok: true, symbol: symbolUpper, name: entry.name, squareMethod: method }
 })
 
 for (const r of results) {
   if (r.ok) {
     downloaded++
     successfulEntries.push({ symbol: r.symbol, name: r.name })
+    if (r.squareMethod === "circle-replace") squareCircleReplace++
+    else if (r.squareMethod === "color-rect-prepend") squareColorPrepend++
+    else squareParseError++
   } else {
     skipped++
   }
 }
 
 console.log(`    Downloaded: ${downloaded}, Skipped: ${skipped}`)
+console.log(`    Squareified via circle-replace: ${squareCircleReplace}`)
+console.log(`    Squareified via color-rect-prepend: ${squareColorPrepend}`)
+if (squareParseError > 0) {
+  console.error(`    PARSE ERRORS (wrote original): ${squareParseError}`)
+}
 
 // ── Step 4: write NOTICE.md ──────────────────────────────────────────────────
 
@@ -190,6 +302,11 @@ console.log("=== Summary ===")
 console.log(`  Manifest entries:  ${manifest.length}`)
 console.log(`  SVGs downloaded:   ${downloaded}`)
 console.log(`  SVGs skipped:      ${skipped}`)
+console.log(`  Squareified (circle-replace):    ${squareCircleReplace}`)
+console.log(`  Squareified (color-rect-prepend): ${squareColorPrepend}`)
+if (squareParseError > 0) {
+  console.error(`  PARSE ERRORS (not squareified):  ${squareParseError}`)
+}
 console.log(`  Total crypto icons in catalog: ${downloaded}`)
 console.log(`  Output directory:  public/icons/crypto/`)
 console.log(`  Catalog updated:   src/lib/ar-fintech-icons.ts`)
