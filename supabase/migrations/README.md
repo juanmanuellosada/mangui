@@ -18,6 +18,8 @@ Documentación del esquema de base de datos, modelo de seguridad y decisiones de
 | `0010_installments_cards.sql` | `installment_purchases`, FK `movements → installment_purchases`, `card_statements` |
 | `0011_recurring_scheduled.sql` | `recurring_transactions`, `recurring_occurrences`, `scheduled_transactions` |
 | `0012_auto_rules.sql` | Enums `rule_match`, `rule_field`, `rule_operator`; tablas `auto_rules`, `auto_rule_conditions` |
+| `0013_budgets_goals.sql` | Enums `budget_period`, `budget_status`, `goal_type`, `goal_status`; tablas `budgets`, `goals`, `goal_snapshots` |
+| `0014_saved_views.sql` | Tabla `saved_views` (filtros serializados de analytics) |
 
 ---
 
@@ -146,7 +148,7 @@ Marcadas con `is_default = true`. El usuario puede editarlas y crear nuevas.
 - **Metas de ahorro:** `goals` (user_id, name, target_amount, target_date).
 - **Adjuntos:** `attachments` (Supabase Storage, referencia por movement_id).
 - **Push notifications:** `push_subscriptions` (user_id, endpoint, keys VAPID).
-- **Vistas guardadas:** `saved_views` (user_id, filtros serializados).
+- ~~**Vistas guardadas:** `saved_views` (user_id, filtros serializados).~~ ✓ Implementado en `0014_saved_views.sql`.
 - **Reglas de auto-categorización:** `categorization_rules` (user_id, pattern, category_id).
 
 ---
@@ -537,6 +539,57 @@ auth.users (Supabase Auth)
             │
             └── goal_snapshots (N:1 → goals)
 ```
+
+---
+
+## Fase 6 — Estadísticas / Reportes: Vistas guardadas (`0014_saved_views.sql`)
+
+### Contexto
+
+La pantalla de Estadísticas deriva todos sus datos analíticos en runtime desde las tablas existentes (`movements`, `transfers`, `budgets`, `goals`, `recurring_transactions`). **No se necesita ninguna tabla nueva para los cálculos** (totales, gráficos, comparaciones de período). La única estructura nueva es `saved_views`, que persiste conjuntos de filtros configurados por el usuario para ser reutilizados en sucesivas sesiones.
+
+### Nueva tabla
+
+#### `saved_views`
+
+Almacena un conjunto de parámetros de filtro de analytics bajo un nombre elegido por el usuario. No contiene resultados calculados — solo el "estado del filtro" que la app puede restaurar al entrar a la pantalla de Estadísticas.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `name` | text NOT NULL | Nombre libre (ej: "Mayo ARS gastos"). Sin unicidad forzada — el usuario puede clonar vistas. |
+| `filters` | jsonb NOT NULL | DEFAULT `'{}'`. Objeto con: `dateFrom`, `dateTo` (ISO date), `categoryIds` uuid[], `accountIds` uuid[], `currency` (`"ARS"`\|`"USD"`\|null), `type` (`"income"`\|`"expense"`\|null). Todos los campos son opcionales. Objeto vacío = sin filtros (vista global). |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**Nota de diseño — arrays sin FK:** igual que `budgets.category_ids` / `account_ids`, los campos `categoryIds` y `accountIds` dentro del jsonb son arrays de uuid sin FK declaradas (jsonb no admite FK). La app valida ownership al crear/editar. Un uuid huérfano (categoría o cuenta borrada) simplemente no produce resultados al filtrar — no corrompe la vista guardada.
+
+**Índice:** `(user_id)` — cubre la consulta estándar de listar vistas del usuario.
+
+### RLS
+
+Mismas cuatro políticas estándar que el resto de tablas de usuario (`select`/`insert`/`update`/`delete` propias via `auth.uid() = user_id`). Bloques `DO $$ EXCEPTION WHEN duplicate_object THEN NULL END $$` para idempotencia.
+
+### Diagrama de relaciones (adición)
+
+```
+auth.users
+    │
+    └── saved_views (1:N)
+            filters jsonb → categoryIds[] → categories  (sin FK; app valida ownership)
+            filters jsonb → accountIds[]  → accounts    (sin FK; app valida ownership)
+```
+
+### Datos analíticos derivados (sin tabla nueva)
+
+| Métrica | Fuente |
+|---|---|
+| Gastos por categoría (donut) | `movements` filtrado por rango + categoría + cuenta + moneda + tipo |
+| Evolución del balance / Ingresos vs Gastos | `movements` + `transfers` agrupados por período |
+| Patrón por día de la semana | `movements` con `EXTRACT(DOW FROM date)` |
+| Total ingresos / Total gastos / Balance neto | `movements` con SUM por tipo |
+| Cumplimiento de presupuestos | `budgets` + `movements` dentro de la ventana activa |
+| Comparación de períodos | mismas consultas parametrizadas con dos rangos de fecha |
 
 ---
 

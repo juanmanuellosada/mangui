@@ -979,6 +979,113 @@ All labels ABOVE inputs, never as placeholders. Lime focus ring on active field.
 
 Photorealistic, implementation-friendly. Light sheet on dark blurred background. Clean vertical rhythm 14–16px between form sections.`,
   },
+
+  // ─── ESTADÍSTICAS / REPORTES ─────────────────────────────────────────────
+  {
+    id: 'estadisticas',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app ESTADÍSTICAS (pantalla principal de analytics).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9. Premium fintech analytics mobile screen, es-AR. ONE screen, complete from status bar to bottom nav. All charts readable with legend, no fake-data tells.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): "Estadísticas" IBM Plex Sans 600 16px dark centered. Left: back-arrow icon (muted dark). Right: export icon (share/upload SVG, muted dark, 20px) + calendar/range icon (muted, 20px). Both icons right side, 4px gap.
+
+2. FILTER BAR: a horizontal scrollable row of filter chips, 8px gap, below top bar. Chips are compact rounded-full, hairline border rgba(0,0,0,.06), IBM Plex Sans 500 12px, padding 6px 12px, warm-white bg.
+   Active chip "Mayo 2025" (lime bg #65A30D, white text) — date range picker trigger.
+   Chips: "Todas las cuentas" (dark hairline outline, muted) · "Todas las categorías" (dark hairline) · "ARS" (active? stone bg, muted dark) · "Todos los tipos" (stone, muted).
+   After the last chip: a "Vistas guardadas" chip with a bookmark SVG icon (lime, 14px) left + "Vistas guardadas" IBM Plex Sans 500 12px lime, hairline border lime rgba(101,163,13,.4), rounded-full. This chip opens the saved filter views panel.
+
+3. TARJETAS DE RESUMEN — a 2×2 compact grid of summary stat cards, each card: radius 12px, warm-white bg slightly elevated, hairline border, padding 12px 14px, warm-tinted shadow (0 2px 4px rgba(0,0,0,.06)). Grid gap 8px.
+   Card TL — "Ingresos": label IBM Plex Sans 400 12px muted. Amount "+ $ 350.000" IBM Plex Mono 700 18px success green #16A34A tabular-nums. Small upward-arrow SVG (success green, 12px) inline right of amount.
+   Card TR — "Gastos": label IBM Plex Sans 400 12px muted. Amount "− $ 124.800" IBM Plex Mono 700 18px #DC2626 red tabular-nums. Small downward-arrow SVG (red, 12px) inline right.
+   Card BL — "Balance neto": label IBM Plex Sans 400 12px muted. Amount "+ $ 225.200" IBM Plex Mono 700 18px #65A30D lime tabular-nums. Lime upward-arrow SVG (12px) inline right.
+   Card BR — "Movimientos": label IBM Plex Sans 400 12px muted. Count "47" IBM Plex Mono 700 18px dark tabular-nums. Small activity SVG icon (muted, 12px) inline right.
+   All amounts tabular-nums, IBM Plex Mono. Color + text conveys sign (never color alone — the +/− prefix and arrow icon ensure accessibility).
+
+4. DONUT CHART — "Gastos por categoría" IBM Plex Sans 600 14px dark left, "ver todo" lime link right (IBM Plex Sans 500 12px). Chart: ~160px tall donut (not too large — this is one of four chart sections). Lime primary segment largest: "Supermercado 32%"; orange secondary: "Restaurantes 18%"; success green small: "Transporte 14%"; stone: "Suscripciones 10%"; lighter stone: "Otros 26%". Center of donut: "$ 124.800" IBM Plex Mono 600 13px dark tabular-nums, "total" IBM Plex Sans 300 10px muted below. Legend: 2-column grid below chart, each row: small colored dot (6px circle) + category name IBM Plex Sans 400 12px muted left + amount IBM Plex Mono 500 12px dark tabular-nums right. Max 4 legend rows visible (others truncated with "+ 1 más"). Chart off-center-left with legend right on same row at larger widths, or legend below. Readable category names in es-AR.
+
+5. LÍNEA / ÁREA "Evolución del balance" — section label "Evolución del balance" IBM Plex Sans 600 14px dark left. An area chart (~110px tall) showing 5 months (Ene–May). Area fill lime→transparent gradient (top-to-bottom, taste — not garish). Line lime #65A30D, 2px stroke, no dots on line (clean). X-axis: month labels IBM Plex Sans 300 10px muted "Ene Feb Mar Abr May". Y-axis: 3 horizontal gridlines (hairline, rgba(0,0,0,.06)), labels "$200k / $350k / $500k" IBM Plex Sans 300 10px muted tabular-nums. Tooltip style suggestion: "May · $ 487.320" in a compact floating chip (warm-white, hairline border, IBM Plex Mono 12px dark tabular-nums, radius 6px). Final value "$ 487.320" annotated at right edge of the line in IBM Plex Mono 600 13px lime.
+
+6. BAR CHART "Patrón por día de la semana" — section label "Patrón por día de la semana" IBM Plex Sans 600 14px dark left. A bar chart (~90px tall) with 7 bars (Lun Mar Mié Jue Vie Sáb Dom). Bar color lime #65A30D; the tallest bar (Vie "Viernes", highest spending day) is accent-orange #F97316 to draw attention. All other bars lime. X-axis day labels IBM Plex Sans 300 10px muted below bars. Y-axis invisible (amounts shown as tooltips only). Bar width generous with 4px gap. Bars rounded-top (radius 3px). Below the chart: a note IBM Plex Sans 300 11px muted "Los viernes concentran el 23% del gasto semanal." (Insight callout, no fake precision.)
+
+7. CUMPLIMIENTO DE PRESUPUESTOS — section label "Presupuestos" IBM Plex Sans 600 14px dark left, "ver todos" lime link right. 2–3 compact horizontal rows, each: budget name IBM Plex Sans 500 13px dark left · progress bar (flex-1, 6px height, rounded-full, lime/orange/red fill) center · percentage IBM Plex Mono 500 12px tabular-nums right with status color. Rows:
+   "Supermercado" · [lime bar ~62%] · "62%" lime
+   "Comida afuera" · [orange bar ~84%] · "84%" orange
+   "Transporte" · [red bar full, overflowed indicator] · "118%" #DC2626 red + small exclamation-circle SVG (red, 12px) inline.
+   Hairline dividers between rows. Padding 8px 0 per row.
+
+8. ACCIONES RÁPIDAS — two full-width buttons side by side (50%–50% split), height 44px, rounded-12, 8px gap.
+   Left: "Reporte mensual" — outline hairline border lime, IBM Plex Sans 600 14px lime, file-text SVG icon (lime, 16px) inline left.
+   Right: "Exportar datos" — outline hairline border muted dark, IBM Plex Sans 600 14px dark, download SVG icon (muted, 16px) inline left.
+
+9. BOTTOM NAV: fixed, 5 items (Inicio / Movimientos / Cuentas / Stats / Más). "Stats" tab active (lime). Safe-area bottom padding.
+
+NO emoji — all icons clean SVG. Tabular numbers throughout ALL amounts and percentages. Charts readable without color alone (labels + values on all data points). NO glassmorphism. Light mode. Premium analytics dashboard feel — generous vertical spacing (12–16px between sections), hairline separators between major sections (rgba(0,0,0,.06)). Clean vertical rhythm. NO nested box-in-box-in-box.
+
+Photorealistic, implementation-friendly. Light mode. Premium fintech analytics mobile screen.`,
+  },
+  {
+    id: 'estadisticas-comparar',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app ESTADÍSTICAS — COMPARAR PERÍODOS (comparación lado a lado de dos meses).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9. Premium fintech comparison analytics mobile screen, es-AR. Drill-down implied: tapping any category row navigates to category detail. All charts readable, no fake-data tells.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): left back-arrow icon (muted dark). Center "Comparar períodos" IBM Plex Sans 600 16px dark. Right: share/export icon (muted, 20px SVG).
+
+2. PERIOD TOGGLE — a compact period-type segmented selector below top bar. Full-width, hairline border rounded-10 container. Three tabs: "Mes" | "Trimestre" | "Rango libre". "Mes" selected (solid lime bg #65A30D, white IBM Plex Sans 700 13px, height 38px). Others: stone bg, muted IBM Plex Sans 500 13px.
+
+3. PERIOD SELECTORS — two date selectors side by side, equal width, 8px gap. Each is a tappable row (hairline border rounded-8, padding 10px 12px, warm-white bg, subtle shadow):
+   Left: label "Período A" IBM Plex Sans 400 11px muted above, in-row: "Mayo 2025" IBM Plex Sans 600 14px lime left + chevron-down SVG (muted, 16px) right.
+   Right: label "Período B" IBM Plex Sans 400 11px muted above, in-row: "Abril 2025" IBM Plex Sans 600 14px dark left + chevron-down SVG (muted, 16px) right. The "Período A" selector has a lime left-border accent (2px solid #65A30D) to visually distinguish current from comparison.
+
+4. RESUMEN COMPARATIVO — a compact 2×2 card grid (same layout as estadisticas summary cards, 8px gap, radius 12px):
+   Card TL — "Ingresos" / Mayo vs Abril: "$ 350.000" IBM Plex Mono 700 16px dark tabular-nums (Mayo, period A). Below: "$ 320.000" IBM Plex Mono 400 12px muted (Abril, period B) + variation chip "+ 9,4%" (lime bg, white IBM Plex Sans 600 11px rounded-full, upward-arrow SVG white 10px inline left).
+   Card TR — "Gastos" / Mayo vs Abril: "$ 124.800" IBM Plex Mono 700 16px dark tabular-nums. Below: "$ 98.300" muted + variation chip "+ 27%" (#DC2626 bg, white IBM Plex Sans 600 11px rounded-full, downward-arrow SVG inline left — higher spending, negative direction).
+   Card BL — "Balance neto" / Mayo vs Abril: "$ 225.200" IBM Plex Mono 700 16px lime. Below: "$ 221.700" muted + "+ 1,6%" variation (lime chip, upward-arrow).
+   Card BR — "Movimientos" / Mayo vs Abril: "47" IBM Plex Mono 700 16px dark. Below: "41" muted + "+ 14,6%" variation (stone chip, neutral — count is informational not directional).
+   Variation chips: color encodes direction (lime = favorable, red = unfavorable for spending) + text percentage + arrow SVG icon — never color alone.
+
+5. GROUPED BAR CHART "Ingresos vs Gastos por mes" — section label "Ingresos vs Gastos" IBM Plex Sans 600 14px dark left. A grouped bar chart (~120px tall): two side-by-side bar groups, one per period. Period A bars: income = lime #65A30D, expense = red-orange #F97316. Period B bars: income = lighter lime (lime at 50% opacity), expense = lighter red. Each group: 2 bars side by side with 3px gap, 12px gap between groups. X-axis: "Mayo (A)" and "Abril (B)" IBM Plex Sans 300 10px muted. Y-axis: 3 gridlines hairline, "$100k / $200k / $350k" IBM Plex Mono 300 10px muted tabular-nums. Legend below chart: two rows — "Ingresos" (lime dot, 6px) · "Mayo" vs "Abril" (text IBM Plex Sans 400 11px muted). Amounts visible as bar labels above each bar (IBM Plex Mono 10px dark tabular-nums, compact: "$350k / $125k").
+
+6. COMPARACIÓN POR CATEGORÍA — section label "Por categoría" IBM Plex Sans 600 14px dark left + "(tocar para ver detalle)" IBM Plex Sans 300 11px muted right, same line. Flat list, hairline dividers, each row tappable (subtle chevron-right muted 14px far right, indicating drill-down). Minimum 5 rows visible before scroll.
+
+   Each row structure (generous padding 13px 16px):
+   Left column: category icon (36px circle, colored bg): category name IBM Plex Sans 600 14px dark · subtitle "Gastos" IBM Plex Sans 300 12px muted.
+   Center column: two amounts stacked, right-aligned tabular IBM Plex Mono:
+     "$ 39.800" IBM Plex Mono 600 14px dark (Mayo, period A, larger).
+     "$ 28.300" IBM Plex Mono 400 12px muted (Abril, period B, smaller below).
+   Right column: variation badge (rounded-full, IBM Plex Sans 600 11px, 4px 8px padding):
+     Upward-arrow SVG (12px) + percentage text. Badge color: lime for favorable (lower expense), red for unfavorable (higher expense), stone for neutral/stable (±5%).
+
+   Row data (realistic es-AR amounts, tabular-nums throughout):
+   Row 1 — "Supermercado" (shopping-cart SVG, lime #65A30D circle bg, white icon): "$ 39.800" / "$ 28.300" · variation badge "+ 40,6%" #DC2626 red rounded-full (higher is bad for expenses) + upward-arrow SVG (red).
+   Row 2 — "Restaurantes" (utensils SVG, orange #F97316 circle, white icon): "$ 22.400" / "$ 19.100" · "+ 17,3%" #DC2626 red badge.
+   Row 3 — "Transporte" (car SVG, stone circle, muted icon): "$ 14.160" / "$ 15.200" · "− 6,8%" #65A30D lime badge + downward-arrow SVG (lime — lower spending is good).
+   Row 4 — "Suscripciones" (play SVG, stone circle, muted icon): "$ 12.097" / "$ 12.097" · "0%" stone badge, "=" symbol instead of arrow (stable).
+   Row 5 — "Servicios" (zap SVG, stone circle, muted icon): "$ 18.200" / "$ 9.800" · "+ 85,7%" #DC2626 red badge + upward-arrow (outlier, significant increase highlighted). Row may have a very faint red-tinted bg (rgba(220,38,38,.03)) to draw attention.
+   Row 6 (partially visible, ~40px): "Salud" — teaser only, scroll implied.
+
+   All amounts IBM Plex Mono tabular-nums. Category names IBM Plex Sans. Color + text + icon on all variation badges (never color alone). Drill-down implied by chevron-right.
+
+7. BOTTOM NAV: fixed, 5 items (Inicio / Movimientos / Cuentas / Stats / Más). "Stats" tab active (lime). Safe-area bottom padding.
+
+NO emoji — all icons clean SVG. Tabular numbers throughout. Charts readable without color alone (labels + values + icons). NO glassmorphism. Light mode. Generous vertical rhythm 12–16px between sections. Hairline separators (rgba(0,0,0,.06)) between major sections. NO nested box-in-box-in-box.
+
+Photorealistic, implementation-friendly. Light mode. Premium fintech period-comparison mobile screen.`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
