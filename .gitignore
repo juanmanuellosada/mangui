@@ -50,3 +50,6 @@ next-env.d.ts
 /design-mockups/*.png
 
 # brand/ source PNGs are committed as brand assets — do NOT ignore them
+
+# QA / mockups (no versionar imágenes)
+design-mockups/**/*.png
