@@ -12,6 +12,8 @@ import {
   PlusCircle,
   LogOut,
   ArrowLeftRight,
+  Repeat,
+  CalendarClock,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
@@ -23,6 +25,8 @@ const navItems = [
   { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
   { icon: BarChart3, label: "Estadísticas", href: "/app/stats" },
   { icon: CreditCard, label: "Tarjetas", href: "/app/cards" },
+  { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
+  { icon: CalendarClock, label: "Programadas", href: "/app/programadas" },
 ];
 
 interface AppSidebarProps {

@@ -400,6 +400,13 @@ export type Database = {
             referencedRelation: "installment_purchases"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "movements_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -428,6 +435,313 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      recurring_occurrences: {
+        Row: {
+          amount_override: number | null
+          created_at: string
+          id: string
+          movement_id: string | null
+          recurring_id: string
+          scheduled_date: string
+          status: Database["public"]["Enums"]["occurrence_status"]
+          transfer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_override?: number | null
+          created_at?: string
+          id?: string
+          movement_id?: string | null
+          recurring_id: string
+          scheduled_date: string
+          status?: Database["public"]["Enums"]["occurrence_status"]
+          transfer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_override?: number | null
+          created_at?: string
+          id?: string
+          movement_id?: string | null
+          recurring_id?: string
+          scheduled_date?: string
+          status?: Database["public"]["Enums"]["occurrence_status"]
+          transfer_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_occurrences_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_occurrences_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_occurrences_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_transactions: {
+        Row: {
+          account_id: string | null
+          amount: number
+          category_id: string | null
+          created_at: string
+          currency: Database["public"]["Enums"]["currency"]
+          day_of_month: number | null
+          day_of_week: number | null
+          end_date: string | null
+          frequency: Database["public"]["Enums"]["recurring_frequency"]
+          id: string
+          is_card_recurring: boolean
+          kind: Database["public"]["Enums"]["txn_kind"]
+          month_of_year: number | null
+          next_run: string | null
+          note: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["recurring_status"]
+          to_account_id: string | null
+          to_amount: number | null
+          updated_at: string
+          user_id: string
+          weekend_handling: Database["public"]["Enums"]["weekend_handling"]
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          currency: Database["public"]["Enums"]["currency"]
+          day_of_month?: number | null
+          day_of_week?: number | null
+          end_date?: string | null
+          frequency: Database["public"]["Enums"]["recurring_frequency"]
+          id?: string
+          is_card_recurring?: boolean
+          kind: Database["public"]["Enums"]["txn_kind"]
+          month_of_year?: number | null
+          next_run?: string | null
+          note?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["recurring_status"]
+          to_account_id?: string | null
+          to_amount?: number | null
+          updated_at?: string
+          user_id: string
+          weekend_handling?: Database["public"]["Enums"]["weekend_handling"]
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency"]
+          day_of_month?: number | null
+          day_of_week?: number | null
+          end_date?: string | null
+          frequency?: Database["public"]["Enums"]["recurring_frequency"]
+          id?: string
+          is_card_recurring?: boolean
+          kind?: Database["public"]["Enums"]["txn_kind"]
+          month_of_year?: number | null
+          next_run?: string | null
+          note?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["recurring_status"]
+          to_account_id?: string | null
+          to_amount?: number | null
+          updated_at?: string
+          user_id?: string
+          weekend_handling?: Database["public"]["Enums"]["weekend_handling"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_transactions: {
+        Row: {
+          account_id: string | null
+          amount: number
+          category_id: string | null
+          created_at: string
+          currency: Database["public"]["Enums"]["currency"]
+          date: string
+          id: string
+          kind: Database["public"]["Enums"]["txn_kind"]
+          movement_id: string | null
+          note: string | null
+          status: Database["public"]["Enums"]["scheduled_status"]
+          to_account_id: string | null
+          to_amount: number | null
+          transfer_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          currency: Database["public"]["Enums"]["currency"]
+          date: string
+          id?: string
+          kind: Database["public"]["Enums"]["txn_kind"]
+          movement_id?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["scheduled_status"]
+          to_account_id?: string | null
+          to_amount?: number | null
+          transfer_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency"]
+          date?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["txn_kind"]
+          movement_id?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["scheduled_status"]
+          to_account_id?: string | null
+          to_amount?: number | null
+          transfer_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_transactions_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transfers: {
         Row: {
@@ -492,6 +806,13 @@ export type Database = {
             columns: ["from_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfers_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
             referencedColumns: ["id"]
           },
           {
@@ -595,8 +916,19 @@ export type Database = {
       category_type: "income" | "expense"
       currency: "ARS" | "USD"
       movement_type: "income" | "expense"
+      occurrence_status: "pending" | "confirmed" | "skipped"
       rate_type: "oficial" | "blue" | "mep" | "ccl" | "manual"
+      recurring_frequency:
+        | "weekly"
+        | "biweekly"
+        | "monthly"
+        | "bimonthly"
+        | "annual"
+      recurring_status: "active" | "paused" | "inactive"
+      scheduled_status: "pending" | "executed" | "rejected"
+      txn_kind: "income" | "expense" | "transfer"
       ui_theme: "light" | "dark" | "system"
+      weekend_handling: "as_is" | "skip" | "previous_business_day"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -736,8 +1068,20 @@ export const Constants = {
       category_type: ["income", "expense"],
       currency: ["ARS", "USD"],
       movement_type: ["income", "expense"],
+      occurrence_status: ["pending", "confirmed", "skipped"],
       rate_type: ["oficial", "blue", "mep", "ccl", "manual"],
+      recurring_frequency: [
+        "weekly",
+        "biweekly",
+        "monthly",
+        "bimonthly",
+        "annual",
+      ],
+      recurring_status: ["active", "paused", "inactive"],
+      scheduled_status: ["pending", "executed", "rejected"],
+      txn_kind: ["income", "expense", "transfer"],
       ui_theme: ["light", "dark", "system"],
+      weekend_handling: ["as_is", "skip", "previous_business_day"],
     },
   },
 } as const

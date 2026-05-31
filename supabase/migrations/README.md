@@ -209,6 +209,130 @@ Ambas tablas tienen RLS habilitado con las cuatro políticas estándar (`select/
 
 ---
 
+## Fase 3 — Recurrentes y Programadas (`0011_recurring_scheduled.sql`)
+
+### Nuevos enums
+
+| Enum | Valores |
+|---|---|
+| `txn_kind` | `income`, `expense`, `transfer` |
+| `recurring_frequency` | `weekly`, `biweekly`, `monthly`, `bimonthly`, `annual` |
+| `weekend_handling` | `as_is`, `skip`, `previous_business_day` |
+| `recurring_status` | `active`, `paused`, `inactive` |
+| `occurrence_status` | `pending`, `confirmed`, `skipped` |
+| `scheduled_status` | `pending`, `executed`, `rejected` |
+
+Todos creados con `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` (idempotente).
+
+### Nuevas tablas
+
+#### `recurring_transactions`
+Template que define la regla de recurrencia. La app/cron la lee para proyectar `recurring_occurrences`.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `kind` | txn_kind NOT NULL | `income` / `expense` / `transfer` |
+| `amount` | numeric(18,2) NOT NULL | CHECK > 0. Para transferencias: monto origen. |
+| `currency` | currency NOT NULL | Enum `ARS` / `USD` |
+| `account_id` | uuid NULL | FK → `accounts` ON DELETE CASCADE. Cuenta afectada (origen para transfers). |
+| `to_account_id` | uuid NULL | FK → `accounts` ON DELETE CASCADE. Solo `kind='transfer'`. |
+| `to_amount` | numeric(18,2) NULL | CHECK > 0. Monto destino para transfers multimoneda. |
+| `category_id` | uuid NULL | FK → `categories` ON DELETE SET NULL |
+| `note` | text | Descripción libre |
+| `frequency` | recurring_frequency NOT NULL | Frecuencia de repetición |
+| `day_of_week` | int NULL | CHECK 0–6. Solo `weekly`/`biweekly` (0=domingo). |
+| `day_of_month` | int NULL | CHECK 1–31. Solo `monthly`/`bimonthly`/`annual`. |
+| `month_of_year` | int NULL | CHECK 1–12. Solo `annual`. |
+| `weekend_handling` | weekend_handling NOT NULL | DEFAULT `as_is` |
+| `start_date` | date NOT NULL | Inicio de vigencia |
+| `end_date` | date NULL | Fin de vigencia. NULL = sin fecha de fin. |
+| `next_run` | date NULL | Calculado por app/cron. No es fuente de verdad de la regla. |
+| `status` | recurring_status NOT NULL | DEFAULT `active` |
+| `is_card_recurring` | boolean NOT NULL | DEFAULT `false`. True → agrupa ocurrencias en resúmenes de tarjeta. |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**CHECK de integridad:** `chk_recurring_transfer_fields` — cuando `kind='transfer'`, `to_account_id` debe ser NOT NULL y distinto de `account_id`; cuando `kind` es `income`/`expense`, `to_account_id` y `to_amount` deben ser NULL.
+
+**Índices:** `(user_id)` y `(user_id, status, next_run)`.
+
+#### `recurring_occurrences`
+Instancias generadas a partir de un template. Una por fecha-ciclo. El usuario confirma, edita o saltea desde la bandeja "Por confirmar".
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `recurring_id` | uuid NOT NULL | FK → `recurring_transactions` ON DELETE CASCADE |
+| `scheduled_date` | date NOT NULL | Fecha proyectada de la ocurrencia |
+| `status` | occurrence_status NOT NULL | DEFAULT `pending` |
+| `amount_override` | numeric(18,2) NULL | CHECK > 0. NULL = heredar monto del template. |
+| `movement_id` | uuid NULL | FK → `movements` ON DELETE SET NULL. Creado al confirmar. |
+| `transfer_id` | uuid NULL | FK → `transfers` ON DELETE SET NULL. Creado al confirmar (transfers). |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**UNIQUE:** `(recurring_id, scheduled_date)` — una sola ocurrencia por template y fecha.
+
+**Índices:** `(user_id, status)` y `(recurring_id)`.
+
+#### `scheduled_transactions`
+Transacciones programadas puntuales (one-shot). Al llegar la fecha, la app crea el `movement`/`transfer` correspondiente y marca `status = 'executed'`.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `kind` | txn_kind NOT NULL | `income` / `expense` / `transfer` |
+| `amount` | numeric(18,2) NOT NULL | CHECK > 0 |
+| `currency` | currency NOT NULL | Enum `ARS` / `USD` |
+| `account_id` | uuid NULL | FK → `accounts` ON DELETE CASCADE |
+| `to_account_id` | uuid NULL | FK → `accounts` ON DELETE CASCADE. Solo `kind='transfer'`. |
+| `to_amount` | numeric(18,2) NULL | CHECK > 0. Monto destino multimoneda. |
+| `category_id` | uuid NULL | FK → `categories` ON DELETE SET NULL |
+| `note` | text | Descripción libre |
+| `date` | date NOT NULL | Fecha objetivo de ejecución |
+| `status` | scheduled_status NOT NULL | DEFAULT `pending` |
+| `movement_id` | uuid NULL | FK → `movements` ON DELETE SET NULL |
+| `transfer_id` | uuid NULL | FK → `transfers` ON DELETE SET NULL |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**CHECK de integridad:** `chk_scheduled_transfer_fields` — mismo patrón que `recurring_transactions`.
+
+**Índice:** `(user_id, status, date)`.
+
+### RLS
+
+Las tres tablas tienen RLS habilitado con las cuatro políticas estándar (`select`/`insert`/`update`/`delete` propias via `auth.uid() = user_id`), idéntico al patrón de `movements` y `transfers`. Las políticas usan `DO $$ EXCEPTION WHEN duplicate_object THEN NULL END $$` para idempotencia.
+
+### FK forward-compat formalizadas
+
+Las columnas `recurring_id` en `movements` y `transfers` ya existían nullable desde `0004`. Esta migración formaliza la integridad referencial:
+
+- `movements.recurring_id → recurring_transactions(id) ON DELETE SET NULL`
+- `transfers.recurring_id → recurring_transactions(id) ON DELETE SET NULL`
+
+Borrar un template **no borra** los movimientos históricos ya generados; solo desvincula la referencia (`SET NULL`).
+
+### Diagrama de relaciones (adición)
+
+```
+recurring_transactions (1:N)
+    │
+    └── recurring_occurrences (N:1 → recurring_transactions)
+            ├── movement_id  → movements  (opcional, al confirmar)
+            └── transfer_id  → transfers  (opcional, al confirmar)
+
+scheduled_transactions
+    ├── movement_id  → movements  (opcional, al ejecutar)
+    └── transfer_id  → transfers  (opcional, al ejecutar)
+
+movements.recurring_id  → recurring_transactions (nullable)
+transfers.recurring_id  → recurring_transactions (nullable)
+```
+
+---
+
 ## Cómo aplicar las migraciones
 
 ```bash

@@ -533,6 +533,157 @@ Layout top to bottom:
 
 Photorealistic, implementation-friendly. Light mode, clean data list, clear status badges with color + text (not color alone).`,
   },
+
+  // ─── RECURRENTES + PROGRAMADAS ───────────────────────────────────────────
+  {
+    id: 'recurrentes',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app RECURRENTES (lista de transacciones recurrentes).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): "Recurrentes" IBM Plex Sans 600 16px dark, centered. Left: back-arrow icon (muted). Right: search icon (muted dark).
+
+2. PRÓXIMAS OCURRENCIAS INBOX (~120px tall): a compact horizontal-scrollable card strip labeled "Por confirmar" IBM Plex Sans 500 12px muted UPPERCASE left (this is the ONLY eyebrow on this screen). Cards (2 visible, 3rd partially): each is a small double-bezel card (outer shell hairline-bordered, inner core slightly contrasted, radius 12px, padding 12px 14px):
+   Card A: category icon (calendar-clock SVG, lime) · "Alquiler" IBM Plex Sans 600 14px dark · "$ 185.000" IBM Plex Mono 500 14px tabular-nums dark · "1 jun" IBM Plex Sans 300 12px muted. Two action buttons at bottom: "Confirmar" (solid lime, micro-size, IBM Plex Sans 600 11px rounded-8) + "Saltar" (outline muted, same size).
+   Card B: category icon (repeat SVG, muted stone) · "Netflix" · "$ 4.899" · "3 jun". Same action buttons.
+   Card C (partially visible, ~30px showing): "Spotify" — teaser only.
+   Strip has horizontal scroll implied. Background slightly off-white card strip behind the cards.
+
+3. FILTER CHIPS: horizontal scrollable row. Active chip "Todas" (lime bg, white IBM Plex Sans 500 12px, rounded-full). Others: "Activas" · "Pausadas" · "Gastos" · "Ingresos" · "Tarjeta" (dark hairline outline, muted text, rounded-full). IBM Plex Sans 500 12px. Generous horizontal padding 12px each.
+
+4. RECURRING TEMPLATES LIST — the main body, grouped by none (flat list with hairline dividers). At least 5 rows visible before scroll:
+
+Row 1 — "Alquiler":
+  Left: category icon circle (house SVG, lime bg #65A30D, white icon, 36px circle) · center: "Alquiler" IBM Plex Sans 600 15px dark · subtitle "Mensual · día 1" IBM Plex Sans 400 13px muted · right column: "$ 185.000" IBM Plex Mono 600 15px dark tabular-nums top-right · "Próx: 1 jun" IBM Plex Sans 300 12px muted top-right · iOS-style toggle switch ON (lime, 28px) below the amount on the right.
+
+Row 2 — "Sueldo":
+  Icon circle (arrow-up SVG, success green #16A34A bg, white icon) · "Sueldo" 600 15px · "Mensual · día 10" · "+ $ 650.000" IBM Plex Mono 600 15px SUCCESS GREEN tabular-nums · "Próx: 10 jun" · toggle ON (lime).
+
+Row 3 — "Netflix":
+  Icon circle (play SVG, orange #F97316 bg, white) · "Netflix" · "Mensual · día 3" + small badge "Tarjeta" (orange hairline chip, IBM Plex Sans 400 11px rounded-full) · "− $ 4.899" red tabular-nums · "Próx: 3 jun" · toggle ON (lime).
+
+Row 4 — "Spotify":
+  Icon circle (music-note SVG, stone bg, muted icon) · "Spotify" · "Mensual · día 15" · "− $ 2.299" muted red · "Próx: 15 jun" · toggle ON (lime).
+
+Row 5 — "Gym":
+  Icon circle (dumbbell SVG, stone bg) · "Gym" · "Mensual · día 5" · "− $ 12.000" muted red · "Próx: 5 jun" · toggle OFF (stone, switch visually off). Row has slightly muted opacity (0.6) to indicate paused.
+
+Row 6 (partially visible): "Internet Fibertel" · "Mensual · día 20".
+
+Hairline dividers (rgba(0,0,0,.06)) between rows. Rows have 16px horizontal padding, 14px vertical padding. IBM Plex Sans throughout. Amounts IBM Plex Mono tabular-nums. Generous vertical rhythm.
+
+5. FAB "Nueva recurrente": floating action button, bottom-right corner, solid lime #65A30D, 56px circle, white "+" icon (24px clean SVG), warm-tinted shadow (0 8px 16px rgba(101,163,13,.3)). Positioned 24px from right edge, 80px above bottom nav.
+
+6. BOTTOM NAV: fixed, 5 items, "Más" or generic tab active showing context. Safe-area bottom padding.
+
+Photorealistic, implementation-friendly. Light mode. NO emoji as icons — all icons are clean SVG. Tabular numbers throughout. NO glassmorphism. Clear visual hierarchy between template name, frequency label, amount, and next-run date.`,
+  },
+  {
+    id: 'recurrente-nueva',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app RECURRENTE NUEVA (alta de transacción recurrente).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only.
+
+Background: dark #0B1410 dashboard blurred (backdrop-filter blur(6px) + rgba(0,0,0,.5) overlay), just enough visible to indicate context.
+
+BOTTOM SHEET: light background #FAFAF9, rounded top corners only (radius 24px top-left/top-right), drag handle (short gray rounded bar, 36px wide × 4px tall, stone color) at top center. Padding 24px. Sheet covers ~92% of screen height (tall form, scrollable).
+
+Sheet content top to bottom:
+
+1. SHEET HEADER: "Nueva recurrente" IBM Plex Sans 600 18px dark left. Close × icon right (muted dark, 20px).
+
+2. TIPO SELECTOR: 3-tab pill group, full-width, rounded-10 container, hairline border. Tabs: "Gasto" | "Ingreso" | "Transferencia". "Gasto" tab selected (solid lime bg #65A30D, white IBM Plex Sans 700 14px). Others: stone bg, muted dark text IBM Plex Sans 500 14px. Tab height 40px.
+
+3. MONTO + MONEDA ROW: two fields side by side.
+   Left (~65% width): label "Monto" IBM Plex Sans 400 13px muted above. Large input "$ 185.000" Calistoga ~2rem dark tabular-nums, lime focus ring 3px, rounded-8 hairline border. IBM Plex Mono digits.
+   Right (~33% width): label "Moneda" above. Select field showing "ARS" with chevron-down, hairline border rounded-8, IBM Plex Sans 500 14px dark.
+
+4. CUENTA SELECT: label "Cuenta" above. Full-width select showing a wallet icon left + "Cuenta corriente Santander" IBM Plex Sans 400 14px dark + chevron-down right. Hairline border rounded-8, padding 12px 14px.
+
+5. CATEGORÍA SELECT: label "Categoría" above. Full-width select, tag icon left + "Servicios" IBM Plex Sans 400 14px dark + chevron-down right. Hairline border rounded-8.
+
+6. FRECUENCIA SELECTOR — label "Frecuencia" IBM Plex Sans 400 13px muted above. A 5-option horizontal segmented selector, full-width, rounded-8 container with hairline border. Options: "Semanal" | "Quincenal" | "Mensual" | "Bimestral" | "Anual". "Mensual" selected (solid lime bg, white IBM Plex Sans 600 12px). Others: stone bg, muted IBM Plex Sans 400 12px. Below the selector, a contextual sub-field appears:
+   Label "Día del mes" IBM Plex Sans 400 13px muted above. A number input showing "1" with − / + stepper buttons on each side (hairline-bordered, rounded-8, muted icons, IBM Plex Mono 16px dark center). Helper "El último día válido del mes si el mes es más corto." IBM Plex Sans 300 11px muted below.
+
+7. FIN DE SEMANA ROW: label "Si cae en fin de semana" IBM Plex Sans 400 13px muted above. Three radio-chip options in a horizontal row, each a rounded-full hairline chip, IBM Plex Sans 500 12px:
+   "Tal cual" (selected: lime bg, white text) · "Saltar" (stone bg, muted) · "Viernes hábil" (stone bg, muted).
+
+8. VIGENCIA ROW: two date fields side by side.
+   Left: label "Desde" above. Date chip "1 jun 2025" (lime bg, white IBM Plex Sans 500 13px, calendar icon left, rounded-8).
+   Right: label "Hasta (opcional)" above. Date chip placeholder "Sin fin" (stone bg, muted IBM Plex Sans 400 13px, calendar icon left, hairline border rounded-8).
+
+9. TARJETA TOGGLE ROW: a full-width row with a hairline divider above it, padding 14px 0. Left: "Gasto de tarjeta de crédito" IBM Plex Sans 500 14px dark + below: "Se agrupará en los resúmenes" IBM Plex Sans 300 12px muted. Right: iOS-style toggle switch OFF (stone, 28px).
+
+10. PREVIEW CHIP: a subtle inline preview row, no border, just muted bg. Left: repeat-clock icon (lime, 16px SVG) · "Próxima ejecución: 1 de junio de 2025" IBM Plex Sans 400 13px dark. IBM Plex Mono for the date. Rounded-8, padding 10px 14px, stone-tinted background.
+
+11. PRIMARY CTA: full-width solid lime button "Guardar recurrente" height 52px rounded-12 IBM Plex Sans 700 white. Bottom safe-area padding below.
+
+Labels are always ABOVE inputs, never as placeholders. All inputs have visible labels. Lime focus ring on active field. Hairline borders throughout. Tabular numbers on all amounts and dates. NO nested box-in-box-in-box. NO glassmorphism.
+
+Photorealistic, implementation-friendly. Light sheet on dark blurred bg. Clean vertical rhythm 12–16px between fields.`,
+  },
+  {
+    id: 'programadas',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app PROGRAMADAS (transacciones programadas + bandeja de confirmación).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): "Programadas" IBM Plex Sans 600 16px dark centered. Left: back-arrow icon (muted). Right: "+" icon (lime, 20px) to add a new scheduled transaction.
+
+2. BANDEJA DE CONFIRMACIÓN SECTION — label "Acción requerida" IBM Plex Sans 500 12px muted UPPERCASE left (the ONLY eyebrow on this screen). A vertically-stacked inbox of 2–3 items requiring user action (mix of pending recurring occurrences and scheduled transactions that arrived):
+
+Item A (recurring occurrence): left side has a lime left-border accent (2px solid #65A30D) on the card. Row: repeat icon (lime, 16px SVG) · "Alquiler · Recurrente" IBM Plex Sans 600 14px dark · subtitle "Vence 1 jun 2025" IBM Plex Sans 300 12px muted. Right: "$ 185.000" IBM Plex Mono 600 14px dark tabular-nums. Below text, inline 3 action buttons (micro, compact, 28px tall): "Confirmar" (solid lime, IBM Plex Sans 600 11px rounded-6, white text) · "Editar" (outline muted dark, same size) · "Saltar" (text-only, destructive stone, IBM Plex Sans 400 11px). Hairline border around full item card, radius 10px, padding 12px 14px, warm-white bg, subtle tinted shadow.
+
+Item B (scheduled one-time): left border accent orange #F97316 (2px). Row: calendar icon (orange, 16px SVG) · "Pago seguro hogar · Programada" IBM Plex Sans 600 14px dark · "Vence 5 jun 2025" IBM Plex Sans 300 12px muted. Right: "$ 28.400" IBM Plex Mono 600 14px dark tabular. Buttons: "Confirmar" · "Editar" · "Rechazar" (same micro-button pattern, "Rechazar" in #DC2626 red text-only).
+
+Hairline divider between items in the inbox section.
+
+3. FILTER CHIPS: horizontal scrollable row. "Todas" active (lime bg, white rounded-full IBM Plex Sans 500 12px). Others: "Pendientes" · "Ejecutadas" · "Rechazadas" · "Ingresos" · "Gastos" · "Transferencias". Stone hairline chips, muted text, rounded-full 12px.
+
+4. SCHEDULED TRANSACTIONS LIST — flat list, hairline dividers, at least 5 rows visible before scroll. Each row: 16px horizontal padding, 14px vertical padding.
+
+Row 1 — "Renovación seguro auto" (pending):
+  Left: calendar icon circle (34px, stone bg, calendar SVG muted) · "Renovación seguro auto" IBM Plex Sans 600 14px dark · "10 jun 2025 · Gasto" IBM Plex Sans 300 12px muted. Right: "− $ 62.000" IBM Plex Mono 500 14px red tabular · status badge "Pendiente" (stone bg, muted IBM Plex Sans 500 11px rounded-full).
+
+Row 2 — "Cobro freelance" (pending, income):
+  Icon circle (arrow-up SVG, success green bg) · "Cobro freelance diseño" · "15 jun 2025 · Ingreso" · "+ $ 120.000" IBM Plex Mono 500 14px SUCCESS GREEN · badge "Pendiente".
+
+Row 3 — "Netflix" (executed):
+  Icon circle (play SVG, stone bg, muted icon) · "Netflix" · "3 jun 2025 · Gasto" · "− $ 4.899" muted IBM Plex Mono · badge "Ejecutada" (lime bg #65A30D, white IBM Plex Sans 500 11px rounded-full). Row muted opacity ~0.7.
+
+Row 4 — "Transferencia ahorro USD" (pending, transfer):
+  Icon circle (arrows-exchange SVG, stone bg) · "Transferencia ahorro USD" · "20 jun 2025 · Transferencia" · "$ 50.000" muted IBM Plex Mono · badge "Pendiente".
+
+Row 5 — "Pago tarjeta Visa" (rejected):
+  Icon circle (credit-card SVG, stone bg) · "Pago tarjeta Visa" · "28 may 2025 · Gasto" · "− $ 87.420" muted red · badge "Rechazada" (#DC2626 bg, white IBM Plex Sans 500 11px rounded-full). Row muted opacity ~0.6.
+
+Row 6 (partially visible, ~half row): "Internet + teléfono" · "25 jun".
+
+Hairline dividers between rows. Amount column uses IBM Plex Mono tabular-nums throughout. Status badges always show color + text (never color alone). Income amounts are GREEN, expense amounts are RED, transfers NEUTRAL muted.
+
+5. FAB "Nueva programada": floating action button, bottom-right, lime #65A30D, 56px circle, white "+" icon (24px SVG), warm-tinted lime shadow. 24px from right, 80px above bottom nav.
+
+6. BOTTOM NAV: fixed, 5 items, appropriate tab active. Safe-area bottom padding.
+
+Photorealistic, implementation-friendly. Light mode. NO emoji as icons — clean SVG vector icons. Tabular numbers on ALL amounts and dates. Clear status badge differentiation: Pendiente (stone) / Ejecutada (lime) / Rechazada (red). Inbox items visually distinct from the main list via the colored left-border accent and shadow.`,
+  },
 ];
 
 // ---------------------------------------------------------------------------
