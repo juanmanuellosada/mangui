@@ -9,6 +9,7 @@ import { Zap, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { cn } from "@/lib/utils"
@@ -281,32 +282,21 @@ export function MovementForm({
         <Label htmlFor="amount" className="text-xs text-muted-foreground font-medium">
           Monto
         </Label>
-        <div className="relative flex items-center">
-          <span
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none pointer-events-none z-10 tabular-nums transition-opacity duration-100"
-            aria-hidden
-          >
-            {originalCurrency === "USD" ? "US$" : "$"}
-          </span>
-          <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            inputMode="decimal"
-            placeholder="0"
-            style={{
-              paddingLeft: originalCurrency === "USD" ? "3.5rem" : "2.25rem",
-            }}
-            className={cn(
-              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
-              "focus:border-primary focus:ring-2 focus:ring-ring/30",
-              type === "income" ? "focus:border-success" : "focus:border-destructive"
-            )}
-            {...register("amount")}
-            aria-invalid={!!errors.amount}
-          />
-        </div>
+        <MoneyInput
+          id="amount"
+          step="0.01"
+          min="0.01"
+          placeholder="0"
+          currency={originalCurrency}
+          className={cn(
+            "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+            "focus:border-primary focus:ring-2 focus:ring-ring/30",
+            type === "income" ? "focus:border-success" : "focus:border-destructive"
+          )}
+          wrapperClassName="w-full"
+          {...register("amount")}
+          aria-invalid={!!errors.amount}
+        />
         {errors.amount && (
           <p className="text-xs text-destructive">{errors.amount.message}</p>
         )}
@@ -442,13 +432,12 @@ export function MovementForm({
                 </span>
               )}
             </Label>
-            <Input
+            <MoneyInput
               id="converted_amount"
-              type="number"
               step="0.01"
-              inputMode="decimal"
               placeholder="0,00"
-              className="tabular-nums"
+              currency={accountCurrency as "ARS" | "USD"}
+              className="tabular-nums w-full"
               value={convertedAmount ?? ""}
               onChange={(e) =>
                 setValue("converted_amount", e.target.value ? parseFloat(e.target.value) : null)

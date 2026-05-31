@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -189,19 +190,13 @@ function RegisterPaymentDialog({
             <Label className="text-xs text-muted-foreground font-medium">
               Monto pagado
             </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">
-                $
-              </span>
-              <Input
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                className="pl-7 tabular-nums font-semibold"
-              />
-            </div>
+            <MoneyInput
+              step="0.01"
+              currency="ARS"
+              value={paidAmount}
+              onChange={(e) => setPaidAmount(e.target.value)}
+              className="tabular-nums font-semibold w-full"
+            />
           </div>
 
           <div className="space-y-1.5">

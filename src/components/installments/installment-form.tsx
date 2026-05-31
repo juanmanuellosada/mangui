@@ -7,6 +7,7 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { cn } from "@/lib/utils"
@@ -157,31 +158,20 @@ export function InstallmentForm({
         <Label htmlFor="total_amount" className="text-xs text-muted-foreground font-medium">
           Monto total
         </Label>
-        <div className="relative flex items-center">
-          <span
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none pointer-events-none z-10 tabular-nums transition-opacity duration-100"
-            aria-hidden
-          >
-            {currency === "USD" ? "US$" : "$"}
-          </span>
-          <Input
-            id="total_amount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            inputMode="decimal"
-            placeholder="0"
-            style={{
-              paddingLeft: currency === "USD" ? "3.5rem" : "2.25rem",
-            }}
-            className={cn(
-              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
-              "focus:border-primary focus:ring-2 focus:ring-ring/30"
-            )}
-            {...register("total_amount")}
-            aria-invalid={!!errors.total_amount}
-          />
-        </div>
+        <MoneyInput
+          id="total_amount"
+          step="0.01"
+          min="0.01"
+          placeholder="0"
+          currency={currency}
+          className={cn(
+            "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+            "focus:border-primary focus:ring-2 focus:ring-ring/30"
+          )}
+          wrapperClassName="w-full"
+          {...register("total_amount")}
+          aria-invalid={!!errors.total_amount}
+        />
         {errors.total_amount && (
           <p className="text-xs text-destructive">{errors.total_amount.message}</p>
         )}

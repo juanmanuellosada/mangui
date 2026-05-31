@@ -182,18 +182,29 @@ function LogoCell({
           isSelected ? TILE_SELECTED : ""
         )}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={icon.path}
-          alt={icon.title}
+        {/* Logo tile — uniform aspect-square rounded-xl bg-muted/50 container.
+            Banks/AR logos: object-cover fills the rounded square.
+            Crypto coins (transparent round PNGs): object-contain with padding so
+            the round coin sits centred on the same square-tile surface. */}
+        <div
           className={cn(
-            "w-10 h-10 rounded-lg shrink-0",
-            icon.path.startsWith("/icons/crypto/")
-              ? "object-contain p-0.5"
-              : "object-cover"
+            "w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-muted/50 flex items-center justify-center",
+            "aspect-square"
           )}
-          loading="lazy"
-        />
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={icon.path}
+            alt={icon.title}
+            className={cn(
+              "w-full h-full",
+              icon.path.startsWith("/icons/crypto/")
+                ? "object-contain p-1.5"
+                : "object-cover"
+            )}
+            loading="lazy"
+          />
+        </div>
         <span className="text-[9px] font-medium leading-tight truncate w-full text-center px-1 text-muted-foreground">
           {icon.title}
         </span>

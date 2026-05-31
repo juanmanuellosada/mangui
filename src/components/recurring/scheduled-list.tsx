@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
@@ -458,15 +459,13 @@ function CreateScheduledDialog({
           <div className="space-y-1.5">
             <Label htmlFor="sc-amount" className="text-xs text-muted-foreground font-medium">Monto</Label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none">$</span>
-              <Input
+              <MoneyInput
                 id="sc-amount"
-                type="number"
                 step="0.01"
                 min="0.01"
-                inputMode="decimal"
                 placeholder="0"
-                className="pl-9 text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60"
+                currency={currency}
+                className="text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60 pr-32 w-full"
                 {...register("amount")}
                 aria-invalid={!!errors.amount}
               />
@@ -520,13 +519,12 @@ function CreateScheduledDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="sc-to-amount" className="text-xs text-muted-foreground font-medium">Monto destino</Label>
-                <Input
+                <MoneyInput
                   id="sc-to-amount"
-                  type="number"
                   step="0.01"
-                  inputMode="decimal"
                   placeholder="0,00"
-                  className="tabular-nums"
+                  currency={currency}
+                  className="tabular-nums w-full"
                   value={toAmount ?? ""}
                   onChange={(e) => setValue("to_amount", e.target.value ? parseFloat(e.target.value) : null)}
                 />

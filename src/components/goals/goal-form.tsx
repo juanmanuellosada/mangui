@@ -9,6 +9,7 @@ import { Sparkles, TrendingDown, TrendingUp, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { cn, formatCurrency } from "@/lib/utils"
 import {
@@ -263,17 +264,14 @@ export function GoalForm({
           <div className="space-y-1.5">
             <Label htmlFor="goal-target">Objetivo de ahorro</Label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium select-none">
-                  $
-                </span>
-                <Input
+              <div className="flex-1">
+                <MoneyInput
                   id="goal-target"
-                  type="number"
                   min={0}
                   step={0.01}
-                  className="pl-7 tabular-nums"
+                  className="tabular-nums w-full"
                   placeholder="500"
+                  currency={watchedValues.currency}
                   {...register("target_amount")}
                   aria-invalid={!!errors.target_amount}
                 />
@@ -369,21 +367,16 @@ export function GoalForm({
                 Calcular de mi historial
               </button>
             </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium select-none">
-                $
-              </span>
-              <Input
-                id="red-baseline"
-                type="number"
-                min={0}
-                step={0.01}
-                className="pl-7 tabular-nums"
-                placeholder="16.000"
-                {...register("baseline_amount")}
-                aria-invalid={!!errors.baseline_amount}
-              />
-            </div>
+            <MoneyInput
+              id="red-baseline"
+              min={0}
+              step={0.01}
+              className="tabular-nums w-full"
+              placeholder="16.000"
+              currency={watchedValues.currency}
+              {...register("baseline_amount")}
+              aria-invalid={!!errors.baseline_amount}
+            />
             {errors.baseline_amount && (
               <p className="text-xs text-destructive">{errors.baseline_amount.message}</p>
             )}
@@ -417,17 +410,14 @@ export function GoalForm({
           <div className="space-y-1.5">
             <Label htmlFor="red-target-amt">Monto objetivo (opcional)</Label>
             <div className="flex gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium select-none">
-                  $
-                </span>
-                <Input
+              <div className="flex-1">
+                <MoneyInput
                   id="red-target-amt"
-                  type="number"
                   min={0}
                   step={0.01}
-                  className="pl-7 tabular-nums"
+                  className="tabular-nums w-full"
                   placeholder="Máximo mensual"
+                  currency={watchedValues.currency}
                   {...register("target_amount")}
                 />
               </div>

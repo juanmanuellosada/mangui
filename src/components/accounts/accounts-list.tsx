@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight } from "lucide-react"
+import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight, Search, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,12 +17,16 @@ import {
 } from "@/components/ui/dialog"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Input } from "@/components/ui/input"
+import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
 import { AccountForm, accountToFormValues, type AccountFormValues } from "./account-form"
 import {
   ACCOUNT_TYPE_LABELS,
+  ACCOUNT_TYPE_EMOJIS,
   renderAccountIcon,
   type Account,
   type AccountBalance,
+  type AccountType,
 } from "@/lib/accounts"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -470,6 +474,172 @@ function PatrimonioCard({
   )
 }
 
+// ── Filter helpers ────────────────────────────────────────────
+type TipoFilter = "todas" | AccountType
+type MonedaFilter = "todas" | "ARS" | "USD"
+type VisibilidadFilter = "todas" | "visibles" | "ocultas"
+type OrdenFilter = "nombre_az" | "mayor_saldo" | "menor_saldo" | "recientes"
+
+interface AccountFilters {
+  search: string
+  tipo: TipoFilter
+  moneda: MonedaFilter
+  visibilidad: VisibilidadFilter
+  orden: OrdenFilter
+}
+
+const DEFAULT_FILTERS: AccountFilters = {
+  search: "",
+  tipo: "todas",
+  moneda: "todas",
+  visibilidad: "todas",
+  orden: "recientes",
+}
+
+function normalize(s: string) {
+  return s
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+}
+
+function isFiltersActive(f: AccountFilters) {
+  return (
+    f.search.trim() !== "" ||
+    f.tipo !== "todas" ||
+    f.moneda !== "todas" ||
+    f.visibilidad !== "todas" ||
+    f.orden !== "recientes"
+  )
+}
+
+// ── Accounts filter bar ───────────────────────────────────────
+const TIPO_OPTIONS: MangoSelectOption[] = [
+  { value: "todas", label: "Todos los tipos" },
+  ...(Object.entries(ACCOUNT_TYPE_LABELS) as [AccountType, string][]).map(
+    ([type, label]) => ({
+      value: type,
+      label: `${ACCOUNT_TYPE_EMOJIS[type]} ${label}`,
+    })
+  ),
+]
+
+const MONEDA_OPTIONS: MangoSelectOption[] = [
+  { value: "todas", label: "Todas las monedas" },
+  { value: "ARS", label: "ARS — Pesos" },
+  { value: "USD", label: "USD — Dólares" },
+]
+
+const VISIBILIDAD_OPTIONS: MangoSelectOption[] = [
+  { value: "todas", label: "Todas" },
+  { value: "visibles", label: "Visibles" },
+  { value: "ocultas", label: "Ocultas" },
+]
+
+const ORDEN_OPTIONS: MangoSelectOption[] = [
+  { value: "recientes", label: "Más recientes" },
+  { value: "nombre_az", label: "Nombre (A–Z)" },
+  { value: "mayor_saldo", label: "Mayor saldo" },
+  { value: "menor_saldo", label: "Menor saldo" },
+]
+
+interface AccountsFilterBarProps {
+  filters: AccountFilters
+  onChange: (f: AccountFilters) => void
+  resultCount: number
+  totalCount: number
+}
+
+function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: AccountsFilterBarProps) {
+  const active = isFiltersActive(filters)
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Search input */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none"
+            aria-hidden
+          />
+          <Input
+            type="search"
+            placeholder="Buscar por nombre o número..."
+            value={filters.search}
+            onChange={(e) => onChange({ ...filters, search: e.target.value })}
+            className="pl-8 h-9 text-sm"
+            aria-label="Buscar cuentas"
+          />
+        </div>
+
+        {/* Tipo */}
+        <div className="w-[180px]">
+          <MangoSelect
+            value={filters.tipo}
+            onChange={(v) => onChange({ ...filters, tipo: v as TipoFilter })}
+            options={TIPO_OPTIONS}
+            aria-label="Filtrar por tipo"
+          />
+        </div>
+
+        {/* Moneda */}
+        <div className="w-[150px]">
+          <MangoSelect
+            value={filters.moneda}
+            onChange={(v) => onChange({ ...filters, moneda: v as MonedaFilter })}
+            options={MONEDA_OPTIONS}
+            aria-label="Filtrar por moneda"
+          />
+        </div>
+
+        {/* Visibilidad */}
+        <div className="w-[130px]">
+          <MangoSelect
+            value={filters.visibilidad}
+            onChange={(v) => onChange({ ...filters, visibilidad: v as VisibilidadFilter })}
+            options={VISIBILIDAD_OPTIONS}
+            aria-label="Filtrar por visibilidad"
+          />
+        </div>
+
+        {/* Orden */}
+        <div className="w-[160px]">
+          <MangoSelect
+            value={filters.orden}
+            onChange={(v) => onChange({ ...filters, orden: v as OrdenFilter })}
+            options={ORDEN_OPTIONS}
+            aria-label="Ordenar cuentas"
+          />
+        </div>
+      </div>
+
+      {/* Result count + clear */}
+      {active && (
+        <div className="flex items-center gap-3 px-0.5">
+          <span className="text-xs text-muted-foreground">
+            {resultCount === totalCount
+              ? `${resultCount} ${resultCount === 1 ? "cuenta" : "cuentas"}`
+              : `${resultCount} de ${totalCount} ${totalCount === 1 ? "cuenta" : "cuentas"}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(DEFAULT_FILTERS)}
+            className={cn(
+              "inline-flex items-center gap-1 text-xs text-muted-foreground",
+              "hover:text-foreground transition-colors duration-150 cursor-pointer",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            )}
+          >
+            <X className="h-3 w-3" aria-hidden />
+            Limpiar filtros
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────
 export function AccountsList() {
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
@@ -489,7 +659,55 @@ export function AccountsList() {
     })
   }, [])
 
+  const [filters, setFilters] = useState<AccountFilters>(DEFAULT_FILTERS)
+
   const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
+
+  const filtersActive = isFiltersActive(filters)
+
+  // When filters are active, flatten all accounts into one filtered + sorted list.
+  // When idle, keep the original visible / hidden section split.
+  const filteredAccounts = useMemo(() => {
+    if (!accounts) return []
+    const q = normalize(filters.search)
+
+    return accounts
+      .filter((a) => {
+        // Search
+        if (q) {
+          const nameMatch = normalize(a.name).includes(q)
+          const numMatch = a.account_number ? normalize(a.account_number).includes(q) : false
+          if (!nameMatch && !numMatch) return false
+        }
+        // Tipo
+        if (filters.tipo !== "todas" && a.type !== filters.tipo) return false
+        // Moneda
+        if (filters.moneda !== "todas" && a.currency !== filters.moneda) return false
+        // Visibilidad
+        if (filters.visibilidad === "visibles" && a.is_hidden) return false
+        if (filters.visibilidad === "ocultas" && !a.is_hidden) return false
+        return true
+      })
+      .sort((a, b) => {
+        switch (filters.orden) {
+          case "nombre_az":
+            return a.name.localeCompare(b.name, "es")
+          case "mayor_saldo": {
+            const ba = balanceMap.get(a.id)?.current_balance ?? a.initial_balance
+            const bb = balanceMap.get(b.id)?.current_balance ?? b.initial_balance
+            return bb - ba
+          }
+          case "menor_saldo": {
+            const ba = balanceMap.get(a.id)?.current_balance ?? a.initial_balance
+            const bb = balanceMap.get(b.id)?.current_balance ?? b.initial_balance
+            return ba - bb
+          }
+          case "recientes":
+          default:
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        }
+      })
+  }, [accounts, filters, balanceMap])
 
   const visible = accounts?.filter((a) => !a.is_hidden) ?? []
   const hidden = accounts?.filter((a) => a.is_hidden) ?? []
@@ -507,9 +725,19 @@ export function AccountsList() {
         <CreateAccountDialog asIconButton userId={userId} />
       </div>
 
-      {/* Patrimonio hero */}
+      {/* Patrimonio hero — always reflects all non-hidden accounts */}
       {!loadingAccounts && accounts && accounts.length > 0 && (
         <PatrimonioCard balances={balances} accounts={accounts} />
+      )}
+
+      {/* Search + filter bar — only when there are accounts */}
+      {!loadingAccounts && accounts && accounts.length > 0 && (
+        <AccountsFilterBar
+          filters={filters}
+          onChange={setFilters}
+          resultCount={filtersActive ? filteredAccounts.length : accounts.length}
+          totalCount={accounts.length}
+        />
       )}
 
       {/* Loading */}
@@ -521,7 +749,7 @@ export function AccountsList() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Onboarding empty state — only when user has zero accounts */}
       {!loadingAccounts && accounts?.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
@@ -542,45 +770,86 @@ export function AccountsList() {
         </div>
       )}
 
-      {/* Visible accounts */}
-      {!loadingAccounts && visible.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-            Mis cuentas
-          </p>
-          <div className="space-y-2">
-            {visible.map((account) => (
-              <AccountCard
-                key={account.id}
-                account={account}
-                balance={balanceMap.get(account.id) ?? undefined}
-                userId={userId}
-              />
-            ))}
+      {/* Filtered empty state — user has accounts but none match the current filters */}
+      {!loadingAccounts && accounts && accounts.length > 0 && filtersActive && filteredAccounts.length === 0 && (
+        <div className="rounded-2xl border border-border/60 bg-muted/30 p-10 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+            <Search className="h-5 w-5 text-muted-foreground" />
           </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">Sin resultados</p>
+            <p className="text-sm text-muted-foreground">
+              No se encontraron cuentas con esos filtros.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilters(DEFAULT_FILTERS)}
+          >
+            Limpiar filtros
+          </Button>
         </div>
       )}
 
-      {/* Hidden accounts */}
-      {!loadingAccounts && hidden.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-            Cuentas ocultas
-          </p>
-          <div className="space-y-2">
-            {hidden.map((account) => (
-              <AccountCard
-                key={account.id}
-                account={account}
-                balance={balanceMap.get(account.id) ?? undefined}
-                userId={userId}
-              />
-            ))}
-          </div>
+      {/* Filtered list — shown when any filter/search is active */}
+      {!loadingAccounts && filtersActive && filteredAccounts.length > 0 && (
+        <div className="space-y-2">
+          {filteredAccounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              balance={balanceMap.get(account.id) ?? undefined}
+              userId={userId}
+            />
+          ))}
         </div>
       )}
 
-      {/* Add account dashed button */}
+      {/* Default sections — visible / hidden split, shown when no filters active */}
+      {!loadingAccounts && !filtersActive && (
+        <>
+          {/* Visible accounts */}
+          {visible.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
+                Mis cuentas
+              </p>
+              <div className="space-y-2">
+                {visible.map((account) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    balance={balanceMap.get(account.id) ?? undefined}
+                    userId={userId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hidden accounts */}
+          {hidden.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
+                Cuentas ocultas
+              </p>
+              <div className="space-y-2">
+                {hidden.map((account) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    balance={balanceMap.get(account.id) ?? undefined}
+                    userId={userId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Add account button */}
       {!loadingAccounts && accounts && accounts.length > 0 && (
         <CreateAccountDialog userId={userId} />
       )}

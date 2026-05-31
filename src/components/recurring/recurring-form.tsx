@@ -8,6 +8,7 @@ import { parseISO, startOfDay } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { Switch } from "@/components/ui/switch"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
@@ -257,20 +258,18 @@ export function RecurringForm({
           Monto
         </Label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none">
-            $
-          </span>
-          <Input
+          <MoneyInput
             id="amount"
-            type="number"
             step="0.01"
             min="0.01"
-            inputMode="decimal"
             placeholder="0"
+            currency={currency}
             className={cn(
-              "pl-9 text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
-              "focus:border-primary focus:ring-2 focus:ring-ring/30"
+              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+              "focus:border-primary focus:ring-2 focus:ring-ring/30",
+              "pr-32"
             )}
+            wrapperClassName="w-full"
             {...register("amount")}
             aria-invalid={!!errors.amount}
           />
@@ -342,13 +341,12 @@ export function RecurringForm({
                 <Label htmlFor="to_amount" className="text-xs text-muted-foreground font-medium">
                   Monto en {toAccount?.currency}
                 </Label>
-                <Input
+                <MoneyInput
                   id="to_amount"
-                  type="number"
                   step="0.01"
-                  inputMode="decimal"
                   placeholder="0,00"
-                  className="tabular-nums"
+                  currency={toAccount?.currency as "ARS" | "USD" | undefined}
+                  className="tabular-nums w-full"
                   value={toAmount ?? ""}
                   onChange={(e) =>
                     setValue("to_amount", e.target.value ? parseFloat(e.target.value) : null)
@@ -377,13 +375,12 @@ export function RecurringForm({
               <Label htmlFor="to_amount" className="text-xs text-muted-foreground font-medium">
                 Monto destino
               </Label>
-              <Input
+              <MoneyInput
                 id="to_amount"
-                type="number"
                 step="0.01"
-                inputMode="decimal"
                 placeholder="0,00"
-                className="tabular-nums"
+                currency={toAccount?.currency as "ARS" | "USD" | undefined}
+                className="tabular-nums w-full"
                 value={toAmount ?? ""}
                 onChange={(e) =>
                   setValue("to_amount", e.target.value ? parseFloat(e.target.value) : null)

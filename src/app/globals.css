@@ -276,6 +276,22 @@
 }
 
 /* ============================================================
+   NUMBER INPUT — hide native spinners globally (safety net)
+   MoneyInput handles this inline; this catches any stragglers.
+   ============================================================ */
+@layer base {
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* ============================================================
    CURSOR POINTER on all interactive elements
    ============================================================ */
 @layer base {

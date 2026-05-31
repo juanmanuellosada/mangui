@@ -9,6 +9,7 @@ import { X, TrendingDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { Switch } from "@/components/ui/switch"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { cn, formatCurrency } from "@/lib/utils"
@@ -202,17 +203,14 @@ export function BudgetForm({
       <div className="space-y-1.5">
         <Label htmlFor="budget-limit">Límite</Label>
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium select-none">
-              $
-            </span>
-            <Input
+          <div className="flex-1">
+            <MoneyInput
               id="budget-limit"
-              type="number"
               min={0}
               step={0.01}
-              className="pl-7 tabular-nums"
+              className="tabular-nums w-full"
               placeholder="50.000"
+              currency={watchedValues.currency}
               {...register("limit_amount")}
               aria-invalid={!!errors.limit_amount}
             />

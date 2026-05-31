@@ -7,6 +7,7 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { Switch } from "@/components/ui/switch"
@@ -320,28 +321,14 @@ export function AccountForm({
         {/* ── Saldo inicial with dynamic currency prefix ────── */}
         <div className="space-y-1.5">
           <Label htmlFor="initial_balance">Saldo inicial</Label>
-          <div className="relative flex items-center">
-            {/* Currency prefix adornment */}
-            <span
-              className={cn(
-                "absolute left-3 select-none text-sm font-medium text-muted-foreground pointer-events-none z-10 tabular-nums",
-                "transition-opacity duration-100"
-              )}
-              aria-hidden
-            >
-              {currencyPrefix}
-            </span>
-            <Input
-              id="initial_balance"
-              type="number"
-              step="0.01"
-              style={{
-                paddingLeft: currencyPrefix === "US$" ? "2.75rem" : "2rem",
-              }}
-              {...register("initial_balance")}
-              aria-invalid={!!errors.initial_balance}
-            />
-          </div>
+          <MoneyInput
+            id="initial_balance"
+            step="0.01"
+            prefix={currencyPrefix}
+            {...register("initial_balance")}
+            aria-invalid={!!errors.initial_balance}
+            className="w-full"
+          />
           {errors.initial_balance && (
             <p className="text-xs text-destructive">{errors.initial_balance.message}</p>
           )}

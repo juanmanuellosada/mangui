@@ -236,7 +236,7 @@ for (const slug of Object.values(CATEGORY_SLUGS)) {
   }
 }
 
-function sanitizeSvg(raw) {
+function sanitizeSvg(raw, type) {
   if (typeof raw !== "string") return null
   let trimmed = raw.trim()
   // Strip XML declaration if present (browsers don't need it for <img> tag)
@@ -251,7 +251,13 @@ function sanitizeSvg(raw) {
   if (svgEnd === -1) return null
   trimmed = trimmed.slice(0, svgEnd + 6)
   // Strip <script> blocks (security)
-  const clean = trimmed.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+  let clean = trimmed.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+  // For "Monedas" (flags), strip the full-canvas background rect/path so the flag
+  // sits on a transparent background (the toggle/tiles must not show a dark box).
+  if (type === "Monedas") {
+    clean = clean.replace(/<path[^>]*d="M0 0H48V48H0V0Z"[^>]*\/>/gi, "")
+    clean = clean.replace(/<rect[^>]*width="48"[^>]*height="48"[^>]*\/>/gi, "")
+  }
   return clean
 }
 
@@ -269,7 +275,7 @@ for (const icon of icons) {
     continue
   }
 
-  const svg = sanitizeSvg(icon.svgContent)
+  const svg = sanitizeSvg(icon.svgContent, icon.type)
   if (!svg) {
     failedParse.push({ id: icon.id, type: icon.type, preview: String(icon.svgContent).slice(0, 60) })
     continue

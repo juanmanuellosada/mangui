@@ -7,8 +7,8 @@ import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
-import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import type { Account } from "@/lib/accounts"
@@ -208,28 +208,16 @@ export function TransferForm({
               <Label htmlFor="from_amount">
                 Monto en {fromAccount?.currency}
               </Label>
-              <div className="relative flex items-center">
-                <span
-                  className="absolute left-3 select-none text-sm font-medium text-muted-foreground pointer-events-none z-10 tabular-nums transition-opacity duration-100"
-                  aria-hidden
-                >
-                  {fromAccount?.currency === "USD" ? "US$" : "$"}
-                </span>
-                <Input
-                  id="from_amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  style={{
-                    paddingLeft: fromAccount?.currency === "USD" ? "2.75rem" : "2rem",
-                  }}
-                  className="tabular-nums"
-                  {...register("from_amount")}
-                  aria-invalid={!!errors.from_amount}
-                />
-              </div>
+              <MoneyInput
+                id="from_amount"
+                step="0.01"
+                min="0.01"
+                placeholder="0,00"
+                currency={fromAccount?.currency as "ARS" | "USD" | undefined}
+                className="tabular-nums w-full"
+                {...register("from_amount")}
+                aria-invalid={!!errors.from_amount}
+              />
               {errors.from_amount && (
                 <p className="text-xs text-destructive">{errors.from_amount.message}</p>
               )}
@@ -239,28 +227,16 @@ export function TransferForm({
               <Label htmlFor="to_amount">
                 Monto en {toAccount?.currency}
               </Label>
-              <div className="relative flex items-center">
-                <span
-                  className="absolute left-3 select-none text-sm font-medium text-muted-foreground pointer-events-none z-10 tabular-nums transition-opacity duration-100"
-                  aria-hidden
-                >
-                  {toAccount?.currency === "USD" ? "US$" : "$"}
-                </span>
-                <Input
-                  id="to_amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  style={{
-                    paddingLeft: toAccount?.currency === "USD" ? "2.75rem" : "2rem",
-                  }}
-                  className="tabular-nums"
-                  {...register("to_amount")}
-                  aria-invalid={!!errors.to_amount}
-                />
-              </div>
+              <MoneyInput
+                id="to_amount"
+                step="0.01"
+                min="0.01"
+                placeholder="0,00"
+                currency={toAccount?.currency as "ARS" | "USD" | undefined}
+                className="tabular-nums w-full"
+                {...register("to_amount")}
+                aria-invalid={!!errors.to_amount}
+              />
               {errors.to_amount && (
                 <p className="text-xs text-destructive">{errors.to_amount.message}</p>
               )}
@@ -285,28 +261,16 @@ export function TransferForm({
       ) : (
         <div className="space-y-1.5">
           <Label htmlFor="from_amount">Monto</Label>
-          <div className="relative flex items-center">
-            <span
-              className="absolute left-3 select-none text-sm font-medium text-muted-foreground pointer-events-none z-10 tabular-nums transition-opacity duration-100"
-              aria-hidden
-            >
-              {fromAccount?.currency === "USD" ? "US$" : "$"}
-            </span>
-            <Input
-              id="from_amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              inputMode="decimal"
-              placeholder="0,00"
-              style={{
-                paddingLeft: fromAccount?.currency === "USD" ? "2.75rem" : "2rem",
-              }}
-              className="tabular-nums"
-              {...register("from_amount")}
-              aria-invalid={!!errors.from_amount}
-            />
-          </div>
+          <MoneyInput
+            id="from_amount"
+            step="0.01"
+            min="0.01"
+            placeholder="0,00"
+            currency={fromAccount?.currency as "ARS" | "USD" | undefined}
+            className="tabular-nums w-full"
+            {...register("from_amount")}
+            aria-invalid={!!errors.from_amount}
+          />
           {errors.from_amount && (
             <p className="text-xs text-destructive">{errors.from_amount.message}</p>
           )}
