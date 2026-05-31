@@ -684,6 +684,111 @@ Hairline dividers between rows. Amount column uses IBM Plex Mono tabular-nums th
 
 Photorealistic, implementation-friendly. Light mode. NO emoji as icons — clean SVG vector icons. Tabular numbers on ALL amounts and dates. Clear status badge differentiation: Pendiente (stone) / Ejecutada (lime) / Rechazada (red). Inbox items visually distinct from the main list via the colored left-border accent and shadow.`,
   },
+  // ─── REGLAS AUTOMÁTICAS ───────────────────────────────────────────────────
+  {
+    id: 'reglas',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app REGLAS AUTOMÁTICAS (lista de reglas de auto-categorización).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only, no other screens visible.
+
+Light mode, background warm near-white #FAFAF9.
+
+Layout top to bottom:
+
+1. TOP BAR (~56px): "Reglas automáticas" IBM Plex Sans 600 16px dark centered. Left: back-arrow icon (muted dark). Right: info icon (muted, 20px SVG).
+
+2. REGLAS SUGERIDAS — section label "Sugerencias detectadas" IBM Plex Sans 500 12px muted UPPERCASE left (the ONLY eyebrow on this screen). Below: a horizontal scrollable row of suggestion chips. Each chip: rounded-full, hairline border rgba(0,0,0,.06), IBM Plex Sans 500 13px dark, padding 8px 14px, warm-white bg with subtle tinted shadow. Three chips visible:
+   Chip A: sparkle/wand SVG icon left (lime, 14px) + "Netflix -> Suscripciones" + "Crear" link text (lime, IBM Plex Sans 600 12px) appended inside chip.
+   Chip B: sparkle icon (lime) + "Spotify -> Suscripciones" + "Crear" link.
+   Chip C: sparkle icon (lime) + "YPF -> Transporte" + "Crear" link. Partially visible (right edge cut off).
+   Strip has horizontal scroll implied. No glassmorphism on chips.
+
+3. SECTION LABEL "Mis reglas" IBM Plex Sans 600 14px dark left. Secondary text "(4 activas de 5)" IBM Plex Sans 300 13px muted right, same baseline.
+
+4. RULES LIST — flat list, hairline dividers (rgba(0,0,0,.06)), 5 rows visible before scroll. Each row: 16px horizontal padding, 15px vertical padding.
+
+Row 1 — "Netflix -> Suscripciones" (active):
+  Left: rule icon circle (40px, lime bg #65A30D, wand/sparkle SVG white, 20px). Center: "Netflix -> Suscripciones" IBM Plex Sans 600 15px dark, single line. Subtitle: "Si la nota contiene 'Netflix'" IBM Plex Sans 400 13px muted. Second subtitle line: "-> Categoria: Suscripciones" IBM Plex Sans 400 13px lime #65A30D. Priority badge "P1" (stone bg, IBM Plex Mono 500 11px muted, rounded-4, padding 2px 5px) right of rule name. Right side: iOS-style toggle switch ON (lime, 28px).
+
+Row 2 — "Sueldo mensual -> Ingresos" (active):
+  Icon circle (arrow-up SVG, success green #16A34A bg, white icon). "Sueldo mensual -> Ingresos" IBM Plex Sans 600 15px dark. Subtitle: "Si la nota contiene 'Sueldo'" IBM Plex Sans 400 13px muted. "-> Categoria: Sueldo" IBM Plex Sans 400 13px success green. Priority badge "P2". Toggle ON (lime).
+
+Row 3 — "Spotify -> Suscripciones" (active):
+  Icon circle (music-note SVG, orange #F97316 bg, white icon). "Spotify -> Suscripciones" IBM Plex Sans 600 15px dark. Subtitle: "Si la nota contiene 'Spotify'" muted. "-> Categoria: Suscripciones" lime. Priority badge "P3". Toggle ON (lime).
+
+Row 4 — "Combustible -> Transporte" (active):
+  Icon circle (gas-pump SVG, stone bg, muted icon). "Combustible -> Transporte" IBM Plex Sans 600 15px dark. Subtitle: "Si la nota empieza con 'YPF' o 'Shell'" muted. "-> Categoria: Transporte" lime. Priority badge "P4". Toggle ON (lime).
+
+Row 5 — "Alquiler mensual" (inactive/paused):
+  Icon circle (home SVG, stone bg, muted icon). "Alquiler mensual" IBM Plex Sans 600 15px dark, muted opacity (~0.6). Subtitle: "Si el monto esta entre $150.000 y $250.000" muted. "-> Categoria: Alquiler - Cuenta: Santander" IBM Plex Sans 400 13px muted (not lime since inactive). Priority badge "P5" muted. Toggle OFF (stone, switch visually off). Entire row reduced opacity (~0.6).
+
+Hairline dividers between rows. Each row tappable (very muted chevron-right icon, 14px, rightmost). IBM Plex Sans throughout. IBM Plex Mono for priority badges. NO emoji as icons — all icons are clean SVG.
+
+5. FAB "Nueva regla": floating action button, bottom-right corner, solid lime #65A30D, 56px circle, white "+" icon (24px clean SVG), warm-tinted lime shadow (0 8px 16px rgba(101,163,13,.3)). Positioned 24px from right edge, 80px above bottom nav.
+
+6. BOTTOM NAV: fixed, 5 items (Inicio / Movimientos / Cuentas / Stats / Mas). "Mas" tab active (lime). Safe-area bottom padding.
+
+Photorealistic, implementation-friendly. Light mode. NO emoji — all icons clean SVG. Tabular numbers. NO glassmorphism. Clear visual hierarchy: rule name bold dark + condition summary muted + action summary lime (or muted if inactive). Priority badges IBM Plex Mono monospaced.`,
+  },
+  {
+    id: 'regla-nueva',
+    group: 'app',
+    aspect: '9:16',
+    prompt: `${DESIGN_PREAMBLE}
+
+HIGH-FIDELITY MOBILE APP SCREEN MOCKUP — mangui PWA app NUEVA REGLA (constructor de regla de auto-categorizacion).
+Aspect ratio 9:16, mobile viewport (390px wide). One screen only.
+
+Background: dark #0B1410 dashboard blurred (backdrop-filter blur(6px) + rgba(0,0,0,.5) overlay), just enough visible to indicate context (list of rules partially visible behind blur).
+
+BOTTOM SHEET: light background #FAFAF9, rounded top corners only (radius 24px top-left/top-right), drag handle (short gray rounded bar, 36px wide x 4px tall, stone color) at top center. Padding 24px. Sheet covers ~95% of screen height (tall scrollable form).
+
+Sheet content top to bottom:
+
+1. SHEET HEADER: "Nueva regla" IBM Plex Sans 600 18px dark left. Close x icon right (muted dark, 20px).
+
+2. NOMBRE INPUT: label "Nombre de la regla" IBM Plex Sans 400 13px muted above. Text input showing "Netflix -> Suscripciones" — hairline border rounded-8, IBM Plex Sans 400 16px dark, lime focus ring 3px. Helper text IBM Plex Sans 300 11px muted below: "Elegi un nombre que identifique el patron."
+
+3. COINCIDENCIA SELECTOR — label "Las condiciones coinciden cuando" IBM Plex Sans 400 13px muted above. A 2-option segmented selector, full-width, rounded-8 hairline border container. Options: "Coinciden TODAS" | "Coincide ALGUNA". "Coinciden TODAS" selected (solid lime bg #65A30D, white IBM Plex Sans 700 13px). Other option: stone bg, muted IBM Plex Sans 500 13px. Tab height 40px. Helper text below: "TODAS = AND entre condiciones / ALGUNA = OR" IBM Plex Sans 300 11px muted.
+
+4. CONDICIONES SECTION — section label "Condiciones" IBM Plex Sans 600 14px dark left + small "?" tooltip icon right (muted, 14px SVG). Two condition rows already added, with a "+ Agregar condicion" button below.
+
+Condition row 1 (active, lime focus ring on value field):
+  A 3-field inline row on a subtle stone-tinted card (hairline border rounded-10, padding 12px 14px, bg rgba(0,0,0,.03)):
+  Field A "Campo" — compact select chip "Nota" (IBM Plex Sans 500 13px dark, chevron-down, hairline rounded-6, ~80px width).
+  Field B "Operador" — select chip "contiene" (IBM Plex Sans 500 13px dark, chevron-down, hairline rounded-6, ~90px width).
+  Field C "Valor" — text input "Netflix" (IBM Plex Sans 400 13px dark, hairline rounded-6, flex-1, lime focus ring).
+  Trash/delete icon (muted red #DC2626, 16px SVG) far right.
+
+Condition row 2:
+  Same 3-field card pattern. Field A: "Monto". Field B: "menor que". Field C: "$ 10.000" (IBM Plex Mono tabular-nums). Delete icon right.
+
+Below row 2: "+ Agregar condicion" — full-width hairline dashed border rounded-8 (rgba(101,163,13,.4)), IBM Plex Sans 500 13px lime, small "+" SVG icon left, padding 10px.
+
+5. ACCIONES SECTION — section label "Acciones" IBM Plex Sans 600 14px dark left. Two stacked action fields:
+
+"Asignar categoria": label IBM Plex Sans 400 13px muted above. Full-width select: tag SVG icon left + "Suscripciones" IBM Plex Sans 400 14px dark + chevron-down right. Hairline border rounded-8. Lime focus ring (active field).
+
+"Asignar cuenta (opcional)": label IBM Plex Sans 400 13px muted above. Full-width select: wallet SVG icon left + "— Sin cambio —" IBM Plex Sans 400 14px muted + chevron-down right. Hairline border rounded-8, no focus ring.
+
+6. PRIORIDAD ROW — label "Prioridad" IBM Plex Sans 400 13px muted above. Compact number stepper: minus "-" button (hairline rounded-8, 36px, IBM Plex Sans 600 18px muted) + number input "1" (IBM Plex Mono 600 18px dark, 60px wide, hairline rounded-8, centered) + plus "+" button (same). Helper below: "Mayor numero = se aplica primero cuando varias reglas coinciden." IBM Plex Sans 300 11px muted.
+
+7. VISTA PREVIA — a subtle elevated card (hairline border rounded-12, padding 14px 16px, warm-white bg, light tinted shadow, 2px solid lime left-border accent). Sparkle/wand SVG icon (lime, 18px) inline left of first line.
+   Line 1: "3 movimientos del historial coincidirian" IBM Plex Sans 600 14px dark.
+   Mini-list below, 3 compact rows (4px spacing, no dividers):
+     calendar SVG (muted, 12px) + "Netflix - 3 may - $ 4.899" IBM Plex Sans 400 12px muted, IBM Plex Mono for amount.
+     calendar SVG + "Netflix Premium - 3 abr - $ 4.899" muted.
+     calendar SVG + "Netflix - 3 mar - $ 4.899" muted.
+
+8. PRIMARY CTA: full-width solid lime #65A30D button "Guardar regla" height 52px rounded-12 IBM Plex Sans 700 white. Bottom safe-area padding below.
+
+All labels ABOVE inputs, never as placeholders. Lime focus ring on active field. Hairline borders throughout. Tabular numbers on all amounts. NO nested box-in-box-in-box. NO glassmorphism. NO emoji — clean SVG vector icons.
+
+Photorealistic, implementation-friendly. Light sheet on dark blurred background. Clean vertical rhythm 14–16px between form sections.`,
+  },
 ];
 
 // ---------------------------------------------------------------------------

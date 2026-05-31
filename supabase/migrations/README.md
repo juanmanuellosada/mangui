@@ -16,6 +16,8 @@ Documentación del esquema de base de datos, modelo de seguridad y decisiones de
 | `0006_triggers_seed.sql` | Trigger de signup `on_auth_user_created`, función `handle_new_user()`, `seed_default_categories()` |
 | `0007_views.sql` | Vista `account_balances` (saldo derivado), vista `account_balances_projected` |
 | `0010_installments_cards.sql` | `installment_purchases`, FK `movements → installment_purchases`, `card_statements` |
+| `0011_recurring_scheduled.sql` | `recurring_transactions`, `recurring_occurrences`, `scheduled_transactions` |
+| `0012_auto_rules.sql` | Enums `rule_match`, `rule_field`, `rule_operator`; tablas `auto_rules`, `auto_rule_conditions` |
 
 ---
 
@@ -330,6 +332,100 @@ scheduled_transactions
 movements.recurring_id  → recurring_transactions (nullable)
 transfers.recurring_id  → recurring_transactions (nullable)
 ```
+
+---
+
+## Fase 4 — Reglas automáticas de auto-categorización (`0012_auto_rules.sql`)
+
+### Nuevos enums
+
+| Enum | Valores |
+|---|---|
+| `rule_match` | `all`, `any` |
+| `rule_field` | `note`, `amount`, `account`, `type` |
+| `rule_operator` | `contains`, `starts_with`, `ends_with`, `equals`, `gt`, `lt`, `between` |
+
+Todos creados con `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` (idempotente).
+
+### Nuevas tablas
+
+#### `auto_rules`
+Define una regla de auto-categorización / auto-asignación de cuenta. Una regla tiene un conjunto de condiciones, un modo de coincidencia (AND / OR), una o más acciones y una prioridad de aplicación.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE |
+| `name` | text NOT NULL | Nombre legible de la regla (ej: "Netflix → Suscripciones") |
+| `priority` | int NOT NULL | DEFAULT 0. Mayor número = mayor precedencia. |
+| `match` | rule_match NOT NULL | DEFAULT `'all'`. `all` = AND entre condiciones; `any` = OR. |
+| `action_category_id` | uuid NULL | FK → `categories` ON DELETE SET NULL |
+| `action_account_id` | uuid NULL | FK → `accounts` ON DELETE SET NULL |
+| `is_active` | boolean NOT NULL | DEFAULT true. Permite deshabilitar sin borrar. |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**CHECK `chk_rule_has_action`:** `action_category_id IS NOT NULL OR action_account_id IS NOT NULL` — la regla debe tener al menos una acción.
+
+**Índices:** `(user_id)` y `(user_id, is_active, priority DESC)` (clave para la consulta de aplicación de reglas).
+
+#### `auto_rule_conditions`
+Cada fila es una condición individual de una regla. La regla padre evalúa todas sus condiciones con el operador `all` (AND) / `any` (OR) configurado en `auto_rules.match`.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid NOT NULL | FK → `auth.users` ON DELETE CASCADE (necesario para RLS directa sin JOIN) |
+| `rule_id` | uuid NOT NULL | FK → `auto_rules` ON DELETE CASCADE |
+| `field` | rule_field NOT NULL | Campo del movimiento a evaluar |
+| `operator` | rule_operator NOT NULL | Operador de comparación |
+| `value_text` | text NULL | Para `field IN ('note', 'type', 'account')`: texto libre / `'income'\|'expense'` / uuid como texto |
+| `value_num` | numeric(18,2) NULL | Para `field = 'amount'`: valor único (`gt`/`lt`/`equals`) o cota inferior (`between`) |
+| `value_num2` | numeric(18,2) NULL | Solo para `operator = 'between'`: cota superior del rango de monto |
+| `position` | int NOT NULL | DEFAULT 0. Orden de la condición en la lista de UI. |
+| `created_at` / `updated_at` | timestamptz | Trigger `set_updated_at()` |
+
+**Índices:** `(rule_id)` (consulta frecuente: condiciones de una regla) y `(user_id)`.
+
+### Diagrama de relaciones (adición)
+
+```
+auto_rules (1:N)
+    │
+    └── auto_rule_conditions (N:1 → auto_rules)
+
+auto_rules.action_category_id → categories (nullable, SET NULL al borrar)
+auto_rules.action_account_id  → accounts   (nullable, SET NULL al borrar)
+auto_rule_conditions.user_id  → auth.users (CASCADE, para RLS directa)
+```
+
+### RLS
+
+Ambas tablas tienen RLS habilitado con las cuatro políticas estándar (`select`/`insert`/`update`/`delete` propias via `auth.uid() = user_id`), idéntico al patrón de `movements`, `transfers`, `recurring_transactions`, etc.
+
+`auto_rule_conditions` incluye `user_id` propio (redundante con `auto_rules.user_id`) para permitir políticas RLS directas sin requerir un JOIN a `auto_rules`.
+
+### Diagrama de entidades (actualización)
+
+```
+auth.users (Supabase Auth)
+    │
+    └── auto_rules (1:N)
+            │
+            ├── auto_rule_conditions (N:1 → auto_rules)
+            │
+            ├── action_category_id → categories (nullable)
+            └── action_account_id  → accounts   (nullable)
+```
+
+### Semántica de campos de condición
+
+| field | operator(es) válidos | value_text | value_num | value_num2 |
+|---|---|---|---|---|
+| `note` | `contains`, `starts_with`, `ends_with`, `equals` | texto libre | — | — |
+| `type` | `equals` | `'income'` ó `'expense'` | — | — |
+| `account` | `equals` | uuid de la cuenta (text) | — | — |
+| `amount` | `gt`, `lt`, `equals` | — | monto comparación | — |
+| `amount` | `between` | — | cota inferior | cota superior |
 
 ---
 

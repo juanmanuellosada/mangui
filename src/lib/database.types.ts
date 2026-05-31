@@ -166,6 +166,95 @@ export type Database = {
           },
         ]
       }
+      auto_rules: {
+        Row: {
+          action_account_id: string | null
+          action_category_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          match: Database["public"]["Enums"]["rule_match"]
+          name: string
+          priority: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_account_id?: string | null
+          action_category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          match?: Database["public"]["Enums"]["rule_match"]
+          name: string
+          priority?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_account_id?: string | null
+          action_category_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          match?: Database["public"]["Enums"]["rule_match"]
+          name?: string
+          priority?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      auto_rule_conditions: {
+        Row: {
+          created_at: string
+          field: Database["public"]["Enums"]["rule_field"]
+          id: string
+          operator: Database["public"]["Enums"]["rule_operator"]
+          position: number
+          rule_id: string
+          updated_at: string
+          user_id: string
+          value_num: number | null
+          value_num2: number | null
+          value_text: string | null
+        }
+        Insert: {
+          created_at?: string
+          field: Database["public"]["Enums"]["rule_field"]
+          id?: string
+          operator: Database["public"]["Enums"]["rule_operator"]
+          position?: number
+          rule_id: string
+          updated_at?: string
+          user_id: string
+          value_num?: number | null
+          value_num2?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          created_at?: string
+          field?: Database["public"]["Enums"]["rule_field"]
+          id?: string
+          operator?: Database["public"]["Enums"]["rule_operator"]
+          position?: number
+          rule_id?: string
+          updated_at?: string
+          user_id?: string
+          value_num?: number | null
+          value_num2?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_rule_conditions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "auto_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -925,6 +1014,16 @@ export type Database = {
         | "bimonthly"
         | "annual"
       recurring_status: "active" | "paused" | "inactive"
+      rule_field: "note" | "amount" | "account" | "type"
+      rule_match: "all" | "any"
+      rule_operator:
+        | "contains"
+        | "starts_with"
+        | "ends_with"
+        | "equals"
+        | "gt"
+        | "lt"
+        | "between"
       scheduled_status: "pending" | "executed" | "rejected"
       txn_kind: "income" | "expense" | "transfer"
       ui_theme: "light" | "dark" | "system"
@@ -1078,6 +1177,17 @@ export const Constants = {
         "annual",
       ],
       recurring_status: ["active", "paused", "inactive"],
+      rule_field: ["note", "amount", "account", "type"],
+      rule_match: ["all", "any"],
+      rule_operator: [
+        "contains",
+        "starts_with",
+        "ends_with",
+        "equals",
+        "gt",
+        "lt",
+        "between",
+      ],
       scheduled_status: ["pending", "executed", "rejected"],
       txn_kind: ["income", "expense", "transfer"],
       ui_theme: ["light", "dark", "system"],

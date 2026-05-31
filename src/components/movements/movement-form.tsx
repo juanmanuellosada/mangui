@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { useQuery } from "@tanstack/react-query"
+import { Zap, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,8 +22,37 @@ import { fetchDolarRates } from "@/lib/rates/dolar"
 import type { Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
 import { DOLLAR_TYPE_LABELS, type DollarType } from "@/lib/movements"
+import {
+  RULES_KEY,
+  RULE_CONDITIONS_KEY,
+  findMatchingRule,
+  type AutoRule,
+  type AutoRuleCondition,
+} from "@/lib/rules"
+import { createClient } from "@/lib/supabase/client"
 
 type Category = Tables<"categories">
+
+// ── Rule fetchers (used only in create mode) ─────────────────────────────────
+
+async function fetchActiveRules(): Promise<AutoRule[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("auto_rules")
+    .select("*")
+    .eq("is_active", true)
+    .order("priority", { ascending: false })
+  return data ?? []
+}
+
+async function fetchRuleConditions(): Promise<AutoRuleCondition[]> {
+  const supabase = createClient()
+  const { data } = await supabase
+    .from("auto_rule_conditions")
+    .select("*")
+    .order("position")
+  return data ?? []
+}
 
 // ── Form schema ──────────────────────────────────────────────────────────────
 
@@ -61,6 +92,8 @@ interface MovementFormProps {
   onSubmit: (values: MovementFormValues) => Promise<void>
   isLoading?: boolean
   submitLabel?: string
+  /** When true, enables rule auto-fill on category/account. Default false (edit mode is safe). */
+  isCreateMode?: boolean
 }
 
 export function MovementForm({
@@ -70,6 +103,7 @@ export function MovementForm({
   onSubmit,
   isLoading,
   submitLabel = "Guardar",
+  isCreateMode = false,
 }: MovementFormProps) {
   const today = new Date().toISOString().split("T")[0]
 
@@ -104,6 +138,64 @@ export function MovementForm({
   const dollarType = watch("dollar_type")
   const convertedAmount = watch("converted_amount")
   const isFuture = watch("is_future")
+  const note = watch("note")
+  const categoryId = watch("category_id")
+
+  // ── Rule auto-fill (create mode only) ─────────────────────────────────────
+  const [ruleHint, setRuleHint] = useState<{ ruleName: string; ruleId: string } | null>(null)
+  // Track if user manually set the category (to avoid overriding)
+  const userSetCategory = useRef(false)
+
+  const { data: activeRules = [] } = useQuery({
+    queryKey: RULES_KEY,
+    queryFn: fetchActiveRules,
+    enabled: isCreateMode,
+    staleTime: 60_000,
+  })
+
+  const { data: ruleConditions = [] } = useQuery({
+    queryKey: RULE_CONDITIONS_KEY,
+    queryFn: fetchRuleConditions,
+    enabled: isCreateMode,
+    staleTime: 60_000,
+  })
+
+  const condsByRule = useMemo(() => {
+    const map = new Map<string, AutoRuleCondition[]>()
+    for (const c of ruleConditions) {
+      if (!map.has(c.rule_id)) map.set(c.rule_id, [])
+      map.get(c.rule_id)!.push(c)
+    }
+    return map
+  }, [ruleConditions])
+
+  // Evaluate rules when relevant fields change
+  useEffect(() => {
+    if (!isCreateMode || activeRules.length === 0) return
+    // Don't override if user has manually picked a category
+    if (userSetCategory.current) return
+
+    const draft = {
+      note: note ?? undefined,
+      amount: amount ?? undefined,
+      account_id: accountId ?? undefined,
+      type,
+    }
+    const matched = findMatchingRule(activeRules, condsByRule, draft)
+    if (matched) {
+      if (matched.action_category_id) {
+        setValue("category_id", matched.action_category_id)
+      }
+      if (matched.action_account_id) {
+        setValue("account_id", matched.action_account_id)
+      }
+      setRuleHint({ ruleName: matched.name, ruleId: matched.id })
+    } else {
+      // Clear hint if no rule matches and we were using a rule hint
+      setRuleHint((prev) => (prev ? null : prev))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note, amount, accountId, type, isCreateMode, activeRules.length, condsByRule])
 
   const selectedAccount = accounts.find((a) => a.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? "ARS"
@@ -265,12 +357,24 @@ export function MovementForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
+          <div className="flex items-center justify-between min-h-4">
+            <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
+            {ruleHint && !userSetCategory.current && (
+              <span className="text-[10px] text-primary font-medium flex items-center gap-0.5">
+                <Zap className="h-2.5 w-2.5" />
+                Auto
+              </span>
+            )}
+          </div>
           <Select
-            value={watch("category_id") ?? "none"}
-            onValueChange={(v) => setValue("category_id", v === "none" ? null : v)}
+            value={categoryId ?? "none"}
+            onValueChange={(v) => {
+              userSetCategory.current = true
+              setRuleHint(null)
+              setValue("category_id", v === "none" ? null : v)
+            }}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className={cn("w-full", ruleHint && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20")}>
               <SelectValue placeholder="Categoría" />
             </SelectTrigger>
             <SelectContent>
@@ -284,6 +388,28 @@ export function MovementForm({
           </Select>
         </div>
       </div>
+
+      {/* Rule hint chip */}
+      {ruleHint && !userSetCategory.current && (
+        <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2">
+          <Zap className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="text-xs text-primary flex-1">
+            Sugerido por regla: <strong>{ruleHint.ruleName}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              userSetCategory.current = true
+              setRuleHint(null)
+              setValue("category_id", null)
+            }}
+            className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            aria-label="Descartar sugerencia"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Cross-currency section */}
       {isCrossCurrency && (

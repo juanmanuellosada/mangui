@@ -779,6 +779,7 @@ function QuickAddMenu({
                 onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
                 isLoading={movementMutation.isPending}
                 submitLabel="Crear movimiento"
+                isCreateMode
               />
             </>
           ) : mode === "transfer" ? (
@@ -1001,6 +1002,7 @@ function FABQuickAdd({
                 onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
                 isLoading={movementMutation.isPending}
                 submitLabel="Crear movimiento"
+                isCreateMode
               />
             </>
           ) : mode === "transfer" ? (
