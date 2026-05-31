@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight, Search, X } from "lucide-react"
+import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight, Search, X, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
+import { CurrencyChip, CurrencyLogo } from "@/components/ui/currency-chip"
 import { AccountForm, accountToFormValues, type AccountFormValues } from "./account-form"
 import {
   ACCOUNT_TYPE_LABELS,
@@ -72,7 +73,7 @@ function AccountCardSkeleton() {
 }
 
 // ── Create dialog ─────────────────────────────────────────────
-function CreateAccountDialog({ asIconButton = false, userId }: { asIconButton?: boolean; userId?: string }) {
+function CreateAccountDialog({ userId }: { userId?: string }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -118,26 +119,10 @@ function CreateAccountDialog({ asIconButton = false, userId }: { asIconButton?: 
 
   return (
     <>
-      {asIconButton ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className={cn(
-            "inline-flex items-center justify-center h-8 w-8 rounded-xl",
-            "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
-            "press-effect transition-all hover:bg-primary/80",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-          )}
-          aria-label="Agregar cuenta"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      ) : (
-        <Button onClick={() => setOpen(true)} className="gap-2 font-semibold press-effect">
-          <Plus className="h-4 w-4" />
-          Nueva cuenta
-        </Button>
-      )}
+      <Button onClick={() => setOpen(true)} className="gap-2 font-semibold press-effect">
+        <Plus className="h-4 w-4" />
+        Nueva cuenta
+      </Button>
       <MangoSheet
         open={open}
         onOpenChange={setOpen}
@@ -368,14 +353,7 @@ function AccountCard({
             {ACCOUNT_TYPE_LABELS[account.type]}
           </span>
           <span className="text-[10px] text-muted-foreground/60">·</span>
-          <span
-            className={cn(
-              "inline-flex items-center px-1.5 py-0 rounded-md text-[10px] font-bold uppercase tracking-wider",
-              "bg-muted text-muted-foreground"
-            )}
-          >
-            {account.currency}
-          </span>
+          <CurrencyChip currency={account.currency} size="sm" />
         </div>
       </div>
 
@@ -478,14 +456,16 @@ function PatrimonioCard({
 type TipoFilter = "todas" | AccountType
 type MonedaFilter = "todas" | "ARS" | "USD"
 type VisibilidadFilter = "todas" | "visibles" | "ocultas"
-type OrdenFilter = "nombre_az" | "mayor_saldo" | "menor_saldo" | "recientes"
+type SortKey = "recientes" | "nombre" | "saldo"
+type SortDir = "asc" | "desc"
 
 interface AccountFilters {
   search: string
   tipo: TipoFilter
   moneda: MonedaFilter
   visibilidad: VisibilidadFilter
-  orden: OrdenFilter
+  sortKey: SortKey
+  sortDir: SortDir
 }
 
 const DEFAULT_FILTERS: AccountFilters = {
@@ -493,7 +473,8 @@ const DEFAULT_FILTERS: AccountFilters = {
   tipo: "todas",
   moneda: "todas",
   visibilidad: "todas",
-  orden: "recientes",
+  sortKey: "recientes",
+  sortDir: "desc",
 }
 
 function normalize(s: string) {
@@ -510,7 +491,7 @@ function isFiltersActive(f: AccountFilters) {
     f.tipo !== "todas" ||
     f.moneda !== "todas" ||
     f.visibilidad !== "todas" ||
-    f.orden !== "recientes"
+    f.sortKey !== "recientes"
   )
 }
 
@@ -526,9 +507,9 @@ const TIPO_OPTIONS: MangoSelectOption[] = [
 ]
 
 const MONEDA_OPTIONS: MangoSelectOption[] = [
-  { value: "todas", label: "Todas las monedas" },
-  { value: "ARS", label: "ARS — Pesos" },
-  { value: "USD", label: "USD — Dólares" },
+  { value: "todas", label: "Moneda" },
+  { value: "ARS", label: "ARS", leading: <CurrencyLogo currency="ARS" /> },
+  { value: "USD", label: "USD", leading: <CurrencyLogo currency="USD" /> },
 ]
 
 const VISIBILIDAD_OPTIONS: MangoSelectOption[] = [
@@ -537,12 +518,6 @@ const VISIBILIDAD_OPTIONS: MangoSelectOption[] = [
   { value: "ocultas", label: "Ocultas" },
 ]
 
-const ORDEN_OPTIONS: MangoSelectOption[] = [
-  { value: "recientes", label: "Más recientes" },
-  { value: "nombre_az", label: "Nombre (A–Z)" },
-  { value: "mayor_saldo", label: "Mayor saldo" },
-  { value: "menor_saldo", label: "Menor saldo" },
-]
 
 interface AccountsFilterBarProps {
   filters: AccountFilters
@@ -551,21 +526,83 @@ interface AccountsFilterBarProps {
   totalCount: number
 }
 
+// ── Sort segmented control ────────────────────────────────────
+const SORT_PILLS: { key: SortKey; label: string }[] = [
+  { key: "recientes", label: "Recientes" },
+  { key: "nombre", label: "Nombre" },
+  { key: "saldo", label: "Saldo" },
+]
+
+function SortControl({
+  sortKey,
+  sortDir,
+  onChange,
+}: {
+  sortKey: SortKey
+  sortDir: SortDir
+  onChange: (key: SortKey, dir: SortDir) => void
+}) {
+  function handleClick(key: SortKey) {
+    if (key === sortKey) {
+      // Toggle direction on active pill
+      onChange(key, sortDir === "asc" ? "desc" : "asc")
+    } else {
+      // Default direction per key
+      const defaultDir: SortDir = key === "saldo" ? "desc" : key === "nombre" ? "asc" : "desc"
+      onChange(key, defaultDir)
+    }
+  }
+
+  return (
+    <div
+      role="group"
+      aria-label="Ordenar por"
+      className="flex items-center gap-1 shrink-0"
+    >
+      {SORT_PILLS.map(({ key, label }) => {
+        const isActive = sortKey === key
+        const showDir = isActive && key !== "recientes"
+        const DirIcon = sortDir === "asc" ? ChevronUp : ChevronDown
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => handleClick(key)}
+            aria-pressed={isActive}
+            className={cn(
+              "inline-flex items-center gap-1 h-9 px-3 rounded-lg text-sm font-medium",
+              "border transition-all duration-150 cursor-pointer select-none motion-reduce:transition-none",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              isActive
+                ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                : "bg-background border-input text-muted-foreground hover:border-ring/60 hover:text-foreground dark:bg-input/30"
+            )}
+          >
+            <span>{label}</span>
+            {showDir && <DirIcon className="h-3 w-3 shrink-0" aria-hidden />}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: AccountsFilterBarProps) {
   const active = isFiltersActive(filters)
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2 items-center">
-        {/* Search input */}
-        <div className="relative flex-1 min-w-[200px]">
+      {/* Single row on lg+: search grows, selects + sort stay compact */}
+      <div className="flex flex-wrap lg:flex-nowrap gap-2 items-center">
+        {/* Search input — grows to fill available space */}
+        <div className="relative flex-1 min-w-[160px]">
           <Search
             className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none"
             aria-hidden
           />
           <Input
             type="search"
-            placeholder="Buscar por nombre o número..."
+            placeholder="Buscar..."
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             className="pl-8 h-9 text-sm"
@@ -574,7 +611,7 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
         </div>
 
         {/* Tipo */}
-        <div className="w-[180px]">
+        <div className="w-[160px] shrink-0">
           <MangoSelect
             value={filters.tipo}
             onChange={(v) => onChange({ ...filters, tipo: v as TipoFilter })}
@@ -584,7 +621,7 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
         </div>
 
         {/* Moneda */}
-        <div className="w-[150px]">
+        <div className="w-[108px] shrink-0">
           <MangoSelect
             value={filters.moneda}
             onChange={(v) => onChange({ ...filters, moneda: v as MonedaFilter })}
@@ -594,7 +631,7 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
         </div>
 
         {/* Visibilidad */}
-        <div className="w-[130px]">
+        <div className="w-[110px] shrink-0">
           <MangoSelect
             value={filters.visibilidad}
             onChange={(v) => onChange({ ...filters, visibilidad: v as VisibilidadFilter })}
@@ -603,15 +640,12 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
           />
         </div>
 
-        {/* Orden */}
-        <div className="w-[160px]">
-          <MangoSelect
-            value={filters.orden}
-            onChange={(v) => onChange({ ...filters, orden: v as OrdenFilter })}
-            options={ORDEN_OPTIONS}
-            aria-label="Ordenar cuentas"
-          />
-        </div>
+        {/* Sort segmented control */}
+        <SortControl
+          sortKey={filters.sortKey}
+          sortDir={filters.sortDir}
+          onChange={(key, dir) => onChange({ ...filters, sortKey: key, sortDir: dir })}
+        />
       </div>
 
       {/* Result count + clear */}
@@ -689,22 +723,21 @@ export function AccountsList() {
         return true
       })
       .sort((a, b) => {
-        switch (filters.orden) {
-          case "nombre_az":
-            return a.name.localeCompare(b.name, "es")
-          case "mayor_saldo": {
-            const ba = balanceMap.get(a.id)?.current_balance ?? a.initial_balance
-            const bb = balanceMap.get(b.id)?.current_balance ?? b.initial_balance
-            return bb - ba
+        switch (filters.sortKey) {
+          case "nombre": {
+            const cmp = a.name.localeCompare(b.name, "es")
+            return filters.sortDir === "asc" ? cmp : -cmp
           }
-          case "menor_saldo": {
+          case "saldo": {
             const ba = balanceMap.get(a.id)?.current_balance ?? a.initial_balance
             const bb = balanceMap.get(b.id)?.current_balance ?? b.initial_balance
-            return ba - bb
+            return filters.sortDir === "asc" ? ba - bb : bb - ba
           }
           case "recientes":
-          default:
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          default: {
+            const cmp = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            return filters.sortDir === "asc" ? -cmp : cmp
+          }
         }
       })
   }, [accounts, filters, balanceMap])
@@ -713,7 +746,7 @@ export function AccountsList() {
   const hidden = accounts?.filter((a) => a.is_hidden) ?? []
 
   return (
-    <div className="space-y-6 max-w-3xl animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <h1
@@ -722,7 +755,7 @@ export function AccountsList() {
         >
           Cuentas
         </h1>
-        <CreateAccountDialog asIconButton userId={userId} />
+        <CreateAccountDialog userId={userId} />
       </div>
 
       {/* Patrimonio hero — always reflects all non-hidden accounts */}
@@ -849,10 +882,6 @@ export function AccountsList() {
         </>
       )}
 
-      {/* Add account button */}
-      {!loadingAccounts && accounts && accounts.length > 0 && (
-        <CreateAccountDialog userId={userId} />
-      )}
     </div>
   )
 }
