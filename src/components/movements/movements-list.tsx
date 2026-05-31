@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -758,62 +759,51 @@ function QuickAddMenu({
         categories={categories}
       />
 
-      {/* Dialog */}
-      <Dialog open={open && mode !== "ai"} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          {mode === "movement" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto"}
-                </DialogTitle>
-                <DialogDescription>
-                  Registrá un movimiento en una de tus cuentas.
-                </DialogDescription>
-              </DialogHeader>
-              <MovementForm
-                accounts={accounts}
-                categories={categories}
-                defaultValues={{ type: defaultType }}
-                onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
-                isLoading={movementMutation.isPending}
-                submitLabel="Crear movimiento"
-                isCreateMode
-              />
-            </>
-          ) : mode === "transfer" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Nueva transferencia</DialogTitle>
-                <DialogDescription>
-                  Mové saldo entre tus cuentas.
-                </DialogDescription>
-              </DialogHeader>
-              <TransferForm
-                accounts={accounts}
-                onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
-                isLoading={transferMutation.isPending}
-                submitLabel="Crear transferencia"
-              />
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>Nuevo gasto en cuotas</DialogTitle>
-                <DialogDescription>
-                  Dividí una compra en cuotas mensuales.
-                </DialogDescription>
-              </DialogHeader>
-              <InstallmentForm
-                accounts={accounts}
-                categories={categories}
-                onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
-                isLoading={installmentMutation.isPending}
-              />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* MangoSheet — movement / transfer / installment */}
+      <MangoSheet
+        open={open && mode !== "ai"}
+        onOpenChange={setOpen}
+        title={
+          mode === "movement"
+            ? (defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto")
+            : mode === "transfer"
+            ? "Nueva transferencia"
+            : "Nuevo gasto en cuotas"
+        }
+        description={
+          mode === "movement"
+            ? "Registrá un movimiento en una de tus cuentas."
+            : mode === "transfer"
+            ? "Mové saldo entre tus cuentas."
+            : "Dividí una compra en cuotas mensuales."
+        }
+      >
+        {mode === "movement" ? (
+          <MovementForm
+            accounts={accounts}
+            categories={categories}
+            defaultValues={{ type: defaultType }}
+            onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
+            isLoading={movementMutation.isPending}
+            submitLabel="Crear movimiento"
+            isCreateMode
+          />
+        ) : mode === "transfer" ? (
+          <TransferForm
+            accounts={accounts}
+            onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
+            isLoading={transferMutation.isPending}
+            submitLabel="Crear transferencia"
+          />
+        ) : (
+          <InstallmentForm
+            accounts={accounts}
+            categories={categories}
+            onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
+            isLoading={installmentMutation.isPending}
+          />
+        )}
+      </MangoSheet>
     </>
   )
 }
@@ -990,62 +980,51 @@ function FABQuickAdd({
         categories={categories}
       />
 
-      {/* Dialog (non-AI modes) */}
-      <Dialog open={dialogOpen && mode !== "ai"} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          {mode === "movement" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>
-                  {defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto"}
-                </DialogTitle>
-                <DialogDescription>
-                  Registrá un movimiento en una de tus cuentas.
-                </DialogDescription>
-              </DialogHeader>
-              <MovementForm
-                accounts={accounts}
-                categories={categories}
-                defaultValues={{ type: defaultType }}
-                onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
-                isLoading={movementMutation.isPending}
-                submitLabel="Crear movimiento"
-                isCreateMode
-              />
-            </>
-          ) : mode === "transfer" ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>Nueva transferencia</DialogTitle>
-                <DialogDescription>
-                  Mové saldo entre tus cuentas.
-                </DialogDescription>
-              </DialogHeader>
-              <TransferForm
-                accounts={accounts}
-                onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
-                isLoading={transferMutation.isPending}
-                submitLabel="Crear transferencia"
-              />
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle>Nuevo gasto en cuotas</DialogTitle>
-                <DialogDescription>
-                  Dividí una compra en cuotas mensuales.
-                </DialogDescription>
-              </DialogHeader>
-              <InstallmentForm
-                accounts={accounts}
-                categories={categories}
-                onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
-                isLoading={installmentMutation.isPending}
-              />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* MangoSheet (non-AI modes) */}
+      <MangoSheet
+        open={dialogOpen && mode !== "ai"}
+        onOpenChange={setDialogOpen}
+        title={
+          mode === "movement"
+            ? (defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto")
+            : mode === "transfer"
+            ? "Nueva transferencia"
+            : "Nuevo gasto en cuotas"
+        }
+        description={
+          mode === "movement"
+            ? "Registrá un movimiento en una de tus cuentas."
+            : mode === "transfer"
+            ? "Mové saldo entre tus cuentas."
+            : "Dividí una compra en cuotas mensuales."
+        }
+      >
+        {mode === "movement" ? (
+          <MovementForm
+            accounts={accounts}
+            categories={categories}
+            defaultValues={{ type: defaultType }}
+            onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
+            isLoading={movementMutation.isPending}
+            submitLabel="Crear movimiento"
+            isCreateMode
+          />
+        ) : mode === "transfer" ? (
+          <TransferForm
+            accounts={accounts}
+            onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
+            isLoading={transferMutation.isPending}
+            submitLabel="Crear transferencia"
+          />
+        ) : (
+          <InstallmentForm
+            accounts={accounts}
+            categories={categories}
+            onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
+            isLoading={installmentMutation.isPending}
+          />
+        )}
+      </MangoSheet>
     </>
   )
 }
@@ -1121,21 +1100,20 @@ function EditTransferDialog({
   })
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar transferencia</DialogTitle>
-          <DialogDescription>Modificá los datos de la transferencia.</DialogDescription>
-        </DialogHeader>
-        <TransferForm
-          accounts={accounts}
-          defaultValues={transferToFormValues(transfer)}
-          onSubmit={async (v) => { await mutation.mutateAsync(v) }}
-          isLoading={mutation.isPending}
-          submitLabel="Guardar cambios"
-        />
-      </DialogContent>
-    </Dialog>
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editar transferencia"
+      description="Modificá los datos de la transferencia."
+    >
+      <TransferForm
+        accounts={accounts}
+        defaultValues={transferToFormValues(transfer)}
+        onSubmit={async (v) => { await mutation.mutateAsync(v) }}
+        isLoading={mutation.isPending}
+        submitLabel="Guardar cambios"
+      />
+    </MangoSheet>
   )
 }
 
@@ -1289,22 +1267,21 @@ function EditMovementDialog({
   })
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar movimiento</DialogTitle>
-          <DialogDescription>Modificá los datos del movimiento.</DialogDescription>
-        </DialogHeader>
-        <MovementForm
-          accounts={accounts}
-          categories={categories}
-          defaultValues={movementToFormValues(movement)}
-          onSubmit={async (v) => { await mutation.mutateAsync(v) }}
-          isLoading={mutation.isPending}
-          submitLabel="Guardar cambios"
-        />
-      </DialogContent>
-    </Dialog>
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editar movimiento"
+      description="Modificá los datos del movimiento."
+    >
+      <MovementForm
+        accounts={accounts}
+        categories={categories}
+        defaultValues={movementToFormValues(movement)}
+        onSubmit={async (v) => { await mutation.mutateAsync(v) }}
+        isLoading={mutation.isPending}
+        submitLabel="Guardar cambios"
+      />
+    </MangoSheet>
   )
 }
 

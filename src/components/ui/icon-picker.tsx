@@ -1,29 +1,29 @@
 "use client"
 
 /**
- * IconPicker — bespoke icon selector modal for mangui account icons.
+ * IconPicker — bespoke icon selector for mangui account icons.
  * Tabs: Logos (AR fintech catalog) | Emojis (full catalog) | Subir imagen
- * Stores: /icons/ar/… path | emoji string | public image URL
+ *
+ * Logos + Emojis grids are virtualized with react-window v2 Grid
+ * + react-virtualized-auto-sizer, so only visible tiles render.
+ * Filtering/search recomputes the flat item list before rendering the grid.
  */
 
 import * as React from "react"
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { Search, Upload, X, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { AR_FINTECH_ICONS, AR_ICON_CATEGORIES } from "@/lib/ar-fintech-icons"
 import { cn } from "@/lib/utils"
 import { EMOJI_CATALOG, searchEmojis, type EmojiCategory } from "@/lib/emoji-catalog"
 import { createClient } from "@/lib/supabase/client"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { MangoSheet } from "@/components/ui/mango-sheet"
+import { Grid } from "react-window"
+import { AutoSizer } from "react-virtualized-auto-sizer"
+import type { CSSProperties } from "react"
 
 // ── Shared tile classes ───────────────────────────────────────────────────────
 
 const TILE_BASE = cn(
-  // Uniform rectangular tile with rounded corners
   "aspect-square flex flex-col items-center justify-center rounded-xl border transition-colors duration-150 cursor-pointer",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
   "hover:bg-accent/20",
@@ -31,6 +31,18 @@ const TILE_BASE = cn(
 )
 
 const TILE_SELECTED = "ring-2 ring-primary bg-primary/10 border-primary/40"
+
+// Grid layout constants
+const LOGO_TILE_SIZE = 72  // px
+const EMOJI_TILE_SIZE = 64  // px
+const GRID_GAP = 8           // px
+const GRID_PADDING = 4        // px
+
+function getColCount(width: number, tileSize: number): number {
+  // Floor to how many tiles fit with gaps
+  const cols = Math.floor((width - GRID_PADDING * 2 + GRID_GAP) / (tileSize + GRID_GAP))
+  return Math.max(1, cols)
+}
 
 // ── Category chip row with arrow navigation ───────────────────────────────────
 
@@ -75,7 +87,6 @@ function CategoryChips({
 
   return (
     <div className="flex items-center gap-1 min-w-0">
-      {/* Left arrow */}
       <button
         type="button"
         onClick={() => scroll("left")}
@@ -90,8 +101,6 @@ function CategoryChips({
       >
         <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
       </button>
-
-      {/* Scrollable chip row */}
       <div
         ref={scrollRef}
         className="flex gap-1 overflow-x-auto pb-0.5 scrollbar-none flex-1"
@@ -113,8 +122,6 @@ function CategoryChips({
           </button>
         ))}
       </div>
-
-      {/* Right arrow */}
       <button
         type="button"
         onClick={() => scroll("right")}
@@ -133,7 +140,62 @@ function CategoryChips({
   )
 }
 
-// ── Logos (Bancos AR) tab ─────────────────────────────────────────────────────
+// ── Virtualized Logos grid ────────────────────────────────────────────────────
+
+type LogoCellProps = {
+  items: typeof AR_FINTECH_ICONS
+  selectedValue: string
+  onSelect: (path: string) => void
+  colCount: number
+}
+
+function LogoCell({
+  columnIndex,
+  rowIndex,
+  style,
+  items,
+  selectedValue,
+  onSelect,
+  colCount,
+}: {
+  columnIndex: number
+  rowIndex: number
+  style: CSSProperties
+  ariaAttributes: { "aria-colindex": number; role: "gridcell" }
+} & LogoCellProps) {
+  const idx = rowIndex * colCount + columnIndex
+  if (idx >= items.length) return <div style={style} />
+  const icon = items[idx]
+  const isSelected = selectedValue === icon.path
+  return (
+    <div style={style}>
+      <button
+        type="button"
+        onClick={() => onSelect(icon.path)}
+        title={icon.title}
+        aria-label={icon.title}
+        aria-pressed={isSelected}
+        style={{ width: LOGO_TILE_SIZE - GRID_GAP, height: LOGO_TILE_SIZE - GRID_GAP }}
+        className={cn(
+          TILE_BASE,
+          "gap-1 flex-col overflow-hidden",
+          isSelected ? TILE_SELECTED : ""
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={icon.path}
+          alt={icon.title}
+          className="w-10 h-10 rounded-lg object-cover shrink-0"
+          loading="lazy"
+        />
+        <span className="text-[9px] font-medium leading-tight truncate w-full text-center px-1 text-muted-foreground">
+          {icon.title}
+        </span>
+      </button>
+    </div>
+  )
+}
 
 function LogosTab({
   value,
@@ -145,15 +207,19 @@ function LogosTab({
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState(AR_ICON_CATEGORIES[0].id)
 
-  const filtered = search.trim()
-    ? AR_FINTECH_ICONS.filter((icon) =>
-        icon.title.toLowerCase().includes(search.toLowerCase()) ||
-        icon.id.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(() => {
+    if (search.trim()) {
+      return AR_FINTECH_ICONS.filter(
+        (icon) =>
+          icon.title.toLowerCase().includes(search.toLowerCase()) ||
+          icon.id.toLowerCase().includes(search.toLowerCase())
       )
-    : AR_FINTECH_ICONS.filter((icon) => {
-        const cat = AR_ICON_CATEGORIES.find((c) => c.label === icon.category)
-        return cat?.id === activeCategory
-      })
+    }
+    return AR_FINTECH_ICONS.filter((icon) => {
+      const cat = AR_ICON_CATEGORIES.find((c) => c.label === icon.category)
+      return cat?.id === activeCategory
+    })
+  }, [search, activeCategory])
 
   return (
     <div className="flex flex-col gap-3 h-full">
@@ -184,7 +250,7 @@ function LogosTab({
         )}
       </div>
 
-      {/* Category chips with arrows (only when not searching) */}
+      {/* Category chips (only when not searching) */}
       {!search && (
         <CategoryChips
           categories={AR_ICON_CATEGORIES}
@@ -193,47 +259,37 @@ function LogosTab({
         />
       )}
 
-      {/* Icon grid */}
-      <div className="overflow-y-auto flex-1 -mx-1 px-1">
+      {/* Virtualized grid */}
+      <div className="flex-1 min-h-0">
         {filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             Sin resultados para &ldquo;{search}&rdquo;
           </p>
         ) : (
-          <div className="grid grid-cols-5 gap-2">
-            {filtered.map((icon) => {
-              const isSelected = value === icon.path
+          <AutoSizer
+            renderProp={({ width, height }) => {
+              if (!width || !height) return null
+              const colCount = getColCount(width, LOGO_TILE_SIZE)
+              const rowCount = Math.ceil(filtered.length / colCount)
+              const colWidth = Math.floor((width - GRID_PADDING * 2) / colCount)
               return (
-                <button
-                  key={icon.id}
-                  type="button"
-                  onClick={() => onSelect(icon.path)}
-                  title={icon.title}
-                  aria-label={icon.title}
-                  aria-pressed={isSelected}
-                  className={cn(
-                    TILE_BASE,
-                    "gap-1 h-16",
-                    isSelected ? TILE_SELECTED : ""
-                  )}
-                >
-                  {/* White chip so colored logos read in dark mode */}
-                  <div className="h-8 w-8 rounded-lg bg-white dark:bg-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={icon.path}
-                      alt={icon.title}
-                      className="h-7 w-7 object-contain"
-                      loading="lazy"
-                    />
-                  </div>
-                  <span className="text-[9px] font-medium leading-tight truncate w-full text-center px-1 text-muted-foreground">
-                    {icon.title}
-                  </span>
-                </button>
+                <Grid
+                  columnCount={colCount}
+                  rowCount={rowCount}
+                  columnWidth={colWidth}
+                  rowHeight={LOGO_TILE_SIZE}
+                  style={{ width, height, outline: "none" }}
+                  cellComponent={LogoCell}
+                  cellProps={{
+                    items: filtered,
+                    selectedValue: value,
+                    onSelect,
+                    colCount,
+                  }}
+                />
               )
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
 
@@ -253,21 +309,55 @@ function LogosTab({
   )
 }
 
-// ── Tab type ──────────────────────────────────────────────────────────────────
+// ── Virtualized Emojis grid ───────────────────────────────────────────────────
 
-type Tab = "logos" | "emojis" | "subir"
+type EmojiEntry = { emoji: string; keywords: string[] }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-interface IconPickerProps {
-  open: boolean
-  onClose: () => void
-  value: string
-  onChange: (value: string) => void
-  userId?: string
+type EmojiCellProps = {
+  items: EmojiEntry[]
+  selectedValue: string
+  onSelect: (emoji: string) => void
+  colCount: number
 }
 
-// ── Emoji tab ─────────────────────────────────────────────────────────────────
+function EmojiCell({
+  columnIndex,
+  rowIndex,
+  style,
+  items,
+  selectedValue,
+  onSelect,
+  colCount,
+}: {
+  columnIndex: number
+  rowIndex: number
+  style: CSSProperties
+  ariaAttributes: { "aria-colindex": number; role: "gridcell" }
+} & EmojiCellProps) {
+  const idx = rowIndex * colCount + columnIndex
+  if (idx >= items.length) return <div style={style} />
+  const entry = items[idx]
+  const isSelected = selectedValue === entry.emoji
+  return (
+    <div style={style}>
+      <button
+        type="button"
+        onClick={() => onSelect(entry.emoji)}
+        title={entry.keywords[0]}
+        aria-label={entry.keywords[0]}
+        aria-pressed={isSelected}
+        style={{ width: EMOJI_TILE_SIZE - GRID_GAP, height: EMOJI_TILE_SIZE - GRID_GAP }}
+        className={cn(
+          TILE_BASE,
+          "text-2xl",
+          isSelected ? TILE_SELECTED : ""
+        )}
+      >
+        {entry.emoji}
+      </button>
+    </div>
+  )
+}
 
 function EmojiTab({
   value,
@@ -279,11 +369,18 @@ function EmojiTab({
   const [search, setSearch] = useState("")
   const [activeCategory, setActiveCategory] = useState(EMOJI_CATALOG[0].id)
 
-  const searchResults = search.trim() ? searchEmojis(search) : null
+  const flatItems = useMemo<EmojiEntry[]>(() => {
+    if (search.trim()) {
+      return searchEmojis(search)
+    }
+    const cat = EMOJI_CATALOG.find((c) => c.id === activeCategory)
+    return cat ? cat.emojis : []
+  }, [search, activeCategory])
 
-  const displayCategories: EmojiCategory[] = searchResults
-    ? [{ id: "search", label: "Resultados", emojis: searchResults }]
-    : EMOJI_CATALOG
+  const categoryChips = useMemo(
+    () => EMOJI_CATALOG.map((c) => ({ id: c.id, label: c.label })),
+    []
+  )
 
   return (
     <div className="flex flex-col gap-3 h-full">
@@ -314,64 +411,46 @@ function EmojiTab({
         )}
       </div>
 
-      {/* Category chips with arrows (only when not searching) */}
+      {/* Category chips (only when not searching) */}
       {!search && (
         <CategoryChips
-          categories={EMOJI_CATALOG.map((c) => ({ id: c.id, label: c.label }))}
+          categories={categoryChips}
           active={activeCategory}
           onSelect={setActiveCategory}
         />
       )}
 
-      {/* Grid */}
-      <div className="overflow-y-auto flex-1 -mx-1 px-1">
-        {displayCategories
-          .filter((cat) => !search || cat.id === "search" || cat.id === activeCategory)
-          .map((cat) => {
-            const emojis = cat.id === "search"
-              ? cat.emojis
-              : search
-              ? cat.emojis
-              : cat.id === activeCategory
-              ? cat.emojis
-              : []
-
-            if (emojis.length === 0) return null
-
-            return (
-              <div key={cat.id} className="mb-3">
-                {search && (
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-0.5">
-                    {cat.id === "search" ? `${emojis.length} resultados` : cat.label}
-                  </p>
-                )}
-                {/* Uniform grid: same tile size as logos — 5 cols, h-16 */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(56px,1fr))] gap-2">
-                  {emojis.map((entry) => (
-                    <button
-                      key={entry.emoji}
-                      type="button"
-                      onClick={() => onSelect(entry.emoji)}
-                      title={entry.keywords[0]}
-                      className={cn(
-                        TILE_BASE,
-                        "h-14 text-2xl",
-                        value === entry.emoji ? TILE_SELECTED : ""
-                      )}
-                      aria-label={entry.keywords[0]}
-                      aria-pressed={value === entry.emoji}
-                    >
-                      {entry.emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        {searchResults && searchResults.length === 0 && (
+      {/* Virtualized grid */}
+      <div className="flex-1 min-h-0">
+        {flatItems.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Sin resultados para &ldquo;{search}&rdquo;
+            {search ? `Sin resultados para "${search}"` : "Sin emojis en esta categoría"}
           </p>
+        ) : (
+          <AutoSizer
+            renderProp={({ width, height }) => {
+              if (!width || !height) return null
+              const colCount = getColCount(width, EMOJI_TILE_SIZE)
+              const rowCount = Math.ceil(flatItems.length / colCount)
+              const colWidth = Math.floor((width - GRID_PADDING * 2) / colCount)
+              return (
+                <Grid
+                  columnCount={colCount}
+                  rowCount={rowCount}
+                  columnWidth={colWidth}
+                  rowHeight={EMOJI_TILE_SIZE}
+                  style={{ width, height, outline: "none" }}
+                  cellComponent={EmojiCell}
+                  cellProps={{
+                    items: flatItems,
+                    selectedValue: value,
+                    onSelect,
+                    colCount,
+                  }}
+                />
+              )
+            }}
+          />
         )}
       </div>
     </div>
@@ -459,7 +538,6 @@ function SubirTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Drop zone */}
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
@@ -540,6 +618,20 @@ function SubirTab({
   )
 }
 
+// ── Tab type ──────────────────────────────────────────────────────────────────
+
+type Tab = "logos" | "emojis" | "subir"
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface IconPickerProps {
+  open: boolean
+  onClose: () => void
+  value: string
+  onChange: (value: string) => void
+  userId?: string
+}
+
 // ── Main IconPicker ───────────────────────────────────────────────────────────
 
 export function IconPicker({ open, onClose, value, onChange, userId }: IconPickerProps) {
@@ -557,45 +649,43 @@ export function IconPicker({ open, onClose, value, onChange, userId }: IconPicke
   ]
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg h-[600px] flex flex-col p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-4 pt-4 pb-3 border-b border-border/60 shrink-0">
-          <DialogTitle>Elegí un ícono</DialogTitle>
-        </DialogHeader>
+    <MangoSheet
+      open={open}
+      onOpenChange={(o) => { if (!o) onClose() }}
+      title="Elegí un ícono"
+    >
+      {/* Tab bar */}
+      <div className="flex gap-0.5 -mx-4 -mt-4 px-4 pt-3 pb-0 shrink-0 border-b border-border/60 mb-3">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "px-4 py-2 rounded-t-lg text-sm font-medium transition-colors duration-150 cursor-pointer",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              tab === t.id
+                ? "bg-background border border-b-0 border-border/60 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Tab bar */}
-        <div className="flex gap-0.5 px-4 pt-3 pb-0 shrink-0">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "px-4 py-2 rounded-t-lg text-sm font-medium transition-colors duration-150 cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                tab === t.id
-                  ? "bg-background border border-b-0 border-border/60 text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab content */}
-        <div className="flex-1 overflow-hidden px-4 pt-3 pb-4">
-          {tab === "logos" && (
-            <LogosTab value={value} onSelect={handleSelect} />
-          )}
-          {tab === "emojis" && (
-            <EmojiTab value={value} onSelect={handleSelect} />
-          )}
-          {tab === "subir" && (
-            <SubirTab value={value} onSelect={handleSelect} userId={userId} />
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Tab content — fixed height so grid can size itself */}
+      <div className="h-[360px] flex flex-col">
+        {tab === "logos" && (
+          <LogosTab value={value} onSelect={handleSelect} />
+        )}
+        {tab === "emojis" && (
+          <EmojiTab value={value} onSelect={handleSelect} />
+        )}
+        {tab === "subir" && (
+          <SubirTab value={value} onSelect={handleSelect} userId={userId} />
+        )}
+      </div>
+    </MangoSheet>
   )
 }

@@ -15,14 +15,12 @@ await p.waitForTimeout(1200);
 await p.getByRole("button", { name: /nueva cuenta|agregar cuenta|primera cuenta/i }).first().click().catch(() => {});
 await p.waitForTimeout(1200);
 // open icon picker: click the round icon chip (centered near top of the modal)
-const chip = p.locator('button:near(:text("Tocá para cambiar"))').first();
-if (await chip.count()) { await chip.click({ force: true }).catch(() => {}); }
-else { await p.mouse.click(720, 297); }
-await p.waitForTimeout(1200);
+await p.mouse.click(720, 293);
+await p.waitForTimeout(1300);
 await p.screenshot({ path: "design-mockups/qa/05-iconpicker-open.png", fullPage: true });
-// click "Bancos AR" tab
-await p.getByRole("button", { name: /bancos ar/i }).first().click().catch(async () => {
-  await p.getByText(/bancos ar/i).first().click().catch(() => {});
+// click "logos" tab
+await p.getByRole("button", { name: /logos/i }).first().click().catch(async () => {
+  await p.getByText(/logos/i).first().click().catch(() => {});
 });
 await p.waitForTimeout(1200);
 await p.screenshot({ path: "design-mockups/qa/06-iconpicker-bancos-ar.png", fullPage: true });

@@ -95,17 +95,21 @@ export const COLOR_OPTIONS = [
  */
 export function renderAccountIcon(
   icon: string | null | undefined,
-  opts: { size?: string; className?: string } = {}
+  opts: { size?: string; className?: string; logoFill?: boolean } = {}
 ): React.ReactElement {
-  const { size = "h-5 w-5", className = "" } = opts
+  const { size = "h-5 w-5", className = "", logoFill = false } = opts
   if (!icon) {
     return React.createElement(Briefcase, { className: `${size} ${className}` })
   }
   if (icon.startsWith("http") || icon.startsWith("/")) {
+    // logoFill: fills the parent container (use when parent is a clipping rounded square)
+    const imgClass = logoFill
+      ? `w-full h-full object-cover ${className}`
+      : `${size} rounded-xl object-cover ${className}`
     return React.createElement("img", {
       src: icon,
       alt: "Ícono",
-      className: `${size} rounded-full object-cover ${className}`,
+      className: imgClass,
     })
   }
   if (icon.startsWith("lucide:")) {

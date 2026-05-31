@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AccountForm, accountToFormValues, type AccountFormValues } from "./account-form"
 import {
@@ -111,43 +112,41 @@ function CreateAccountDialog({ asIconButton = false, userId }: { asIconButton?: 
   })
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
-        asIconButton ? (
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center justify-center h-8 w-8 rounded-xl",
-              "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
-              "press-effect transition-all hover:bg-primary/80",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-            )}
-            aria-label="Agregar cuenta"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        ) : (
-          <Button className="gap-2 font-semibold press-effect">
-            <Plus className="h-4 w-4" />
-            Nueva cuenta
-          </Button>
-        )
-      } />
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Nueva cuenta</DialogTitle>
-          <DialogDescription>
-            Completá los datos para agregar una cuenta a tu perfil.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {asIconButton ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={cn(
+            "inline-flex items-center justify-center h-8 w-8 rounded-xl",
+            "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
+            "press-effect transition-all hover:bg-primary/80",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          )}
+          aria-label="Agregar cuenta"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      ) : (
+        <Button onClick={() => setOpen(true)} className="gap-2 font-semibold press-effect">
+          <Plus className="h-4 w-4" />
+          Nueva cuenta
+        </Button>
+      )}
+      <MangoSheet
+        open={open}
+        onOpenChange={setOpen}
+        title="Nueva cuenta"
+        description="Completá los datos para agregar una cuenta a tu perfil."
+      >
         <AccountForm
           onSubmit={async (values) => { await mutation.mutateAsync(values) }}
           isLoading={mutation.isPending}
           submitLabel="Crear cuenta"
           userId={userId}
         />
-      </DialogContent>
-    </Dialog>
+      </MangoSheet>
+    </>
   )
 }
 
@@ -217,19 +216,22 @@ function EditAccountDialog({ account, userId }: { account: Account; userId?: str
   })
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
-        <Button variant="ghost" size="icon-sm" title="Editar cuenta" className="press-effect cursor-pointer">
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-      } />
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Editar cuenta</DialogTitle>
-          <DialogDescription>
-            Modificá los datos de la cuenta.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title="Editar cuenta"
+        className="press-effect cursor-pointer"
+        onClick={() => setOpen(true)}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      <MangoSheet
+        open={open}
+        onOpenChange={setOpen}
+        title="Editar cuenta"
+        description="Modificá los datos de la cuenta."
+      >
         <AccountForm
           defaultValues={accountToFormValues(account)}
           onSubmit={async (values) => { await mutation.mutateAsync(values) }}
@@ -237,8 +239,8 @@ function EditAccountDialog({ account, userId }: { account: Account; userId?: str
           submitLabel="Guardar cambios"
           userId={userId}
         />
-      </DialogContent>
-    </Dialog>
+      </MangoSheet>
+    </>
   )
 }
 
@@ -342,8 +344,8 @@ function AccountCard({
       )}
     >
       {/* Icon */}
-      <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60">
-        {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground" })}
+      <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60 overflow-hidden">
+        {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground", logoFill: true })}
       </div>
 
       {/* Info */}

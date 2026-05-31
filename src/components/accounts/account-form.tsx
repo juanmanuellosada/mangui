@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -150,8 +150,15 @@ export function AccountForm({
   const isHidden = watch("is_hidden")
   const isCreditCard = selectedType === "tarjeta_credito"
 
-  // Dynamic currency prefix for the balance input
-  const currencyPrefix = selectedCurrency === "USD" ? "US$" : "$"
+  // Force ARS when credit card is selected; restore toggle when switching away
+  useEffect(() => {
+    if (isCreditCard && selectedCurrency !== "ARS") {
+      setValue("currency", "ARS", { shouldValidate: true })
+    }
+  }, [isCreditCard, selectedCurrency, setValue])
+
+  // Dynamic currency prefix for the balance input — credit cards are always ARS ($)
+  const currencyPrefix = !isCreditCard && selectedCurrency === "USD" ? "US$" : "$"
 
   return (
     <>
@@ -162,11 +169,11 @@ export function AccountForm({
           <button
             type="button"
             onClick={() => setIconPickerOpen(true)}
-            className="h-16 w-16 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center hover:bg-muted transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-16 w-16 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center hover:bg-muted transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring overflow-hidden"
             aria-label="Seleccionar ícono"
             title="Cambiar ícono"
           >
-            {renderAccountIcon(selectedIcon, { size: "h-8 w-8" })}
+            {renderAccountIcon(selectedIcon, { size: "h-8 w-8", logoFill: true })}
           </button>
           <span className="text-[11px] text-muted-foreground">
             Tocá para cambiar
@@ -204,17 +211,19 @@ export function AccountForm({
           )}
         </div>
 
-        {/* ── Moneda — segmented toggle ─────────────────────── */}
-        <div className="space-y-1.5">
-          <Label>Moneda</Label>
-          <CurrencyToggle
-            value={selectedCurrency}
-            onChange={(v) =>
-              setValue("currency", v, { shouldValidate: true })
-            }
-            className="w-full"
-          />
-        </div>
+        {/* ── Moneda — segmented toggle (hidden for credit cards, always ARS) ── */}
+        {!isCreditCard && (
+          <div className="space-y-1.5">
+            <Label>Moneda</Label>
+            <CurrencyToggle
+              value={selectedCurrency}
+              onChange={(v) =>
+                setValue("currency", v, { shouldValidate: true })
+              }
+              className="w-full"
+            />
+          </div>
+        )}
 
         {/* ── Saldo inicial with dynamic currency prefix ────── */}
         <div className="space-y-1.5">

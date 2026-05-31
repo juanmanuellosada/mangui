@@ -57,16 +57,14 @@ export function CurrencyToggle({ value, onChange, className, id }: CurrencyToggl
               !isActive && "bg-muted/40 border-border/60 text-muted-foreground hover:bg-muted/70 hover:border-border",
             )}
           >
-            {/* Coin icon */}
-            <div className="h-5 w-5 rounded-full overflow-hidden shrink-0 bg-white dark:bg-zinc-100 flex items-center justify-center shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={COIN_ICONS[currency]}
-                alt={currency}
-                className="h-5 w-5 object-contain"
-                loading="eager"
-              />
-            </div>
+            {/* Coin icon — transparent bg SVGs, no white wrapper */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={COIN_ICONS[currency]}
+              alt={currency}
+              className="h-[18px] w-[18px] object-contain rounded-[3px] shrink-0"
+              loading="eager"
+            />
             <span className="tabular-nums">{currency}</span>
           </button>
         )

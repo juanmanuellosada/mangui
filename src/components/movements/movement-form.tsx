@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MangoSelect } from "@/components/ui/mango-select"
+import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
@@ -280,9 +281,12 @@ export function MovementForm({
         <Label htmlFor="amount" className="text-xs text-muted-foreground font-medium">
           Monto
         </Label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none">
-            $
+        <div className="relative flex items-center">
+          <span
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground select-none pointer-events-none z-10 tabular-nums transition-opacity duration-100"
+            aria-hidden
+          >
+            {originalCurrency === "USD" ? "US$" : "$"}
           </span>
           <Input
             id="amount"
@@ -291,38 +295,34 @@ export function MovementForm({
             min="0.01"
             inputMode="decimal"
             placeholder="0"
+            style={{
+              paddingLeft: originalCurrency === "USD" ? "3.5rem" : "2.25rem",
+            }}
             className={cn(
-              "pl-9 text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
               "focus:border-primary focus:ring-2 focus:ring-ring/30",
               type === "income" ? "focus:border-success" : "focus:border-destructive"
             )}
             {...register("amount")}
             aria-invalid={!!errors.amount}
           />
-          {/* Currency select inline */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <MangoSelect
-              value={originalCurrency}
-              onChange={(v) => {
-                setValue("original_currency", v as "ARS" | "USD", { shouldValidate: true })
-                setValue("converted_amount", null)
-              }}
-              options={[
-                { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
-                { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
-              ]}
-              className="w-28 h-8"
-              triggerClassName="h-8 text-xs font-bold border-border/60 bg-muted/50"
-              aria-label="Moneda del monto"
-            />
-          </div>
         </div>
         {errors.amount && (
           <p className="text-xs text-destructive">{errors.amount.message}</p>
         )}
-        <p className="text-[11px] text-muted-foreground">
-          Escribí el monto en {originalCurrency === "ARS" ? "pesos" : "dólares"}
-        </p>
+      </div>
+
+      {/* Currency toggle — segmented ARS / USD */}
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground font-medium">Moneda</Label>
+        <CurrencyToggle
+          value={originalCurrency}
+          onChange={(v) => {
+            setValue("original_currency", v, { shouldValidate: true })
+            setValue("converted_amount", null)
+          }}
+          className="w-full"
+        />
       </div>
 
       {/* Cuenta + Categoría — 2-col row */}
@@ -360,7 +360,15 @@ export function MovementForm({
             }}
             options={[
               { value: "none", label: "Sin categoría" },
-              ...filteredCategories.map((c) => ({ value: c.id, label: c.name })),
+              ...filteredCategories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                leading: c.icon ? (
+                  <span className="text-base leading-none select-none" aria-hidden>
+                    {c.icon}
+                  </span>
+                ) : undefined,
+              })),
             ]}
             placeholder="Categoría"
             triggerClassName={cn(ruleHint && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20")}
