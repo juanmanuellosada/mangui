@@ -19,7 +19,7 @@ import { TransferForm, type TransferFormValues } from "@/components/transfers/tr
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
-import { renderAccountIcon, type Account } from "@/lib/accounts"
+import { AccountIconChip, type Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
 import { DOLLAR_TYPE_LABELS, type DollarType } from "@/lib/movements"
 import {
@@ -200,6 +200,19 @@ export function MovementForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId])
 
+  // ── Income/credit-card guard ───────────────────────────────────────────────
+  // Ingresos cannot use credit-card accounts. When the user switches to income
+  // while a credit card is selected, clear the account selection so the user
+  // must pick a valid one.
+  const incomeAccounts = accounts.filter((a) => a.type !== "tarjeta_credito")
+
+  useEffect(() => {
+    if (type === "income" && isCreditCard) {
+      setValue("account_id", "", { shouldValidate: true })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type])
+
   // ── Rule auto-fill (create mode only) ─────────────────────────────────────
   const [ruleHint, setRuleHint] = useState<{ ruleName: string; ruleId: string } | null>(null)
   const userSetCategory = useRef(false)
@@ -308,7 +321,7 @@ export function MovementForm({
   const existingRecibo = existingAttachments?.find((a) => a.kind === "recibo") ?? null
   const existingComprobante = existingAttachments?.find((a) => a.kind === "comprobante") ?? null
 
-  // Submit handler — wraps pending files + 3.4 defense-in-depth currency check
+  // Submit handler — wraps pending files + defense-in-depth checks
   const handleFormSubmit = handleSubmit(async (values) => {
     // 3.4 — Reject currency ≠ account currency when account is not tarjeta_credito
     if (selectedAccount && selectedAccount.type !== "tarjeta_credito") {
@@ -317,6 +330,11 @@ export function MovementForm({
         setValue("original_currency", selectedAccount.currency as "ARS" | "USD")
         return
       }
+    }
+    // Guard: income cannot use a credit-card account (UI already filters, this is defense-in-depth)
+    if (values.type === "income" && selectedAccount?.type === "tarjeta_credito") {
+      setValue("account_id", "")
+      return
     }
     await onSubmit(values, {
       factura: pendingFactura,
@@ -470,14 +488,14 @@ export function MovementForm({
           {/* 3.5 — Account in its own row */}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground font-medium">Cuenta</Label>
-            {/* 2.2 — account icon + showSearch */}
+            {/* Income: credit cards excluded; Expense: all accounts allowed */}
             <MangoSelect
               value={accountId}
               onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-              options={accounts.map((a) => ({
+              options={(type === "income" ? incomeAccounts : accounts).map((a) => ({
                 value: a.id,
                 label: a.name,
-                leading: renderAccountIcon(a.icon, { size: "h-4 w-4" }),
+                leading: <AccountIconChip icon={a.icon} />,
               }))}
               placeholder="Cuenta"
               showSearch
