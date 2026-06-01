@@ -2,7 +2,7 @@
 
 /**
  * IconPicker — bespoke icon selector for mangui account icons.
- * Tabs: Logos (AR fintech catalog) | Emojis (full catalog) | Subir imagen
+ * Tabs: Logos (AR fintech catalog or category catalog) | Emojis (full catalog) | Subir imagen
  *
  * Logos + Emojis grids are virtualized with react-window v2 Grid
  * + react-virtualized-auto-sizer, so only visible tiles render.
@@ -13,8 +13,9 @@ import * as React from "react"
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { Search, Upload, X, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { AR_FINTECH_ICONS, AR_ICON_CATEGORIES } from "@/lib/ar-fintech-icons"
+import { CATEGORY_ICONS, CATEGORY_ICON_GROUPS } from "@/lib/category-icons"
 import { cn } from "@/lib/utils"
-import { EMOJI_CATALOG, searchEmojis, type EmojiCategory } from "@/lib/emoji-catalog"
+import { EMOJI_CATALOG, searchEmojis } from "@/lib/emoji-catalog"
 import { createClient } from "@/lib/supabase/client"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Grid } from "react-window"
@@ -314,6 +315,110 @@ function LogosTab({
           icons.com.ar
         </a>
       </p>
+    </div>
+  )
+}
+
+// ── Category logos tab (for categories catalog) ───────────────────────────────
+
+// Convert CATEGORY_ICON_GROUPS (plain strings) into chips format
+const CATEGORY_GROUP_CHIPS: { id: string; label: string }[] = CATEGORY_ICON_GROUPS.map(
+  (g) => ({ id: g, label: g })
+)
+
+function CategoryLogosTab({
+  value,
+  onSelect,
+}: {
+  value: string
+  onSelect: (v: string) => void
+}) {
+  const [search, setSearch] = useState("")
+  const [activeGroup, setActiveGroup] = useState(CATEGORY_ICON_GROUPS[0])
+
+  const filtered = useMemo(() => {
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      return CATEGORY_ICONS.filter(
+        (icon) =>
+          icon.title.toLowerCase().includes(q) ||
+          icon.keywords.some((kw) => kw.toLowerCase().includes(q))
+      )
+    }
+    return CATEGORY_ICONS.filter((icon) => icon.category === activeGroup)
+  }, [search, activeGroup])
+
+  return (
+    <div className="flex flex-col gap-3 h-full">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+        <input
+          type="text"
+          placeholder="Buscar categoría…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={cn(
+            "w-full pl-8 pr-3 h-8 rounded-lg border border-input bg-background text-sm",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring",
+            "placeholder:text-muted-foreground"
+          )}
+          aria-label="Buscar ícono de categoría"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Limpiar búsqueda"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Group chips (only when not searching) */}
+      {!search && (
+        <CategoryChips
+          categories={CATEGORY_GROUP_CHIPS}
+          active={activeGroup}
+          onSelect={setActiveGroup}
+        />
+      )}
+
+      {/* Virtualized grid */}
+      <div className="flex-1 min-h-0">
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">
+            {search ? `Sin resultados para "${search}"` : "Sin íconos en esta categoría"}
+          </p>
+        ) : (
+          <AutoSizer
+            renderProp={({ width, height }) => {
+              if (!width || !height) return null
+              const colCount = getColCount(width, LOGO_TILE_SIZE)
+              const rowCount = Math.ceil(filtered.length / colCount)
+              const colWidth = Math.floor((width - GRID_PADDING * 2) / colCount)
+              return (
+                <Grid
+                  columnCount={colCount}
+                  rowCount={rowCount}
+                  columnWidth={colWidth}
+                  rowHeight={LOGO_TILE_SIZE}
+                  style={{ width, height, outline: "none" }}
+                  cellComponent={LogoCell}
+                  cellProps={{
+                    items: filtered,
+                    selectedValue: value,
+                    onSelect,
+                    colCount,
+                  }}
+                />
+              )
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -639,11 +744,13 @@ interface IconPickerProps {
   value: string
   onChange: (value: string) => void
   userId?: string
+  /** Which logo catalog to show in the Logos tab. Defaults to "accounts" (AR fintech). */
+  logoCatalog?: "accounts" | "categories"
 }
 
 // ── Main IconPicker ───────────────────────────────────────────────────────────
 
-export function IconPicker({ open, onClose, value, onChange, userId }: IconPickerProps) {
+export function IconPicker({ open, onClose, value, onChange, userId, logoCatalog = "accounts" }: IconPickerProps) {
   const [tab, setTab] = useState<Tab>("logos")
 
   function handleSelect(v: string) {
@@ -685,7 +792,10 @@ export function IconPicker({ open, onClose, value, onChange, userId }: IconPicke
 
       {/* Tab content — fixed height so grid can size itself */}
       <div className="h-[360px] flex flex-col">
-        {tab === "logos" && (
+        {tab === "logos" && logoCatalog === "categories" && (
+          <CategoryLogosTab value={value} onSelect={handleSelect} />
+        )}
+        {tab === "logos" && logoCatalog === "accounts" && (
           <LogosTab value={value} onSelect={handleSelect} />
         )}
         {tab === "emojis" && (

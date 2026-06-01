@@ -18,6 +18,7 @@ import {
   Target,
   Plug,
   Bot,
+  Tag,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
@@ -28,6 +29,7 @@ const navItems = [
   { icon: Home, label: "Inicio", href: "/app/dashboard" },
   { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movements" },
   { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
+  { icon: Tag, label: "Categorías", href: "/app/categorias" },
   { icon: BarChart3, label: "Estadísticas", href: "/app/stats" },
   { icon: CreditCard, label: "Tarjetas", href: "/app/cards" },
   { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
