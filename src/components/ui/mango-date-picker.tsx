@@ -122,7 +122,7 @@ export function MangoDatePicker({
   }, [open])
 
   const displayLabel = value
-    ? format(value, "EEE d MMM", { locale: es })
+    ? format(value, "dd-MM-yyyy")
     : null
 
   const disabled = disablePast
@@ -197,10 +197,10 @@ export function MangoDatePicker({
             disabled={disabled}
             classNames={{
               months: "flex flex-col",
-              month: "space-y-2",
-              month_caption: "relative flex items-center justify-center h-9 mb-1",
+              month: "relative space-y-2",
+              month_caption: "flex items-center justify-center h-9 mb-1 px-9",
               caption_label: "text-sm font-semibold text-foreground capitalize",
-              nav: "absolute inset-0 flex items-center justify-between pointer-events-none",
+              nav: "absolute top-0 inset-x-0 h-9 flex items-center justify-between pointer-events-none",
               button_previous: [
                 "pointer-events-auto h-7 w-7 rounded-lg flex items-center justify-center",
                 "text-muted-foreground hover:text-foreground hover:bg-muted/60",

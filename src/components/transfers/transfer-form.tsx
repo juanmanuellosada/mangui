@@ -13,7 +13,7 @@ import { MangoSelect } from "@/components/ui/mango-select"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
-import { renderAccountIcon, type Account } from "@/lib/accounts"
+import { AccountIconChip, type Account } from "@/lib/accounts"
 import { isFutureDate } from "@/lib/date-utils"
 import type { Tables } from "@/lib/database.types"
 
@@ -59,6 +59,9 @@ export function TransferForm({
 }: TransferFormProps) {
   const today = new Date().toISOString().split("T")[0]
 
+  // Transfers exclude credit cards from both origin and destination
+  const transferAccounts = accounts.filter((a) => a.type !== "tarjeta_credito")
+
   const {
     register,
     handleSubmit,
@@ -69,8 +72,8 @@ export function TransferForm({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(transferSchema) as unknown as Resolver<TransferFormValues, any>,
     defaultValues: {
-      from_account_id: accounts[0]?.id ?? "",
-      to_account_id: accounts[1]?.id ?? accounts[0]?.id ?? "",
+      from_account_id: transferAccounts[0]?.id ?? "",
+      to_account_id: transferAccounts[1]?.id ?? transferAccounts[0]?.id ?? "",
       from_amount: 0,
       to_amount: 0,
       date: today,
@@ -162,10 +165,10 @@ export function TransferForm({
   })
 
   // Account options with icons + currency label
-  const accountOptions = accounts.map((a) => ({
+  const accountOptions = transferAccounts.map((a) => ({
     value: a.id,
     label: `${a.name} (${a.currency})`,
-    leading: renderAccountIcon(a.icon, { size: "h-4 w-4" }),
+    leading: <AccountIconChip icon={a.icon} />,
   }))
 
   return (
@@ -208,10 +211,10 @@ export function TransferForm({
         <MangoSelect
           value={toAccountId}
           onChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
-          options={accounts.map((a) => ({
+          options={transferAccounts.map((a) => ({
             value: a.id,
             label: `${a.name} (${a.currency})`,
-            leading: renderAccountIcon(a.icon, { size: "h-4 w-4" }),
+            leading: <AccountIconChip icon={a.icon} />,
             disabled: a.id === fromAccountId,
           }))}
           placeholder="Seleccioná cuenta destino"

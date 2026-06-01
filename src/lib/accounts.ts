@@ -124,3 +124,42 @@ export function renderAccountIcon(
     icon
   )
 }
+
+/**
+ * AccountIconChip — a fixed-size square chip (~24px) that wraps any account icon
+ * so emojis, uploaded logos, lucide icons, and catalog icons all render at the
+ * same visual size in selectors.
+ *
+ * Match the Cuentas list treatment: rounded-md, subtle bg + border, overflow-hidden
+ * so images clip cleanly.
+ */
+export function AccountIconChip({
+  icon,
+}: {
+  icon: string | null | undefined
+}): React.ReactElement {
+  const isImage = !!icon && (icon.startsWith("http") || icon.startsWith("/"))
+  const isEmoji = !!icon && !icon.startsWith("lucide:") && !isImage
+
+  return React.createElement(
+    "span",
+    {
+      className:
+        "inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-border/40 bg-muted/60 overflow-hidden",
+      "aria-hidden": true,
+    },
+    isImage
+      ? React.createElement("img", {
+          src: icon!,
+          alt: "",
+          className: "w-full h-full object-cover",
+        })
+      : isEmoji
+      ? React.createElement(
+          "span",
+          { className: "text-[13px] leading-none select-none" },
+          icon
+        )
+      : renderAccountIcon(icon, { size: "h-3.5 w-3.5", className: "text-muted-foreground" })
+  )
+}
