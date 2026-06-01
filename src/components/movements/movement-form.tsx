@@ -31,6 +31,8 @@ import {
 } from "@/lib/rules"
 import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
+import { computeInstallmentAmounts } from "@/lib/installments"
+import { nextCloseDate, computeDueDate } from "@/lib/cards"
 
 type Category = Tables<"categories">
 
@@ -69,6 +71,8 @@ export type MovementFormValues = {
   // cross-currency
   dollar_type: DollarType | null
   converted_amount: number | null
+  // cuotas — only meaningful for expense + tarjeta_credito
+  cuotas: number
 }
 
 const movementSchema = z.object({
@@ -84,6 +88,7 @@ const movementSchema = z.object({
     .enum(["oficial", "blue", "mep", "ccl", "tarjeta"])
     .nullable(),
   converted_amount: z.coerce.number().nullable(),
+  cuotas: z.coerce.number().int().min(1).max(60),
 })
 
 // ── Exported pending files type for parent (quick-add-provider) ──────────────
@@ -159,6 +164,7 @@ export function MovementForm({
       is_future: false,
       dollar_type: null,
       converted_amount: null,
+      cuotas: 1,
       ...defaultValues,
     },
   })
@@ -172,6 +178,10 @@ export function MovementForm({
   const note = watch("note")
   const categoryId = watch("category_id")
   const dateStr = watch("date")
+  const cuotas = watch("cuotas")
+
+  // Local state for the "Otro" cuotas custom input
+  const [customCuotas, setCustomCuotas] = useState("")
 
   // Sync form "type" field with visual mode (when mode != transfer)
   useEffect(() => {
@@ -188,6 +198,37 @@ export function MovementForm({
   const accountCurrency = selectedAccount?.currency ?? "ARS"
   const isCrossCurrency = !!originalCurrency && !!accountCurrency && originalCurrency !== accountCurrency
 
+  // ── Cuotas / resumen summary ─────────────────────────────────────────────────
+  const showCuotas = type === "expense" && isCreditCard
+  const safeCuotas = showCuotas && Number.isInteger(cuotas) && cuotas >= 1 ? cuotas : 1
+  const { perAmount: cuotaAmount } =
+    showCuotas && safeCuotas >= 2 && amount > 0
+      ? computeInstallmentAmounts(amount, safeCuotas)
+      : { perAmount: 0 }
+
+  const resumenSummary = useMemo(() => {
+    if (!showCuotas) return null
+    if (!selectedAccount?.closing_day) return { type: "no_closing_day" as const }
+
+    const purchaseDate = dateStr ? parseISO(dateStr) : new Date()
+    const firstClose = nextCloseDate(selectedAccount.closing_day, purchaseDate)
+    const dueDay = selectedAccount.due_day ?? selectedAccount.closing_day
+    const firstDue = computeDueDate(firstClose, dueDay, selectedAccount.closing_day)
+
+    const fmt = (d: Date) => {
+      const dd = String(d.getDate()).padStart(2, "0")
+      const mm = String(d.getMonth() + 1).padStart(2, "0")
+      const yyyy = d.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+
+    return {
+      type: "computed" as const,
+      closeStr: fmt(firstClose),
+      dueStr: fmt(firstDue),
+    }
+  }, [showCuotas, dateStr, selectedAccount?.closing_day, selectedAccount?.due_day])
+
 
   // When account changes and it's not a credit card, force the currency to account's currency
   useEffect(() => {
@@ -199,6 +240,15 @@ export function MovementForm({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId])
+
+  // Reset cuotas to 1 when switching away from credit-card expense
+  useEffect(() => {
+    if (!showCuotas) {
+      setValue("cuotas", 1, { shouldValidate: false })
+      setCustomCuotas("")
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCuotas])
 
   // ── Income/credit-card guard ───────────────────────────────────────────────
   // Ingresos cannot use credit-card accounts. When the user switches to income
@@ -349,7 +399,11 @@ export function MovementForm({
 
   const submitLabel_resolved = submitLabel !== "Guardar"
     ? submitLabel
-    : type === "income" ? "Guardar ingreso" : "Guardar gasto"
+    : type === "income"
+      ? "Guardar ingreso"
+      : showCuotas && safeCuotas >= 2
+        ? `Guardar en ${safeCuotas} cuotas`
+        : "Guardar gasto"
 
   const showTransferTab = !!initialMode
 
@@ -448,7 +502,7 @@ export function MovementForm({
           {/* Amount — prominent, large */}
           <div className="space-y-1.5">
             <Label htmlFor="amount" className="text-xs text-muted-foreground font-medium">
-              Monto
+              {showCuotas && safeCuotas >= 2 ? "Monto total" : "Monto"}
             </Label>
             <MoneyInput
               id="amount"
@@ -482,6 +536,62 @@ export function MovementForm({
                 }}
                 className="w-full"
               />
+            </div>
+          )}
+
+          {/* Cuotas selector — only for credit card expenses */}
+          {showCuotas && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground font-medium">Cuotas</Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                {([1, 3, 6, 12] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      setValue("cuotas", n, { shouldValidate: false })
+                      setCustomCuotas("")
+                    }}
+                    className={cn(
+                      "h-10 w-12 rounded-xl text-sm font-bold border transition-all duration-150 cursor-pointer press-effect",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      cuotas === n && customCuotas === ""
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                        : "bg-muted text-muted-foreground border-transparent hover:border-primary/40 hover:text-foreground"
+                    )}
+                  >
+                    {n === 1 ? "1" : n}
+                  </button>
+                ))}
+                <div className="flex-1 min-w-[5rem]">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    inputMode="numeric"
+                    placeholder="Otro"
+                    value={customCuotas}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setCustomCuotas(v)
+                      const n = parseInt(v, 10)
+                      if (!isNaN(n) && n >= 1 && n <= 60) {
+                        setValue("cuotas", n, { shouldValidate: false })
+                      }
+                    }}
+                    className={cn(
+                      "text-sm font-bold tabular-nums text-center",
+                      customCuotas !== "" && "border-primary ring-1 ring-ring/30"
+                    )}
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {safeCuotas === 1 ? "Un pago" : `${safeCuotas} cuotas`}
+                {safeCuotas >= 2 && amount > 0 && cuotaAmount > 0 && (
+                  <> · <span className="tabular-nums font-semibold">{formatCurrency(cuotaAmount, originalCurrency)}</span> por cuota</>
+                )}
+              </p>
             </div>
           )}
 
@@ -562,6 +672,38 @@ export function MovementForm({
               >
                 <X className="h-3.5 w-3.5" />
               </button>
+            </div>
+          )}
+
+          {/* Resumen summary — credit card expenses only */}
+          {showCuotas && resumenSummary && (
+            <div className={cn(
+              "rounded-xl border px-3 py-2.5 text-xs",
+              resumenSummary.type === "computed"
+                ? "border-primary/20 bg-primary/5 text-foreground"
+                : "border-border/60 bg-muted/40 text-muted-foreground"
+            )}>
+              {resumenSummary.type === "computed" ? (
+                <p className="tabular-nums leading-relaxed">
+                  {safeCuotas >= 2 && amount > 0 && cuotaAmount > 0 ? (
+                    <>
+                      <span className="font-semibold">{safeCuotas} cuotas de {formatCurrency(cuotaAmount, originalCurrency)}</span>
+                      {" · "}
+                    </>
+                  ) : null}
+                  Primer pago entra en el resumen que cierra el{" "}
+                  <span className="font-semibold">{resumenSummary.closeStr}</span>
+                  {" "}(vence <span className="font-semibold">{resumenSummary.dueStr}</span>)
+                </p>
+              ) : (
+                <p>Configurá la fecha de cierre de la tarjeta para ver en qué resumen entra
+                  {safeCuotas >= 2 && amount > 0 && cuotaAmount > 0 && (
+                    <span className="block mt-0.5 font-semibold tabular-nums">
+                      {safeCuotas} cuotas de {formatCurrency(cuotaAmount, originalCurrency)}
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
           )}
 
@@ -713,5 +855,6 @@ export function movementToFormValues(
     is_future: movement.is_future,
     dollar_type: (movement.dollar_type as DollarType | null) ?? null,
     converted_amount: movement.converted_amount ?? null,
+    cuotas: 1,
   }
 }

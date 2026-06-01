@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * QuickAddProvider — global quick-add modal for new movements/transfers/cuotas/AI.
+ * QuickAddProvider — global quick-add modal for new movements/transfers/AI.
  *
  * Mount once in the (app) layout. Any component in the tree can call
  * `useQuickAdd().open(mode?, type?)` to open the modal, regardless of route.
@@ -9,8 +9,9 @@
  * Supported modes:
  *  - "movement" (default) — opens MovementForm with a 3-way toggle
  *    (Gasto / Ingreso / Transferencia) so the user can switch inline.
+ *    When the account is a credit card and type=expense, cuotas are
+ *    handled inline — selecting ≥2 cuotas creates an installment purchase.
  *  - "transfer"           — opens directly in transfer mode (same sheet)
- *  - "installment"        — opens InstallmentForm
  *  - "ai"                 — opens AiQuickAddSheet
  */
 
@@ -20,7 +21,7 @@ import { toast } from "sonner"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { MovementForm, type MovementFormValues, type PendingAttachments, type MovementMode } from "@/components/movements/movement-form"
 import type { TransferFormValues } from "@/components/transfers/transfer-form"
-import { InstallmentForm, type InstallmentFormValues } from "@/components/installments/installment-form"
+import type { InstallmentFormValues } from "@/components/installments/installment-form"
 import { AiQuickAddSheet } from "@/components/ai/ai-quick-add-sheet"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
@@ -39,7 +40,7 @@ import { uploadAttachment } from "@/lib/attachments"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 
 type Category = Tables<"categories">
-export type QuickAddMode = "movement" | "transfer" | "installment" | "ai"
+export type QuickAddMode = "movement" | "transfer" | "ai"
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -179,7 +180,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   })
 
   const open = React.useCallback((m: QuickAddMode = "movement", type: "income" | "expense" = "expense") => {
-    // Both "movement" and "transfer" are served by the same MovementForm sheet now.
+    // Both "movement" and "transfer" are served by the same MovementForm sheet.
     // Map "transfer" to "movement" mode so the sheet opens with the 3-way toggle,
     // but store the intended initial mode so MovementForm starts on the transfer tab.
     setMode(m === "transfer" ? "movement" : m)
@@ -212,8 +213,27 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       if (!user) throw new Error("No autenticado")
 
       const account = accounts.find((a) => a.id === values.account_id)
+      const isCreditCard = account?.type === "tarjeta_credito"
       const isCross = account && values.original_currency !== account.currency
 
+      // Route to installment purchase when expense + credit card + cuotas >= 2
+      if (values.type === "expense" && isCreditCard && (values.cuotas ?? 1) >= 2) {
+        const category = categories.find((c) => c.id === values.category_id)
+        const installmentValues: InstallmentFormValues = {
+          description: values.note || category?.name || "Gasto en cuotas",
+          total_amount: values.amount,
+          installments_count: values.cuotas,
+          start_date: values.date,
+          account_id: values.account_id,
+          category_id: values.category_id,
+          currency: values.original_currency,
+          dollar_type: isCross ? values.dollar_type : null,
+        }
+        await createInstallmentPurchaseWithMovements(installmentValues, accounts)
+        return null
+      }
+
+      // Standard single-movement insert
       // 3.2 — derive is_future from the date
       const is_future = isFutureDate(values.date)
 
@@ -260,6 +280,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
       toast.success("Movimiento creado")
       setIsOpen(false)
     },
@@ -326,36 +347,13 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     },
   })
 
-  const installmentMutation = useMutation({
-    mutationFn: (values: InstallmentFormValues) =>
-      createInstallmentPurchaseWithMovements(values, accounts),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
-      toast.success("Compra en cuotas creada")
-      setIsOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear las cuotas", { description: err.message })
-    },
-  })
-
   // Determine initial movement mode for the 3-way toggle
   const movementInitialMode: MovementMode = openedAsTransfer
     ? "transfer"
     : defaultType
 
-  const sheetTitle =
-    mode === "movement"
-      ? "Nuevo movimiento"
-      : "Nuevo gasto en cuotas"
-
-  const sheetDescription =
-    mode === "movement"
-      ? "Registrá un movimiento o transferencia."
-      : "Dividí una compra en cuotas mensuales."
+  const sheetTitle = "Nuevo movimiento"
+  const sheetDescription = "Registrá un movimiento o transferencia."
 
   return (
     <QuickAddContext.Provider value={{ open: openWithTransferTracking }}>
@@ -369,41 +367,34 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         categories={categories}
       />
 
-      {/* MangoSheet — movement (3-way) / installment */}
+      {/* MangoSheet — movement (3-way toggle: Gasto / Ingreso / Transferencia) */}
       <MangoSheet
         open={isOpen && mode !== "ai"}
         onOpenChange={setIsOpen}
         title={sheetTitle}
         description={sheetDescription}
       >
-        {mode === "movement" ? (
-          /* 5.1/5.2 — MovementForm handles the 3-way toggle (Gasto/Ingreso/Transferencia) */
-          <MovementForm
-            accounts={accounts}
-            categories={categories}
-            defaultValues={{ type: defaultType }}
-            onSubmit={async (v, pending) => {
-              await movementMutation.mutateAsync({ values: v, pending })
-            }}
-            onTransferSubmit={
-              (async (v: TransferFormValues, pendingComprobante?: File | null) => {
-                await transferMutation.mutateAsync({ values: v, pendingComprobante })
-              }) as (v: TransferFormValues) => Promise<void>
-            }
-            isLoading={movementMutation.isPending}
-            transferLoading={transferMutation.isPending}
-            submitLabel="Crear movimiento"
-            isCreateMode
-            initialMode={movementInitialMode}
-          />
-        ) : (
-          <InstallmentForm
-            accounts={accounts}
-            categories={categories}
-            onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
-            isLoading={installmentMutation.isPending}
-          />
-        )}
+        {/* MovementForm handles the 3-way toggle (Gasto/Ingreso/Transferencia).
+            Credit card expenses with cuotas ≥ 2 are routed to installment purchase
+            inside movementMutation — no separate sheet needed. */}
+        <MovementForm
+          accounts={accounts}
+          categories={categories}
+          defaultValues={{ type: defaultType }}
+          onSubmit={async (v, pending) => {
+            await movementMutation.mutateAsync({ values: v, pending })
+          }}
+          onTransferSubmit={
+            (async (v: TransferFormValues, pendingComprobante?: File | null) => {
+              await transferMutation.mutateAsync({ values: v, pendingComprobante })
+            }) as (v: TransferFormValues) => Promise<void>
+          }
+          isLoading={movementMutation.isPending}
+          transferLoading={transferMutation.isPending}
+          submitLabel="Crear movimiento"
+          isCreateMode
+          initialMode={movementInitialMode}
+        />
       </MangoSheet>
     </QuickAddContext.Provider>
   )

@@ -15,7 +15,6 @@ import {
   SlidersHorizontal,
   Clock,
   Search,
-  CreditCard,
   Sparkles,
 } from "lucide-react"
 import { useMultiSelect } from "@/hooks/use-multi-select"
@@ -515,7 +514,7 @@ function QuickAddMenu({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const quickAdd = useQuickAdd()
 
-  const openDialog = (m: "movement" | "transfer" | "installment" | "ai", type?: "income" | "expense") => {
+  const openDialog = (m: "movement" | "transfer" | "ai", type?: "income" | "expense") => {
     setMenuOpen(false)
     quickAdd.open(m, type)
   }
@@ -575,11 +574,6 @@ function QuickAddMenu({ accounts }: { accounts: Account[] }) {
               <span className="font-medium">Transferencia</span>
             </button>
             <div className="h-px bg-border/60 mx-2" />
-            <button type="button" onClick={() => openDialog("installment")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
-              <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
-              <span className="font-medium">Gasto en cuotas</span>
-            </button>
-            <div className="h-px bg-border/60 mx-2" />
             <button type="button" onClick={() => openDialog("ai")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
               <span className="font-medium">Cargar con IA</span>
@@ -598,7 +592,7 @@ function FABQuickAdd({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const quickAdd = useQuickAdd()
 
-  const openDialog = (m: "movement" | "transfer" | "installment" | "ai", type?: "income" | "expense") => {
+  const openDialog = (m: "movement" | "transfer" | "ai", type?: "income" | "expense") => {
     setMenuOpen(false)
     quickAdd.open(m, type)
   }
@@ -616,7 +610,6 @@ function FABQuickAdd({ accounts }: { accounts: Account[] }) {
                 { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white" },
                 { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
                 { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
-                { m: "installment" as const, type: undefined, icon: CreditCard, label: "En cuotas", color: "bg-primary text-primary-foreground" },
                 { m: "ai" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground" },
               ] as const
             ).map(({ m, type, icon: Icon, label, color }) => (
