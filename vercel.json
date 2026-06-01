@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/send-notifications",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/activate-futures",
+      "schedule": "0 3 * * *"
     }
   ]
 }

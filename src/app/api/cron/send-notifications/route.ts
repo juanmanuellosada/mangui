@@ -10,7 +10,6 @@ import { format, addDays, parseISO, startOfDay, isAfter } from "date-fns"
  * Sends deduped push notifications for:
  *  1. Card close/due reminders (if card_reminder_enabled)
  *  2. Pending recurring_occurrences with scheduled_date ≤ today
- *  3. Pending scheduled_transactions with date ≤ today
  *
  * Dedup: UNIQUE(user_id, event_key) on notification_log. If insert succeeds →
  * send. If it fails (duplicate) → already sent, skip.
@@ -148,27 +147,6 @@ export async function GET(req: NextRequest) {
       if (sent) totalSent++
     }
 
-    // ── 3. Scheduled transactions ──────────────────────────────────────────
-    const { data: scheduled } = await admin
-      .from("scheduled_transactions")
-      .select("id, date, note")
-      .eq("user_id", userId)
-      .eq("status", "pending")
-      .lte("date", todayStr)
-
-    for (const txn of scheduled ?? []) {
-      const eventKey = `scheduled:${txn.id}`
-      const sent = await tryNotify(admin, userId, eventKey, async () => {
-        await sendPushToUser(admin, userId, {
-          title: "Transacción programada pendiente",
-          body: txn.note
-            ? `"${txn.note}" está pendiente desde el ${format(parseISO(txn.date), "d MMM")}.`
-            : `Tenés una transacción programada pendiente desde el ${format(parseISO(txn.date), "d MMM")}.`,
-          url: "/app/programadas",
-        })
-      })
-      if (sent) totalSent++
-    }
   }
 
   return NextResponse.json({ ok: true, processed: usersPrefs.length, sent: totalSent })

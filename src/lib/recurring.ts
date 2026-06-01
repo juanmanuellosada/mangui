@@ -17,14 +17,12 @@ import { defaultDateRange, type DateRangeValue } from "@/components/ui/date-rang
 
 export type RecurringTransaction = Tables<"recurring_transactions">
 export type RecurringOccurrence = Tables<"recurring_occurrences">
-export type ScheduledTransaction = Tables<"scheduled_transactions">
 export type RecurringFrequency = Enums<"recurring_frequency">
 export type WeekendHandling = Enums<"weekend_handling">
 
 /** Query keys for TanStack Query cache invalidation */
 export const RECURRING_KEY = ["recurring_transactions"] as const
 export const OCCURRENCES_KEY = ["recurring_occurrences"] as const
-export const SCHEDULED_KEY = ["scheduled_transactions"] as const
 
 // ── AR national holidays (fixed-date) ────────────────────────────────────────
 //

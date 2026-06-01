@@ -999,127 +999,6 @@ export type Database = {
         }
         Relationships: []
       }
-      scheduled_transactions: {
-        Row: {
-          account_id: string | null
-          amount: number
-          category_id: string | null
-          created_at: string
-          currency: Database["public"]["Enums"]["currency"]
-          date: string
-          id: string
-          kind: Database["public"]["Enums"]["txn_kind"]
-          movement_id: string | null
-          note: string | null
-          status: Database["public"]["Enums"]["scheduled_status"]
-          to_account_id: string | null
-          to_amount: number | null
-          transfer_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          account_id?: string | null
-          amount: number
-          category_id?: string | null
-          created_at?: string
-          currency: Database["public"]["Enums"]["currency"]
-          date: string
-          id?: string
-          kind: Database["public"]["Enums"]["txn_kind"]
-          movement_id?: string | null
-          note?: string | null
-          status?: Database["public"]["Enums"]["scheduled_status"]
-          to_account_id?: string | null
-          to_amount?: number | null
-          transfer_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          account_id?: string | null
-          amount?: number
-          category_id?: string | null
-          created_at?: string
-          currency?: Database["public"]["Enums"]["currency"]
-          date?: string
-          id?: string
-          kind?: Database["public"]["Enums"]["txn_kind"]
-          movement_id?: string | null
-          note?: string | null
-          status?: Database["public"]["Enums"]["scheduled_status"]
-          to_account_id?: string | null
-          to_amount?: number | null
-          transfer_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scheduled_transactions_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_balances"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_balances_projected"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_movement_id_fkey"
-            columns: ["movement_id"]
-            isOneToOne: false
-            referencedRelation: "movements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
-            columns: ["to_account_id"]
-            isOneToOne: false
-            referencedRelation: "account_balances"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
-            columns: ["to_account_id"]
-            isOneToOne: false
-            referencedRelation: "account_balances_projected"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_to_account_id_fkey"
-            columns: ["to_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scheduled_transactions_transfer_id_fkey"
-            columns: ["transfer_id"]
-            isOneToOne: false
-            referencedRelation: "transfers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       transfers: {
         Row: {
           created_at: string
@@ -1357,7 +1236,6 @@ export type Database = {
         | "gt"
         | "lt"
         | "between"
-      scheduled_status: "pending" | "executed" | "rejected"
       txn_kind: "income" | "expense" | "transfer"
       ui_theme: "light" | "dark" | "system"
       weekend_handling: "as_is" | "skip" | "previous_business_day"
@@ -1527,7 +1405,6 @@ export const Constants = {
         "lt",
         "between",
       ],
-      scheduled_status: ["pending", "executed", "rejected"],
       txn_kind: ["income", "expense", "transfer"],
       ui_theme: ["light", "dark", "system"],
       weekend_handling: ["as_is", "skip", "previous_business_day"],
