@@ -176,7 +176,7 @@ export function MangoDatePicker({
           style={{
             top: pos.top,
             left: pos.left,
-            minWidth: pos.width,
+            width: "max-content",
             maxWidth: "min(320px, calc(100vw - 2rem))",
             transform: pos.placeAbove ? "translateY(-100%)" : undefined,
             transformOrigin: pos.placeAbove ? "bottom left" : "top left",
