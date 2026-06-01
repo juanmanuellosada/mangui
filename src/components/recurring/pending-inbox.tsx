@@ -7,13 +7,11 @@ import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import {
   CheckCircle2,
-  XCircle,
   SkipForward,
   Pencil,
   ArrowUpCircle,
   ArrowDownCircle,
   ArrowLeftRight,
-  CalendarClock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,16 +30,12 @@ import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
 import {
-  RECURRING_KEY,
   OCCURRENCES_KEY,
-  SCHEDULED_KEY,
 } from "@/lib/recurring"
 import { MOVEMENTS_KEY, TRANSFERS_KEY, BALANCES_KEY, ACCOUNTS_KEY } from "@/lib/movements"
 
 type RecurringOccurrence = Tables<"recurring_occurrences">
 type RecurringTransaction = Tables<"recurring_transactions">
-type ScheduledTransaction = Tables<"scheduled_transactions">
-type Category = Tables<"categories">
 
 export type OccurrenceWithRec = RecurringOccurrence & {
   recurring: RecurringTransaction
@@ -49,9 +43,7 @@ export type OccurrenceWithRec = RecurringOccurrence & {
 
 interface PendingInboxProps {
   occurrences: OccurrenceWithRec[]
-  scheduledTxns: ScheduledTransaction[]
   accounts: Account[]
-  categories: Category[]
 }
 
 // ── Confirm occurrence ─────────────────────────────────────────────────────────
@@ -130,72 +122,6 @@ async function confirmOccurrence(
     })
     .eq("id", occ.id)
   if (occError) throw occError
-}
-
-// ── Confirm scheduled ─────────────────────────────────────────────────────────
-
-async function confirmScheduled(
-  txn: ScheduledTransaction,
-  accounts: Account[]
-): Promise<void> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("No autenticado")
-
-  const account = accounts.find((a) => a.id === txn.account_id)
-
-  let movementId: string | null = null
-  let transferId: string | null = null
-
-  if (txn.kind === "transfer") {
-    const { data, error } = await supabase
-      .from("transfers")
-      .insert({
-        user_id: user.id,
-        from_account_id: txn.account_id!,
-        to_account_id: txn.to_account_id!,
-        from_amount: txn.amount,
-        to_amount: txn.to_amount ?? txn.amount,
-        date: txn.date,
-        note: txn.note ?? null,
-        is_future: false,
-      })
-      .select("id")
-      .single()
-    if (error) throw error
-    transferId = data.id
-  } else {
-    const { data, error } = await supabase
-      .from("movements")
-      .insert({
-        user_id: user.id,
-        type: txn.kind as "income" | "expense",
-        amount: txn.amount,
-        original_currency: txn.currency,
-        account_id: txn.account_id!,
-        category_id: txn.category_id ?? null,
-        date: txn.date,
-        note: txn.note ?? null,
-        is_future: false,
-        converted_amount: null,
-        dollar_type: null,
-      })
-      .select("id")
-      .single()
-    if (error) throw error
-    movementId = data.id
-  }
-
-  const { error: txnError } = await supabase
-    .from("scheduled_transactions")
-    .update({
-      status: "executed",
-      movement_id: movementId,
-      transfer_id: transferId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", txn.id)
-  if (txnError) throw txnError
 }
 
 // ── Edit amount dialog ─────────────────────────────────────────────────────────
@@ -420,123 +346,13 @@ function OccurrenceCard({
   )
 }
 
-// ── Scheduled card ─────────────────────────────────────────────────────────────
-
-function ScheduledCard({
-  txn,
-  accounts,
-}: {
-  txn: ScheduledTransaction
-  accounts: Account[]
-}) {
-  const queryClient = useQueryClient()
-
-  const formattedDate = format(parseISO(txn.date), "d MMM", { locale: es })
-
-  const confirmMutation = useMutation({
-    mutationFn: () => confirmScheduled(txn, accounts),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SCHEDULED_KEY })
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Transacción programada ejecutada")
-    },
-    onError: (err: Error) => {
-      toast.error("Error al confirmar", { description: err.message })
-    },
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: async () => {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from("scheduled_transactions")
-        .update({ status: "rejected", updated_at: new Date().toISOString() })
-        .eq("id", txn.id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SCHEDULED_KEY })
-      toast.success("Transacción rechazada")
-    },
-    onError: (err: Error) => {
-      toast.error("Error al rechazar", { description: err.message })
-    },
-  })
-
-  const isLoading = confirmMutation.isPending || rejectMutation.isPending
-
-  return (
-    <div className="flex items-center gap-3 py-3">
-      {/* Icon */}
-      <div
-        className={cn(
-          "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
-          txn.kind === "income" ? "bg-success/10" :
-          txn.kind === "expense" ? "bg-destructive/10" : "bg-muted"
-        )}
-      >
-        <CalendarClock className="h-4.5 w-4.5 text-muted-foreground" style={{ width: "1.125rem", height: "1.125rem" }} />
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">
-          {txn.note || (txn.kind === "income" ? "Ingreso" : txn.kind === "expense" ? "Gasto" : "Transferencia")}
-        </p>
-        <p className="text-xs text-muted-foreground tabular-nums">Programada · {formattedDate}</p>
-      </div>
-
-      {/* Amount */}
-      <p
-        className={cn(
-          "text-sm font-bold tabular-nums flex-shrink-0",
-          txn.kind === "income" ? "text-success" :
-          txn.kind === "expense" ? "text-destructive" : "text-foreground"
-        )}
-      >
-        {txn.kind === "income" ? "+ " : txn.kind === "expense" ? "− " : ""}
-        {formatCurrency(txn.amount, txn.currency)}
-      </p>
-
-      {/* Actions */}
-      <div className="flex gap-1 flex-shrink-0">
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          title="Rechazar"
-          className="press-effect cursor-pointer"
-          onClick={() => rejectMutation.mutate()}
-          disabled={isLoading}
-        >
-          <XCircle className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          title="Confirmar"
-          className="press-effect cursor-pointer"
-          onClick={() => confirmMutation.mutate()}
-          disabled={isLoading}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-        </Button>
-      </div>
-    </div>
-  )
-}
-
 // ── Public component ───────────────────────────────────────────────────────────
 
 export function PendingInbox({
   occurrences,
-  scheduledTxns,
   accounts,
-  categories,
 }: PendingInboxProps) {
-  if (occurrences.length === 0 && scheduledTxns.length === 0) return null
+  if (occurrences.length === 0) return null
 
   return (
     <div className="space-y-2">
@@ -546,7 +362,7 @@ export function PendingInbox({
           Por confirmar
         </p>
         <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-accent/15 text-accent text-[10px] font-bold">
-          {occurrences.length + scheduledTxns.length}
+          {occurrences.length}
         </span>
       </div>
 
@@ -554,11 +370,6 @@ export function PendingInbox({
         {occurrences.map((occ) => (
           <div key={occ.id} className="px-4">
             <OccurrenceCard occ={occ} accounts={accounts} />
-          </div>
-        ))}
-        {scheduledTxns.map((txn) => (
-          <div key={txn.id} className="px-4">
-            <ScheduledCard txn={txn} accounts={accounts} />
           </div>
         ))}
       </div>

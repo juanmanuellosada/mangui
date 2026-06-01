@@ -97,7 +97,7 @@ async function exportAllData() {
   const tables = [
     "accounts", "categories", "movements", "transfers",
     "installment_purchases", "card_statements", "recurring_transactions",
-    "recurring_occurrences", "scheduled_transactions",
+    "recurring_occurrences",
     "auto_rules", "auto_rule_conditions",
     "budgets", "goals", "saved_views", "user_preferences", "profiles",
   ] as const

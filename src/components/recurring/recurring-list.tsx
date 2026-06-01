@@ -38,7 +38,6 @@ import type { Tables } from "@/lib/database.types"
 import {
   RECURRING_KEY,
   OCCURRENCES_KEY,
-  SCHEDULED_KEY,
   frequencyLabel,
   computeNextRun,
   defaultRecurringFilter,
@@ -50,7 +49,6 @@ import { PendingInbox, type OccurrenceWithRec } from "./pending-inbox"
 import { RecurringForm, recurringToFormValues, type RecurringFormValues } from "./recurring-form"
 
 type Category = Tables<"categories">
-type ScheduledTransaction = Tables<"scheduled_transactions">
 
 export type { OccurrenceWithRec }
 
@@ -77,19 +75,6 @@ async function fetchPendingOccurrences(): Promise<OccurrenceWithRec[]> {
     .order("scheduled_date", { ascending: true })
   if (error) throw error
   return (data ?? []) as OccurrenceWithRec[]
-}
-
-async function fetchPendingScheduled(): Promise<ScheduledTransaction[]> {
-  const supabase = createClient()
-  const today = new Date().toISOString().split("T")[0]
-  const { data, error } = await supabase
-    .from("scheduled_transactions")
-    .select("*")
-    .eq("status", "pending")
-    .lte("date", today)
-    .order("date", { ascending: true })
-  if (error) throw error
-  return data ?? []
 }
 
 async function fetchAccounts(): Promise<Account[]> {
@@ -749,11 +734,6 @@ export function RecurringList() {
     queryFn: fetchPendingOccurrences,
   })
 
-  const { data: scheduled = [] } = useQuery({
-    queryKey: [...SCHEDULED_KEY, "pending"],
-    queryFn: fetchPendingScheduled,
-  })
-
   const { data: accounts = [] } = useQuery({
     queryKey: ACCOUNTS_KEY,
     queryFn: fetchAccounts,
@@ -879,9 +859,7 @@ export function RecurringList() {
       {/* Pending inbox */}
       <PendingInbox
         occurrences={occurrences}
-        scheduledTxns={scheduled}
         accounts={accounts}
-        categories={categories}
       />
 
       {/* Filter bar */}
