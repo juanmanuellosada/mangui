@@ -128,6 +128,7 @@ async function fetchSavedViews(): Promise<SavedView[]> {
   const { data, error } = await supabase
     .from("saved_views")
     .select("*")
+    .eq("scope", "stats")
     .order("created_at", { ascending: false })
   if (error) throw error
   return data
@@ -140,7 +141,7 @@ async function createSavedView(name: string, filters: FilterState): Promise<void
   const { error } = await supabase
     .from("saved_views")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert({ name, filters: filters as any, user_id: user.id })
+    .insert({ name, filters: filters as any, user_id: user.id, scope: "stats" })
   if (error) throw error
 }
 
