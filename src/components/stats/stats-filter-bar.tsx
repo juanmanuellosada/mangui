@@ -22,6 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { MangoSelect } from "@/components/ui/mango-select"
+import { CurrencyLogo } from "@/components/ui/currency-chip"
 import {
   Dialog,
   DialogContent,
@@ -229,62 +231,46 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
   return (
     <div className="flex flex-wrap gap-2 items-center">
       {/* Date preset */}
-      <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-xs font-medium shadow-sm hover:bg-accent/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <CalendarDays className="h-3.5 w-3.5" />
-          {PRESET_LABELS[filter.preset]}
-          <ChevronDown className="h-3 w-3 opacity-60" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-44">
-          {(Object.keys(PRESET_LABELS) as FilterState["preset"][]).map((p) => (
-            <DropdownMenuItem
-              key={p}
-              onSelect={() => applyPreset(p)}
-              className={cn(filter.preset === p && "font-semibold text-primary")}
-            >
-              {PRESET_LABELS[p]}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MangoSelect
+        value={filter.preset}
+        onChange={(v) => applyPreset(v as FilterState["preset"])}
+        options={(Object.keys(PRESET_LABELS) as FilterState["preset"][]).map((p) => ({
+          value: p,
+          label: PRESET_LABELS[p],
+          leading: p === filter.preset ? <CalendarDays className="h-3.5 w-3.5" /> : undefined,
+        }))}
+        aria-label="Período"
+        className="w-auto"
+        triggerClassName="h-8 text-xs font-medium shadow-sm"
+      />
 
       {/* Type filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger className={cn("inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-xs font-medium shadow-sm hover:bg-accent/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", filter.type !== "all" && "border-primary text-primary")}>
-          {filter.type === "all" ? "Todos" : filter.type === "income" ? "Ingresos" : "Gastos"}
-          <ChevronDown className="h-3 w-3 opacity-60" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {(["all", "income", "expense"] as const).map((t) => (
-            <DropdownMenuItem
-              key={t}
-              onSelect={() => onChange({ ...filter, type: t })}
-              className={cn(filter.type === t && "font-semibold text-primary")}
-            >
-              {t === "all" ? "Todos" : t === "income" ? "Ingresos" : "Gastos"}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MangoSelect
+        value={filter.type}
+        onChange={(v) => onChange({ ...filter, type: v as FilterState["type"] })}
+        options={[
+          { value: "all", label: "Todos" },
+          { value: "income", label: "Ingresos" },
+          { value: "expense", label: "Gastos" },
+        ]}
+        aria-label="Tipo"
+        className="w-auto"
+        triggerClassName="h-8 text-xs font-medium shadow-sm"
+      />
 
       {/* Currency */}
-      <DropdownMenu>
-        <DropdownMenuTrigger className={cn("inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-input bg-background text-xs font-medium shadow-sm hover:bg-accent/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", filter.currency !== "all" && "border-primary text-primary")}>
-          {filter.currency === "all" ? "Moneda" : filter.currency}
-          <ChevronDown className="h-3 w-3 opacity-60" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {(["all", "ARS", "USD"] as const).map((c) => (
-            <DropdownMenuItem
-              key={c}
-              onSelect={() => onChange({ ...filter, currency: c })}
-              className={cn(filter.currency === c && "font-semibold text-primary")}
-            >
-              {c === "all" ? "Todas las monedas" : c}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MangoSelect
+        value={filter.currency}
+        onChange={(v) => onChange({ ...filter, currency: v as FilterState["currency"] })}
+        options={[
+          { value: "all", label: "Todas" },
+          { value: "ARS", label: "ARS", leading: <CurrencyLogo currency="ARS" /> },
+          { value: "USD", label: "USD", leading: <CurrencyLogo currency="USD" /> },
+        ]}
+        aria-label="Moneda"
+        className="w-auto"
+        triggerClassName="h-8 text-xs font-medium shadow-sm"
+      />
 
       {/* Categories */}
       {categories.length > 0 && (
