@@ -1,0 +1,14 @@
+import { chromium } from "playwright";
+const BASE="https://mangui-rho.vercel.app";
+const b=await chromium.launch({headless:true});
+const ctx=await b.newContext({viewport:{width:1440,height:900}});
+const p=await ctx.newPage();
+await p.goto(`${BASE}/`,{waitUntil:"networkidle"}); await p.waitForTimeout(1500);
+await p.screenshot({path:"design-mockups/qa/11-landing-font.png"});
+await p.goto(`${BASE}/login`,{waitUntil:"networkidle"});
+await p.fill('input[type="email"]',"qa@mangui.app"); await p.fill('input[type="password"]',"ManguiQA-2026!");
+await p.locator('button[type="submit"]').first().click().catch(()=>p.keyboard.press("Enter"));
+await p.waitForURL(/\/app\//,{timeout:30000}).catch(()=>{});
+await p.goto(`${BASE}/app/accounts`,{waitUntil:"networkidle"}); await p.waitForTimeout(1500);
+await p.screenshot({path:"design-mockups/qa/12-accounts-font.png",fullPage:true});
+console.log("ok"); await b.close();

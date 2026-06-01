@@ -43,8 +43,10 @@ export function SelectionBar({
       role="toolbar"
       aria-label="Barra de selección múltiple"
       className={cn(
-        // Sticky floating bar — sits just above mobile bottom nav
-        "fixed z-40 left-0 right-0",
+        // Sticky floating bar — sits just above mobile bottom nav.
+        // On desktop start AFTER the 16rem sidebar so the left rounded corner
+        // isn't hidden behind it (both rounded corners visible within content).
+        "fixed z-40 left-0 right-0 lg:left-64",
         // Bottom position respects safe area + 4rem (bottom nav height)
         "bottom-[calc(4rem+env(safe-area-inset-bottom))]",
         // Desktop: a narrower bar centered
