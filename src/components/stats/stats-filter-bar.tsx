@@ -243,6 +243,7 @@ interface StatsFilterBarProps {
   accounts: Account[]
   onChange: (f: FilterState) => void
   tab?: "resumen" | "comparar"
+  onTabChange?: (tab: "resumen" | "comparar") => void
   period1?: DateRangeValue
   period2?: DateRangeValue
   onPeriod1Change?: (v: DateRangeValue) => void
@@ -261,6 +262,7 @@ export function StatsFilterBar({
   accounts,
   onChange,
   tab = "resumen",
+  onTabChange,
   period1,
   period2,
   onPeriod1Change,
@@ -355,8 +357,21 @@ export function StatsFilterBar({
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
-      {/* Row 1: type segmented control (left) + saved views (right) */}
-      <div className="flex items-center justify-between gap-2">
+      {/* Row 1: tab toggle (left) + type segmented control + saved views (pinned right) */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Resumen / Comparar tab toggle */}
+        {onTabChange && (
+          <SegmentedControl
+            value={tab}
+            onChange={(v) => onTabChange(v as "resumen" | "comparar")}
+            options={[
+              { value: "resumen", label: "Resumen" },
+              { value: "comparar", label: "Comparar" },
+            ]}
+            aria-label="Vista de estadísticas"
+          />
+        )}
+
         {/* Type segmented control */}
         <SegmentedControl
           value={filter.type}
@@ -368,6 +383,9 @@ export function StatsFilterBar({
           ]}
           aria-label="Tipo de movimiento"
         />
+
+        {/* Spacer pushes Vistas to the right */}
+        <div className="flex-1" />
 
         {/* Saved views — pinned right */}
         <DropdownMenu>

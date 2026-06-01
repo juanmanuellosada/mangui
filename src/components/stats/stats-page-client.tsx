@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -348,6 +347,7 @@ export function StatsPageClient() {
         accounts={accounts}
         onChange={setFilter}
         tab={activeTab}
+        onTabChange={setTab}
         period1={period1}
         period2={period2}
         onPeriod1Change={setPeriod1}
@@ -356,26 +356,6 @@ export function StatsPageClient() {
           setFilter((f) => ({ ...f, type: sf.type, categoryIds: sf.categoryIds, accountIds: sf.accountIds, currency: sf.currency }))
         }
       />
-
-      {/* Tab switcher */}
-      <div className="flex rounded-xl border border-border bg-muted p-0.5 gap-0.5 w-fit">
-        {([["resumen", "Resumen"], ["comparar", "Comparar"]] as [TabKey, string][]).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={cn(
-              "px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              activeTab === key
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            aria-pressed={activeTab === key}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       {/* Loading skeletons */}
       {isLoading && (
