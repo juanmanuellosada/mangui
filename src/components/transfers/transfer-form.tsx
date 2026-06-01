@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -13,6 +13,7 @@ import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { AttachmentSlot } from "@/components/ui/attachment-slot"
+import { Switch } from "@/components/ui/switch"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar"
 import { AccountIconChip, type Account } from "@/lib/accounts"
@@ -156,6 +157,12 @@ export function TransferForm({
   // Numeric rate being applied (for display)
   const [appliedRate, setAppliedRate] = useState<number | null>(null)
 
+  // Tracks which amount field the user last edited — prevents bidirectional loop
+  const lastEdited = useRef<"from" | "to">("from")
+
+  // Controls whether the cross-currency auto-compute is active
+  const [autoComplete, setAutoComplete] = useState(true)
+
   // Compute to_amount from from_amount using the configured rate
   const computeToAmount = (amount: number, fromCur: string, toCur: string): number | null => {
     if (!amount || !isCrossCurrency) return null
@@ -173,6 +180,26 @@ export function TransferForm({
       return Math.round((amount / rateData.sell) * 100) / 100
     }
     return Math.round(amount * rateData.buy * 100) / 100
+  }
+
+  // Compute from_amount from to_amount (inverse direction)
+  const computeFromAmount = (amount: number, fromCur: string, toCur: string): number | null => {
+    if (!amount || !isCrossCurrency) return null
+    if (configuredRateType === "manual") {
+      if (!configuredManualRate) return null
+      // inverse: to_amount in toCur → from_amount in fromCur
+      if (fromCur === "ARS" && toCur === "USD") {
+        return Math.round(amount * configuredManualRate * 100) / 100
+      }
+      return Math.round((amount / configuredManualRate) * 100) / 100
+    }
+    if (!ratesMap) return null
+    const rateData = ratesMap[configuredRateType]
+    if (!rateData) return null
+    if (fromCur === "ARS" && toCur === "USD") {
+      return Math.round(amount * rateData.sell * 100) / 100
+    }
+    return Math.round((amount / rateData.buy) * 100) / 100
   }
 
   // Update appliedRate whenever relevant inputs change
@@ -198,42 +225,49 @@ export function TransferForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCrossCurrency, configuredRateType, configuredManualRate, ratesMap, fromAccountId, toAccountId])
 
-  // When accounts change to cross-currency, pre-load to_amount if there's a from_amount
+  // When accounts change (currency switch), re-seed the non-edited field from scratch
   useEffect(() => {
     if (!isCrossCurrency) {
       setValue("to_amount", fromAmount || 0)
       return
     }
+    if (!autoComplete) return
     const fromCur = fromAccount?.currency
     const toCur = toAccount?.currency
-    if (!fromCur || !toCur || !fromAmount) return
+    if (!fromCur || !toCur) return
+    // Always drive from → to on account change (sensible default)
+    lastEdited.current = "from"
+    if (!fromAmount) return
     const computed = computeToAmount(fromAmount, fromCur, toCur)
-    if (computed !== null) {
-      setValue("to_amount", computed)
-    }
+    if (computed !== null) setValue("to_amount", computed)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromAccountId, toAccountId, isCrossCurrency])
+  }, [fromAccountId, toAccountId, isCrossCurrency, autoComplete])
 
-  // Sync to_amount when same currency
+  // Sync same-currency: to always mirrors from
   useEffect(() => {
     if (!isCrossCurrency) {
       setValue("to_amount", fromAmount || 0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromAmount])
+  }, [fromAmount, isCrossCurrency])
 
-  // Recompute to_amount when from_amount changes and cross-currency
+  // Cross-currency: recompute the OTHER field when rate data changes (e.g. rate type switch)
   useEffect(() => {
-    if (!isCrossCurrency) return
+    if (!isCrossCurrency || !autoComplete) return
     const fromCur = fromAccount?.currency
     const toCur = toAccount?.currency
     if (!fromCur || !toCur) return
-    const computed = computeToAmount(fromAmount, fromCur, toCur)
-    if (computed !== null) {
-      setValue("to_amount", computed)
+    if (lastEdited.current === "from") {
+      if (!fromAmount) return
+      const computed = computeToAmount(fromAmount, fromCur, toCur)
+      if (computed !== null) setValue("to_amount", computed)
+    } else {
+      if (!toAmount) return
+      const computed = computeFromAmount(toAmount, fromCur, toCur)
+      if (computed !== null) setValue("from_amount", computed)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromAmount, configuredRateType, configuredManualRate, ratesMap])
+  }, [configuredRateType, configuredManualRate, ratesMap, autoComplete])
 
   // Compute implied effective rate from what the user actually typed
   const effectiveRate = (() => {
@@ -335,16 +369,29 @@ export function TransferForm({
       {/* Amounts */}
       {isCrossCurrency ? (
         <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-3">
-          <p className="text-xs font-medium text-muted-foreground">
-            Transferencia entre cuentas de distinta moneda —{" "}
-            <strong className="text-foreground">{fromAccount?.currency}</strong> →{" "}
-            <strong className="text-foreground">{toAccount?.currency}</strong>
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground">
+              Transferencia entre cuentas de distinta moneda —{" "}
+              <strong className="text-foreground">{fromAccount?.currency}</strong> →{" "}
+              <strong className="text-foreground">{toAccount?.currency}</strong>
+            </p>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0 ml-3">
+              <Switch
+                id="auto-complete-toggle"
+                checked={autoComplete}
+                onCheckedChange={setAutoComplete}
+                aria-label="Autocompletar con la cotización"
+              />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                Autocompletar
+              </span>
+            </label>
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <Label htmlFor="from_amount" className="text-xs text-muted-foreground font-medium">
-                Monto en {fromAccount?.currency}
+                Monto en {fromAccount?.currency} saliente
               </Label>
               <MoneyInput
                 id="from_amount"
@@ -353,7 +400,22 @@ export function TransferForm({
                 placeholder="0,00"
                 currency={fromAccount?.currency as "ARS" | "USD" | undefined}
                 className="tabular-nums w-full"
-                {...register("from_amount")}
+                value={fromAmount || ""}
+                onBlur={register("from_amount").onBlur}
+                name={register("from_amount").name}
+                ref={register("from_amount").ref}
+                onChange={(e) => {
+                  lastEdited.current = "from"
+                  const raw = parseFloat(e.target.value)
+                  const next = isNaN(raw) ? 0 : raw
+                  setValue("from_amount", next, { shouldValidate: true })
+                  if (!autoComplete) return
+                  const fromCur = fromAccount?.currency
+                  const toCur = toAccount?.currency
+                  if (!fromCur || !toCur || !next) return
+                  const computed = computeToAmount(next, fromCur, toCur)
+                  if (computed !== null) setValue("to_amount", computed)
+                }}
                 aria-invalid={!!errors.from_amount}
               />
               {errors.from_amount && (
@@ -363,7 +425,7 @@ export function TransferForm({
 
             <div className="space-y-1.5">
               <Label htmlFor="to_amount" className="text-xs text-muted-foreground font-medium">
-                Monto en {toAccount?.currency}
+                Monto en {toAccount?.currency} entrante
               </Label>
               <MoneyInput
                 id="to_amount"
@@ -372,7 +434,22 @@ export function TransferForm({
                 placeholder="0,00"
                 currency={toAccount?.currency as "ARS" | "USD" | undefined}
                 className="tabular-nums w-full"
-                {...register("to_amount")}
+                value={toAmount || ""}
+                onBlur={register("to_amount").onBlur}
+                name={register("to_amount").name}
+                ref={register("to_amount").ref}
+                onChange={(e) => {
+                  lastEdited.current = "to"
+                  const raw = parseFloat(e.target.value)
+                  const next = isNaN(raw) ? 0 : raw
+                  setValue("to_amount", next, { shouldValidate: true })
+                  if (!autoComplete) return
+                  const fromCur = fromAccount?.currency
+                  const toCur = toAccount?.currency
+                  if (!fromCur || !toCur || !next) return
+                  const computed = computeFromAmount(next, fromCur, toCur)
+                  if (computed !== null) setValue("from_amount", computed)
+                }}
                 aria-invalid={!!errors.to_amount}
               />
               {errors.to_amount && (
@@ -416,7 +493,7 @@ export function TransferForm({
       ) : (
         <div className="space-y-1.5">
           <Label htmlFor="from_amount" className="text-xs text-muted-foreground font-medium">
-            Monto
+            Monto en {fromAccount?.currency}
           </Label>
           <MoneyInput
             id="from_amount"
