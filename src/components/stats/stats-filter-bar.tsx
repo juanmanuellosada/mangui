@@ -21,9 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MangoSelect } from "@/components/ui/mango-select"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
-import { CurrencyLogo } from "@/components/ui/currency-chip"
 import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
 import {
   Dialog,
@@ -108,6 +106,124 @@ async function deleteSavedView(id: string): Promise<void> {
   if (error) throw error
 }
 
+// ── Local UI primitives ───────────────────────────────────────────────────────
+
+/** Generic connected segmented control. Active segment gets lime/primary pill. */
+function SegmentedControl({
+  value,
+  onChange,
+  options,
+  "aria-label": ariaLabel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  "aria-label"?: string
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 p-0.5 gap-0"
+    >
+      {options.map(({ value: v, label }) => {
+        const isActive = value === v
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            aria-pressed={isActive}
+            className={cn(
+              "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+              isActive
+                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const COIN_ICONS: Record<"ARS" | "USD", string> = {
+  ARS: "/icons/ar/monedas/ARS.svg",
+  USD: "/icons/ar/monedas/USD.svg",
+}
+
+/** Three-option currency segmented toggle: Todas | ARS | USD. */
+function CurrencySegmented({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Moneda"
+      className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 p-0.5 gap-0"
+    >
+      {/* Todas */}
+      <button
+        type="button"
+        onClick={() => onChange("all")}
+        aria-pressed={value === "all"}
+        className={cn(
+          "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          value === "all"
+            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        Todas
+      </button>
+
+      {/* ARS */}
+      <button
+        type="button"
+        onClick={() => onChange("ARS")}
+        aria-pressed={value === "ARS"}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          value === "ARS"
+            ? "bg-lime-500/15 text-lime-700 dark:text-lime-400 shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={COIN_ICONS.ARS} alt="" className="h-3.5 w-3.5 object-contain shrink-0" aria-hidden="true" />
+        ARS
+      </button>
+
+      {/* USD */}
+      <button
+        type="button"
+        onClick={() => onChange("USD")}
+        aria-pressed={value === "USD"}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          value === "USD"
+            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shadow-sm"
+            : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={COIN_ICONS.USD} alt="" className="h-3.5 w-3.5 object-contain shrink-0" aria-hidden="true" />
+        USD
+      </button>
+    </div>
+  )
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface StatsFilterBarProps {
@@ -175,91 +291,76 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
-      {/* Top row: date + saved views */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex-1 min-w-[200px]">
+      {/* Row 1: type segmented control (left) + saved views (right) */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Type segmented control */}
+        <SegmentedControl
+          value={filter.type}
+          onChange={(type) => onChange({ ...filter, type: type as FilterState["type"] })}
+          options={[
+            { value: "all", label: "Todos" },
+            { value: "income", label: "Ingresos" },
+            { value: "expense", label: "Gastos" },
+          ]}
+          aria-label="Tipo de movimiento"
+        />
+
+        {/* Saved views — pinned right */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border border-input bg-background shrink-0">
+            <Bookmark className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Vistas</span>
+            {savedViews.length > 0 && (
+              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">
+                {savedViews.length}
+              </span>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {savedViews.length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Sin vistas guardadas</div>
+            )}
+            {savedViews.map((view) => (
+              <div key={view.id} className="flex items-center gap-1 px-1">
+                <DropdownMenuItem
+                  className="flex-1"
+                  onSelect={() => loadView(view)}
+                >
+                  <span className="truncate">{view.name}</span>
+                </DropdownMenuItem>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    deleteMutation.mutate(view.id)
+                  }}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Eliminar vista ${view.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)} className="gap-2">
+              <Plus className="h-3.5 w-3.5" />
+              Guardar filtros actuales
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Row 2: date, accounts, categories, currency, clear */}
+      <div className="flex flex-wrap items-end gap-3">
+        {/* Date */}
+        <div className="min-w-[180px] flex-1">
           <DateRangeFilter
             value={filter.date}
             onChange={(date) => onChange({ ...filter, date })}
           />
         </div>
 
-        {/* Saved views */}
-        <div className="ml-auto flex items-center gap-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border border-input bg-background">
-              <Bookmark className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Vistas</span>
-              {savedViews.length > 0 && (
-                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">
-                  {savedViews.length}
-                </span>
-              )}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              {savedViews.length === 0 && (
-                <div className="px-3 py-2 text-xs text-muted-foreground">Sin vistas guardadas</div>
-              )}
-              {savedViews.map((view) => (
-                <div key={view.id} className="flex items-center gap-1 px-1">
-                  <DropdownMenuItem
-                    className="flex-1"
-                    onSelect={() => loadView(view)}
-                  >
-                    <span className="truncate">{view.name}</span>
-                  </DropdownMenuItem>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      deleteMutation.mutate(view.id)
-                    }}
-                    className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`Eliminar vista ${view.name}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)} className="gap-2">
-                <Plus className="h-3.5 w-3.5" />
-                Guardar filtros actuales
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Secondary row: type pills + currency + accounts + categories */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Type pills */}
-        <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {([
-              { value: "all", label: "Todos" },
-              { value: "income", label: "Ingresos" },
-              { value: "expense", label: "Gastos" },
-            ] as const).map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onChange({ ...filter, type: value })}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  filter.type === value
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Accounts */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-[160px] flex-1">
           <Label className="text-xs">Cuentas</Label>
           <MangoMultiSelect
             values={filter.accountIds}
@@ -272,7 +373,7 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
         </div>
 
         {/* Categories */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-[160px] flex-1">
           <Label className="text-xs">Categorías</Label>
           <MangoMultiSelect
             values={filter.categoryIds}
@@ -284,35 +385,26 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
           />
         </div>
 
-        {/* Currency */}
-        <div className="space-y-1.5">
+        {/* Currency segmented control */}
+        <div className="space-y-1.5 shrink-0">
           <Label className="text-xs">Moneda</Label>
-          <MangoSelect
+          <CurrencySegmented
             value={filter.currency}
-            onChange={(v) => onChange({ ...filter, currency: v as FilterState["currency"] })}
-            options={[
-              { value: "all", label: "Todas" },
-              { value: "ARS", label: "ARS", leading: <CurrencyLogo currency="ARS" /> },
-              { value: "USD", label: "USD", leading: <CurrencyLogo currency="USD" /> },
-            ]}
-            aria-label="Moneda"
-            className="w-full"
+            onChange={(currency) => onChange({ ...filter, currency: currency as FilterState["currency"] })}
           />
         </div>
 
         {/* Clear all */}
         {hasActiveFilters && (
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={() => onChange(defaultFilter())}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer h-9"
-              aria-label="Limpiar filtros"
-            >
-              <X className="h-3.5 w-3.5" />
-              Limpiar
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onChange(defaultFilter())}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer h-9 shrink-0"
+            aria-label="Limpiar filtros"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
         )}
       </div>
 
