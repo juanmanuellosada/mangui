@@ -13,6 +13,7 @@ import {
 } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Tables, Enums } from "@/lib/database.types"
+import { defaultDateRange, type DateRangeValue } from "@/components/ui/date-range-filter"
 
 export type RecurringTransaction = Tables<"recurring_transactions">
 export type RecurringOccurrence = Tables<"recurring_occurrences">
@@ -319,6 +320,30 @@ export const WEEKEND_HANDLING_LABELS: Record<WeekendHandling, string> = {
   as_is: "Tal cual",
   skip: "Saltar al lunes",
   previous_business_day: "Viernes hábil anterior",
+}
+
+// ── RecurringFilter ──────────────────────────────────────────────────────────
+
+export interface RecurringFilter {
+  search: string
+  type: "all" | "income" | "expense" | "transfer"
+  date: DateRangeValue
+  accountIds: string[]
+  categoryIds: string[]
+  status: "all" | "active" | "paused"
+  cardOnly: boolean
+}
+
+export function defaultRecurringFilter(): RecurringFilter {
+  return {
+    search: "",
+    type: "all",
+    date: defaultDateRange(),
+    accountIds: [],
+    categoryIds: [],
+    status: "all",
+    cardOnly: false,
+  }
 }
 
 /** Labels for day of week (0=domingo) */
