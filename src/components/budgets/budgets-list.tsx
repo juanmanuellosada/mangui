@@ -673,7 +673,7 @@ export function BudgetsList() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <div>
@@ -699,7 +699,7 @@ export function BudgetsList() {
 
       {/* Skeleton */}
       {loadingBudgets && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center gap-3">
@@ -739,7 +739,7 @@ export function BudgetsList() {
 
       {/* Budget cards */}
       {!loadingBudgets && budgets.length > 0 && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {budgets.map((budget) => (
             <BudgetCard
               key={budget.id}

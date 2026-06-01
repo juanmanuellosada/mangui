@@ -47,7 +47,7 @@ export default async function DashboardPage() {
   const manualRate = prefs?.manual_rate ?? null
 
   return (
-    <div className="space-y-5 max-w-2xl animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between pt-1">
         <div className="space-y-0.5">

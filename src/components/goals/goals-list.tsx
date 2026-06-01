@@ -821,7 +821,7 @@ export function GoalsList() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <h1
@@ -845,7 +845,7 @@ export function GoalsList() {
 
       {/* Skeleton */}
       {loadingGoals && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center gap-3">
@@ -895,7 +895,7 @@ export function GoalsList() {
 
       {/* Goal cards */}
       {!loadingGoals && filteredGoals.length > 0 && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {filteredGoals.map((goal) =>
             goal.type === "saving" ? (
               <SavingGoalCard

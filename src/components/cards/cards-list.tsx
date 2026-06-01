@@ -557,7 +557,7 @@ export function CardsList() {
       : cards?.[0]
 
   return (
-    <div className="space-y-5 max-w-xl animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <h1

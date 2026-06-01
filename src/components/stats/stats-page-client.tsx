@@ -318,7 +318,7 @@ export function StatsPageClient() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -376,25 +376,37 @@ export function StatsPageClient() {
         <div className="space-y-5">
           <SummaryCards totals={totals} currency={currency} period={periodLabel} />
 
-          {/* Category distribution */}
-          <CategoryDistributionChart
-            items={expenseDistribution}
-            type="expense"
-            currency={currency}
-          />
+          {/* Charts row 1: category distributions side-by-side on lg+ */}
+          <div className={incomeDistribution.length > 0 ? "grid grid-cols-1 lg:grid-cols-2 gap-5" : undefined}>
+            <CategoryDistributionChart
+              items={expenseDistribution}
+              type="expense"
+              currency={currency}
+            />
+            {incomeDistribution.length > 0 && (
+              <CategoryDistributionChart
+                items={incomeDistribution}
+                type="income"
+                currency={currency}
+              />
+            )}
+          </div>
 
-          {/* Income/Expense over time */}
-          <IncomeExpenseSeriesChart data={series} currency={currency} />
+          {/* Charts row 2: time series + weekday pattern side-by-side on lg+ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Income/Expense over time */}
+            <IncomeExpenseSeriesChart data={series} currency={currency} />
 
-          {/* Weekday pattern */}
-          <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Patrón por día de la semana</h3>
-              <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-                por total
-              </span>
+            {/* Weekday pattern */}
+            <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Patrón por día de la semana</h3>
+                <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+                  por total
+                </span>
+              </div>
+              <WeekdayPatternBars data={weekdayData} currency={currency} />
             </div>
-            <WeekdayPatternBars data={weekdayData} currency={currency} />
           </div>
 
           {/* Budget compliance */}
@@ -425,15 +437,6 @@ export function StatsPageClient() {
                 Impacto mensual estimado de tus transacciones recurrentes activas.
               </p>
             </div>
-          )}
-
-          {/* Income distribution (secondary) */}
-          {incomeDistribution.length > 0 && (
-            <CategoryDistributionChart
-              items={incomeDistribution}
-              type="income"
-              currency={currency}
-            />
           )}
 
           {/* Action buttons */}

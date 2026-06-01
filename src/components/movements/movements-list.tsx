@@ -1181,7 +1181,7 @@ export function MovementsList() {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <h1
@@ -1215,6 +1215,8 @@ export function MovementsList() {
         </div>
       </div>
 
+      {/* Feed content — capped at max-w-3xl for readability */}
+      <div className="w-full max-w-3xl space-y-5">
       {/* Type filter pills */}
       <TypeFilterPills />
 
@@ -1335,6 +1337,7 @@ export function MovementsList() {
           Mostrando los últimos 100 registros. Usá los filtros de fecha para ver más.
         </p>
       )}
+      </div>{/* end feed max-w-3xl */}
 
       {/* Mobile FAB */}
       {accounts.length > 0 && (

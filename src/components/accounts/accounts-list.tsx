@@ -839,7 +839,7 @@ export function AccountsList() {
 
       {/* Loading */}
       {loadingAccounts && (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {[...Array(3)].map((_, i) => (
             <AccountCardSkeleton key={i} />
           ))}
@@ -891,7 +891,7 @@ export function AccountsList() {
 
       {/* Filtered list — shown when any filter/search is active */}
       {!loadingAccounts && filtersActive && filteredAccounts.length > 0 && (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {filteredAccounts.map((account) => (
             <AccountCard
               key={account.id}
@@ -915,7 +915,7 @@ export function AccountsList() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
                 Mis cuentas
               </p>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {visible.map((account) => (
                   <AccountCard
                     key={account.id}
@@ -937,7 +937,7 @@ export function AccountsList() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
                 Cuentas ocultas
               </p>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {hidden.map((account) => (
                   <AccountCard
                     key={account.id}

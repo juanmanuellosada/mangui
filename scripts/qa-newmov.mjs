@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+const BASE="https://mangui-rho.vercel.app";
+const b=await chromium.launch({headless:true});
+const p=await (await b.newContext({viewport:{width:1440,height:900}})).newPage();
+await p.goto(`${BASE}/login`,{waitUntil:"networkidle"});
+await p.fill('input[type="email"]',"qa@mangui.app"); await p.fill('input[type="password"]',"ManguiQA-2026!");
+await p.locator('button[type="submit"]').first().click().catch(()=>p.keyboard.press("Enter"));
+await p.waitForURL(/\/app\//,{timeout:30000}).catch(()=>{});
+await p.goto(`${BASE}/app/accounts`,{waitUntil:"networkidle"}); await p.waitForTimeout(1200);
+await p.getByRole("button",{name:/Nuevo movimiento/i}).first().click().catch(()=>{});
+await p.waitForTimeout(1200);
+await p.screenshot({path:"design-mockups/qa/14-newmov-modal.png"});
+console.log("ok"); await b.close();

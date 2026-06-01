@@ -531,7 +531,7 @@ export function RulesList() {
   const activeCount = rules.filter((r) => r.is_active).length
 
   return (
-    <div className="max-w-lg mx-auto space-y-6 pb-24 lg:pb-8">
+    <div className="space-y-6 pb-24 lg:pb-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
