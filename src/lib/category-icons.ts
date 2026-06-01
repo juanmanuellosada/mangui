@@ -420,6 +420,83 @@ export const CATEGORY_ICONS: CategoryIcon[] = [
   { id: "8f499236-5456-4390-992e-955b34026cee", title: "Glovo", category: "🛵 Delivery", keywords: ["delivery","comida","envio"], path: "/icons/categories/glovoapp_com.png" },
   { id: "04741ba0-90b4-47c1-a577-7be2da98b925", title: "PedidosYa", category: "🛵 Delivery", keywords: ["delivery","comida","envio"], path: "/icons/categories/pedidosya_com.png" },
   { id: "f107d038-36ec-4784-b07a-23c0326c1061", title: "Rappi", category: "🛵 Delivery", keywords: ["delivery","comida","envio"], path: "/icons/categories/rappi_com_ar.png" },
+  // 🎵 Streaming Música (gilbarbara additions)
+  { id: "62921a06-187f-4526-8c91-53e1dd5044c4", title: "Last.fm", category: "🎵 Streaming Música", keywords: ["musica","streaming","scrobbling"], path: "/icons/categories/gb_lastfm.png" },
+  // 💻 Software & Productividad (gilbarbara additions)
+  { id: "072eaaea-16d9-446b-8ab9-c6819c771f12", title: "Jira", category: "💻 Software & Productividad", keywords: ["productividad","proyectos","atlassian"], path: "/icons/categories/gb_jira.png" },
+  { id: "ed6438d6-6b7f-4903-ad7e-cc0633f57054", title: "Confluence", category: "💻 Software & Productividad", keywords: ["productividad","documentacion","atlassian"], path: "/icons/categories/gb_confluence.png" },
+  { id: "2de91fe2-aff8-4003-bea5-545f279434ba", title: "HubSpot", category: "💻 Software & Productividad", keywords: ["crm","marketing","ventas"], path: "/icons/categories/gb_hubspot.png" },
+  { id: "10a8e3b9-dce3-4c86-8af6-1344976ab0db", title: "Salesforce", category: "💻 Software & Productividad", keywords: ["crm","ventas"], path: "/icons/categories/gb_salesforce.png" },
+  { id: "53f1e151-a5eb-4653-8e39-ca030f8b51ce", title: "Zendesk", category: "💻 Software & Productividad", keywords: ["soporte","crm"], path: "/icons/categories/gb_zendesk.png" },
+  { id: "5481865f-1a6f-480e-9706-fbffd4c3329e", title: "Intercom", category: "💻 Software & Productividad", keywords: ["soporte","mensajeria"], path: "/icons/categories/gb_intercom.png" },
+  { id: "c3bac20e-7f4c-4c29-a0bd-9f798fc79270", title: "Mailchimp", category: "💻 Software & Productividad", keywords: ["email","marketing"], path: "/icons/categories/gb_mailchimp.png" },
+  { id: "f62a1cfa-eb68-49ac-84b1-f5e48c8f0f72", title: "SendGrid", category: "💻 Software & Productividad", keywords: ["email","transaccional"], path: "/icons/categories/gb_sendgrid.png" },
+  { id: "61b287f6-2af6-4b84-8528-1bbd59aad048", title: "Box", category: "💻 Software & Productividad", keywords: ["almacenamiento","nube"], path: "/icons/categories/gb_box.png" },
+  { id: "f1195cec-5c39-49cd-9305-5d1c8e2a1a6c", title: "Basecamp", category: "💻 Software & Productividad", keywords: ["productividad","proyectos"], path: "/icons/categories/gb_basecamp.png" },
+  { id: "23849758-c8e2-495a-b929-ef6fae71a7dd", title: "Linear", category: "💻 Software & Productividad", keywords: ["productividad","proyectos"], path: "/icons/categories/gb_linear.png" },
+  { id: "0c084fbe-4833-49b7-a62c-bca30010aae2", title: "Contentful", category: "💻 Software & Productividad", keywords: ["cms","contenido"], path: "/icons/categories/gb_contentful.png" },
+  { id: "06b22e25-40f5-4a22-aee1-365df20184ab", title: "Coda", category: "💻 Software & Productividad", keywords: ["productividad","documentos"], path: "/icons/categories/gb_coda.png" },
+  { id: "8674a4a6-452b-4afd-b648-7e9fcc4ebb12", title: "Obsidian", category: "💻 Software & Productividad", keywords: ["notas","productividad"], path: "/icons/categories/gb_obsidian.png" },
+  { id: "32c127eb-61b8-41c1-869d-10ae4d5dc202", title: "Loom", category: "💻 Software & Productividad", keywords: ["video","productividad"], path: "/icons/categories/gb_loom.png" },
+  { id: "29b1ab18-4a0b-4c2b-af4b-85a660bb69a4", title: "Zapier", category: "💻 Software & Productividad", keywords: ["automatizacion","productividad"], path: "/icons/categories/gb_zapier.png" },
+  { id: "b4ac6af4-e3de-4f53-8bf2-7aff40c0f9d6", title: "Typeform", category: "💻 Software & Productividad", keywords: ["formularios","encuestas"], path: "/icons/categories/gb_typeform.png" },
+  { id: "353d2d9c-b201-4034-b042-0276334ea2ce", title: "Webflow", category: "💻 Software & Productividad", keywords: ["diseño","web"], path: "/icons/categories/gb_webflow.png" },
+  { id: "56ff3d6b-80d9-4a24-83ca-dcb8a63b64a3", title: "Framer", category: "💻 Software & Productividad", keywords: ["diseño","prototipado"], path: "/icons/categories/gb_framer.png" },
+  // 👨‍💻 Developer Tools (gilbarbara additions)
+  { id: "f46bb88b-e5ef-4b39-847f-546e0e631364", title: "Docker", category: "👨‍💻 Developer Tools", keywords: ["contenedores","devops"], path: "/icons/categories/gb_docker.png" },
+  { id: "af3a8183-3ac5-411c-a324-0c7e39e6cc34", title: "Kubernetes", category: "👨‍💻 Developer Tools", keywords: ["orquestacion","devops"], path: "/icons/categories/gb_kubernetes.png" },
+  { id: "a61f0fe7-9329-4f22-bc75-b541021473ec", title: "Terraform", category: "👨‍💻 Developer Tools", keywords: ["infraestructura","devops"], path: "/icons/categories/gb_terraform.png" },
+  { id: "371a9c0a-a93a-4983-b978-6491afc53b4c", title: "Ansible", category: "👨‍💻 Developer Tools", keywords: ["automatizacion","devops"], path: "/icons/categories/gb_ansible.png" },
+  { id: "c7f7ed6b-5ea6-4e40-82e6-930e29cbd1ed", title: "Jenkins", category: "👨‍💻 Developer Tools", keywords: ["ci/cd","devops"], path: "/icons/categories/gb_jenkins.png" },
+  { id: "6d3f0b2e-0577-404e-8251-b6a007432f1d", title: "CircleCI", category: "👨‍💻 Developer Tools", keywords: ["ci/cd","devops"], path: "/icons/categories/gb_circleci.png" },
+  { id: "e3c24e09-5e96-4a44-a287-1e880e83d1c3", title: "Datadog", category: "👨‍💻 Developer Tools", keywords: ["monitoreo","devops"], path: "/icons/categories/gb_datadog.png" },
+  { id: "8a0e5dc5-71af-4d38-aee7-bac989da7f80", title: "Sentry", category: "👨‍💻 Developer Tools", keywords: ["errores","monitoreo"], path: "/icons/categories/gb_sentry.png" },
+  { id: "ac7841ae-b661-49a0-996f-5d5a4408ec2d", title: "Postman", category: "👨‍💻 Developer Tools", keywords: ["api","desarrollo"], path: "/icons/categories/gb_postman.png" },
+  { id: "44203b8b-f026-402a-b212-67aefbc200c7", title: "Algolia", category: "👨‍💻 Developer Tools", keywords: ["busqueda","api"], path: "/icons/categories/gb_algolia.png" },
+  { id: "d184c344-8857-4528-9c53-e921df33021d", title: "Redis", category: "👨‍💻 Developer Tools", keywords: ["base de datos","cache"], path: "/icons/categories/gb_redis.png" },
+  { id: "17fb1ea8-d12d-4607-950f-87f97b9ae8d6", title: "Elasticsearch", category: "👨‍💻 Developer Tools", keywords: ["busqueda","datos"], path: "/icons/categories/gb_elasticsearch.png" },
+  { id: "1ef4bd8f-b767-4a35-867f-1b43514410c1", title: "Grafana", category: "👨‍💻 Developer Tools", keywords: ["monitoreo","metricas"], path: "/icons/categories/gb_grafana.png" },
+  { id: "2a7dd6d2-8071-438b-a872-d695b9dcaa14", title: "PlanetScale", category: "👨‍💻 Developer Tools", keywords: ["base de datos","mysql"], path: "/icons/categories/gb_planetscale.png" },
+  { id: "776fc3ed-5aa3-4d09-bed7-b94bf9c0b008", title: "Neon", category: "👨‍💻 Developer Tools", keywords: ["base de datos","postgresql"], path: "/icons/categories/gb_neon.png" },
+  { id: "142a93e4-d5a4-494a-a8b6-2c1d7da2c385", title: "Appwrite", category: "👨‍💻 Developer Tools", keywords: ["backend","baas"], path: "/icons/categories/gb_appwrite.png" },
+  { id: "2bedeb12-84f0-485d-b4a8-03bbb87c40de", title: "Fly.io", category: "👨‍💻 Developer Tools", keywords: ["hosting","desarrollo"], path: "/icons/categories/gb_fly.png" },
+  { id: "563c1bcb-fc47-4c49-be81-2192fde6ced1", title: "FastAPI", category: "👨‍💻 Developer Tools", keywords: ["api","python"], path: "/icons/categories/gb_fastapi.png" },
+  { id: "17179690-f9a0-42bd-9af8-32c805bdabbd", title: "Prisma", category: "👨‍💻 Developer Tools", keywords: ["base de datos","orm"], path: "/icons/categories/gb_prisma.png" },
+  { id: "1d1116c7-0cbf-4c55-80b6-5c08aceacbf2", title: "Strapi", category: "👨‍💻 Developer Tools", keywords: ["cms","headless"], path: "/icons/categories/gb_strapi.png" },
+  // 🔐 Suscripciones Tech (gilbarbara additions — AI tools)
+  { id: "c92caedd-aae4-4b92-a59d-336d263a044f", title: "Anthropic", category: "🔐 Suscripciones Tech", keywords: ["ia","claude","anthropic"], path: "/icons/categories/gb_anthropic.png" },
+  { id: "c7a5dbd1-3425-436e-b3b5-6d6cde112457", title: "Perplexity", category: "🔐 Suscripciones Tech", keywords: ["ia","busqueda"], path: "/icons/categories/gb_perplexity.png" },
+  { id: "7e11628f-7996-475a-98a1-1d28cfb0fd9b", title: "Hugging Face", category: "🔐 Suscripciones Tech", keywords: ["ia","ml"], path: "/icons/categories/gb_huggingface.png" },
+  // 💳 Pagos Internacionales (gilbarbara additions)
+  { id: "83c638ec-dd9f-49f7-b47f-f99a048743ad", title: "Visa", category: "💳 Pagos Internacionales", keywords: ["pagos","tarjeta"], path: "/icons/categories/gb_visa.png" },
+  { id: "0b36b9d4-c37a-4419-838d-76f636f1a071", title: "Mastercard", category: "💳 Pagos Internacionales", keywords: ["pagos","tarjeta"], path: "/icons/categories/gb_mastercard.png" },
+  { id: "6a627409-9ef1-4b3a-80a9-bf7ef0c720e3", title: "American Express", category: "💳 Pagos Internacionales", keywords: ["pagos","tarjeta"], path: "/icons/categories/gb_amex.png" },
+  { id: "0d014fb5-9eb2-4559-a4eb-6e9c4b9417bb", title: "Adyen", category: "💳 Pagos Internacionales", keywords: ["pagos","ecommerce"], path: "/icons/categories/gb_adyen.png" },
+  { id: "634d55e8-70f9-4257-acaf-750d75391bf9", title: "Square", category: "💳 Pagos Internacionales", keywords: ["pagos","pos"], path: "/icons/categories/gb_square.png" },
+  // 📱 Redes Sociales (gilbarbara additions)
+  { id: "94a1a413-7394-4600-95ab-6db7ace2187a", title: "Mastodon", category: "📱 Redes Sociales", keywords: ["red social","descentralizado"], path: "/icons/categories/gb_mastodon.png" },
+  { id: "08f9071a-6ef6-4716-86f8-74bbd78be7e8", title: "Bluesky", category: "📱 Redes Sociales", keywords: ["red social","twitter"], path: "/icons/categories/gb_bluesky.png" },
+  { id: "eef8cb8c-21a2-4199-b796-6e6cd6f9bd02", title: "Medium", category: "📱 Redes Sociales", keywords: ["blog","escritura"], path: "/icons/categories/gb_medium.png" },
+  { id: "d460daaa-c174-433a-ac0a-ed1c34437f99", title: "Quora", category: "📱 Redes Sociales", keywords: ["foros","preguntas"], path: "/icons/categories/gb_quora.png" },
+  { id: "5dcd78d0-693c-4335-abbd-257e258b2c2b", title: "Product Hunt", category: "📱 Redes Sociales", keywords: ["startups","productos"], path: "/icons/categories/gb_producthunt.png" },
+  // 💬 Mensajería (gilbarbara additions)
+  { id: "57a24dac-57e9-4c4f-99a4-e652183a2652", title: "Mattermost", category: "💬 Mensajería", keywords: ["mensajeria","trabajo"], path: "/icons/categories/gb_mattermost.png" },
+  // 🛒 E-commerce (gilbarbara additions)
+  { id: "9c021d36-d775-4a0a-ae55-5964df35c744", title: "Shopify", category: "🛒 E-commerce", keywords: ["ecommerce","tienda online"], path: "/icons/categories/gb_shopify.png" },
+  { id: "4858f6bb-8fc2-4f69-ae26-70cab4fe3883", title: "WooCommerce", category: "🛒 E-commerce", keywords: ["ecommerce","wordpress"], path: "/icons/categories/gb_woocommerce.png" },
+  // 🌐 Crypto Internacional (gilbarbara additions)
+  { id: "f8227e81-cfec-4bf3-a65d-6b11f1e73b0a", title: "Ethereum", category: "🌐 Crypto Internacional", keywords: ["crypto","eth","blockchain"], path: "/icons/categories/gb_ethereum.png" },
+  { id: "d60a1e1d-6f30-4b54-8a13-1967320cd300", title: "MetaMask", category: "🌐 Crypto Internacional", keywords: ["crypto","wallet","ethereum"], path: "/icons/categories/gb_metamask.png" },
+  // 🎁 Otros Servicios (gilbarbara additions)
+  { id: "179b3021-cbff-41fc-a43a-eab63b5cca07", title: "Ghost", category: "🎁 Otros Servicios", keywords: ["blog","newsletter"], path: "/icons/categories/gb_ghost.png" },
+  // 📚 Cursos Online (gilbarbara additions)
+  { id: "1b59ac0f-77d0-4bb8-97c0-62dcf5cefc4e", title: "Pluralsight", category: "📚 Cursos Online", keywords: ["educacion","tecnologia","cursos"], path: "/icons/categories/gb_pluralsight.png" },
+  { id: "dd1e4d93-7160-4e6e-a94f-a3eef5e1e464", title: "Treehouse", category: "📚 Cursos Online", keywords: ["educacion","programacion","cursos"], path: "/icons/categories/gb_treehouse.png" },
+  // 🔌 Electro & Tech Argentina (gilbarbara additions — international hardware brands)
+  { id: "a0c86dff-36f8-47e1-8e37-0ec46db51978", title: "Samsung", category: "🔌 Electro & Tech Argentina", keywords: ["tecnologia","samsung","celular"], path: "/icons/categories/gb_samsung.png" },
+  { id: "84f12094-05d5-460b-b008-44fe9d744887", title: "Intel", category: "🔌 Electro & Tech Argentina", keywords: ["tecnologia","procesador"], path: "/icons/categories/gb_intel.png" },
+  { id: "79746b79-c19a-401c-8bf4-de4da2d82148", title: "Nvidia", category: "🔌 Electro & Tech Argentina", keywords: ["tecnologia","gpu","gaming"], path: "/icons/categories/gb_nvidia.png" },
+  { id: "26e566c5-f6f2-473c-8f47-bcce67153c00", title: "AMD", category: "🔌 Electro & Tech Argentina", keywords: ["tecnologia","cpu","gpu"], path: "/icons/categories/gb_amd.png" },
 ]
 
 export const CATEGORY_ICON_GROUPS: string[] = [
