@@ -22,19 +22,12 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
-import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { MangoSheet, MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
 import { DateRangeFilter } from "@/components/ui/date-range-filter"
 import type { DateRangeValue } from "@/components/ui/date-range-filter"
 import { bulkDelete } from "@/lib/bulk-delete"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -608,6 +601,7 @@ function RecurringDialog({
         day_of_week: values.day_of_week,
         day_of_month: values.day_of_month,
         month_of_year: values.month_of_year,
+        interval_days: values.frequency === "custom" ? (values.interval_days ?? 1) : null,
         weekend_handling: values.weekend_handling,
         start_date: values.start_date,
         end_date: values.end_date || null,
@@ -652,6 +646,7 @@ function RecurringDialog({
           day_of_week: values.day_of_week,
           day_of_month: values.day_of_month,
           month_of_year: values.month_of_year,
+          interval_days: values.frequency === "custom" ? (values.interval_days ?? 1) : null,
           weekend_handling: values.weekend_handling,
           start_date: values.start_date,
           end_date: values.end_date || null,
@@ -697,31 +692,30 @@ function RecurringDialog({
   const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar recurrente" : "Nueva recurrente"}</DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? "Modificá los datos de la transacción recurrente."
-              : "Configurá una transacción que se repite automáticamente."}
-          </DialogDescription>
-        </DialogHeader>
-        <RecurringForm
-          accounts={accounts}
-          categories={categories}
-          defaultValues={rec ? recurringToFormValues(rec) : undefined}
-          onSubmit={async (v) => {
-            if (isEditing) await updateMutation.mutateAsync(v)
-            else await createMutation.mutateAsync(v)
-          }}
-          onDelete={isEditing ? async () => deleteMutation.mutate() : undefined}
-          isLoading={isPending}
-          isDeleting={deleteMutation.isPending}
-          submitLabel={isEditing ? "Guardar cambios" : "Guardar recurrente"}
-        />
-      </DialogContent>
-    </Dialog>
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={isEditing ? "Editar recurrente" : "Nueva recurrente"}
+      description={
+        isEditing
+          ? "Modificá los datos de la transacción recurrente."
+          : "Configurá una transacción que se repite automáticamente."
+      }
+    >
+      <RecurringForm
+        accounts={accounts}
+        categories={categories}
+        defaultValues={rec ? recurringToFormValues(rec) : undefined}
+        onSubmit={async (v) => {
+          if (isEditing) await updateMutation.mutateAsync(v)
+          else await createMutation.mutateAsync(v)
+        }}
+        onDelete={isEditing ? async () => deleteMutation.mutate() : undefined}
+        isLoading={isPending}
+        isDeleting={deleteMutation.isPending}
+        submitLabel={isEditing ? "Guardar cambios" : "Guardar recurrente"}
+      />
+    </MangoSheet>
   )
 }
 

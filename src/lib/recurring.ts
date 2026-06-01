@@ -130,6 +130,8 @@ function rawCandidateDate(rec: RecurringTransaction, base: Date): Date {
       const clamped = clampDay(y, moy, dom)
       return startOfDay(new Date(y, moy - 1, clamped))
     }
+    case "custom":
+      return base
   }
 }
 
@@ -215,6 +217,21 @@ export function computeNextRun(rec: RecurringTransaction, from: Date): Date {
       candidate = attempt
       break
     }
+    case "custom": {
+      const days = rec.interval_days ?? 1
+      const origin = rec.start_date
+        ? startOfDay(parseISO(rec.start_date))
+        : fromDay
+      // Find smallest k >= 0 such that origin + k*days >= fromDay
+      let k = 0
+      if (isBefore(origin, fromDay)) {
+        const diffMs = fromDay.getTime() - origin.getTime()
+        const msPerDay = days * 86_400_000
+        k = Math.ceil(diffMs / msPerDay)
+      }
+      candidate = addDays(origin, k * days)
+      break
+    }
   }
 
   return applyWeekendHandling(candidate, rec.weekend_handling)
@@ -256,6 +273,11 @@ export function advanceNextRun(rec: RecurringTransaction, current: Date): Date {
       const next = addYears(current, 1)
       const y = next.getFullYear()
       raw = startOfDay(new Date(y, moy - 1, clampDay(y, moy, dom)))
+      break
+    }
+    case "custom": {
+      const days = rec.interval_days ?? 1
+      raw = addDays(current, days)
       break
     }
   }
@@ -303,6 +325,10 @@ export function frequencyLabel(rec: RecurringTransaction): string {
       const moy = rec.month_of_year ?? 1
       return `Anual · ${dom} de ${MONTH_LABELS[moy]}`
     }
+    case "custom": {
+      const days = rec.interval_days ?? 1
+      return `Cada ${days} día${days === 1 ? "" : "s"}`
+    }
   }
 }
 
@@ -313,6 +339,7 @@ export const FREQUENCY_LABELS: Record<RecurringFrequency, string> = {
   monthly: "Mensual",
   bimonthly: "Bimestral",
   annual: "Anual",
+  custom: "Personalizado",
 }
 
 /** Labels for weekend_handling */
