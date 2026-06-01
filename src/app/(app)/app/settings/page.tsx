@@ -8,14 +8,13 @@ import { z } from "zod"
 import { useTheme } from "next-themes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info, Plug, ExternalLink, Bot } from "lucide-react"
+import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info, Plug, ExternalLink, Bot, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
-import { CategoriesManager } from "@/components/settings/categories-manager"
 import { createClient } from "@/lib/supabase/client"
 import { signOut } from "@/app/actions/auth"
 import { cn } from "@/lib/utils"
@@ -547,7 +546,24 @@ export default function SettingsPage() {
 
       {/* Categories */}
       <SettingsSection id="categories" icon={Tag} title="Categorías">
-        <CategoriesManager />
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Gestioná tus categorías</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Creá, editá y organizá las categorías para clasificar tus movimientos.
+            </p>
+          </div>
+          <Link
+            href="/app/categorias"
+            className={cn(
+              "inline-flex items-center gap-1.5 text-xs font-semibold text-primary",
+              "hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
+            )}
+          >
+            Ver categorías
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </SettingsSection>
 
       {/* IA link */}
