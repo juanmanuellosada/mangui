@@ -480,7 +480,7 @@ export function TransferForm({
                 configurá una cotización en Ajustes.
               </p>
             ) : null}
-            {effectiveRate !== null && (
+            {!autoComplete && effectiveRate !== null && (
               <p className="text-xs text-muted-foreground">
                 Tasa implícita:{" "}
                 <span className="font-semibold text-foreground tabular-nums">
