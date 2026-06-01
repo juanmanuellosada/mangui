@@ -51,39 +51,89 @@ export type RecurringFormValues = {
   day_of_week: number | null
   day_of_month: number | null
   month_of_year: number | null
+  interval_days: number | null
   weekend_handling: WeekendHandling
   start_date: string
   end_date: string | null
   is_card_recurring: boolean
 }
 
-const schema = z
-  .object({
-    kind: z.enum(["income", "expense", "transfer"]),
-    amount: z.coerce.number().positive("El monto debe ser mayor a 0"),
-    currency: z.enum(["ARS", "USD"]),
-    account_id: z.string().min(1, "Seleccioná una cuenta"),
-    to_account_id: z.string().nullable(),
-    to_amount: z.coerce.number().nullable(),
-    category_id: z.string().nullable(),
-    note: z.string(),
-    frequency: z.enum(["weekly", "biweekly", "monthly", "bimonthly", "annual"]),
-    day_of_week: z.coerce.number().nullable(),
-    day_of_month: z.coerce.number().nullable(),
-    month_of_year: z.coerce.number().nullable(),
-    weekend_handling: z.enum(["as_is", "skip", "previous_business_day"]),
-    start_date: z.string().min(1, "Seleccioná una fecha de inicio"),
-    end_date: z.string().nullable(),
-    is_card_recurring: z.boolean(),
-  })
-  .refine(
-    (v) => v.kind !== "transfer" || (v.to_account_id && v.to_account_id !== v.account_id),
-    { message: "La cuenta destino debe ser distinta", path: ["to_account_id"] }
-  )
-  .refine(
-    (v) => v.kind !== "transfer" || (v.to_amount !== null && v.to_amount > 0),
-    { message: "Ingresá el monto destino", path: ["to_amount"] }
-  )
+function buildSchema(accounts: Account[]) {
+  const accountMap = new Map(accounts.map((a) => [a.id, a]))
+
+  return z
+    .object({
+      kind: z.enum(["income", "expense", "transfer"]),
+      amount: z.coerce.number().positive("El monto debe ser mayor a 0"),
+      currency: z.enum(["ARS", "USD"]),
+      account_id: z.string().min(1, "Seleccioná una cuenta"),
+      to_account_id: z.string().nullable(),
+      to_amount: z.coerce.number().nullable(),
+      category_id: z.string().nullable(),
+      note: z.string(),
+      frequency: z.enum(["weekly", "biweekly", "monthly", "bimonthly", "annual", "custom"]),
+      day_of_week: z.coerce.number().nullable(),
+      day_of_month: z.coerce.number().nullable(),
+      month_of_year: z.coerce.number().nullable(),
+      interval_days: z.coerce.number().int().positive().nullable(),
+      weekend_handling: z.enum(["as_is", "skip", "previous_business_day"]),
+      start_date: z.string().min(1, "Seleccioná una fecha de inicio"),
+      end_date: z.string().nullable(),
+      is_card_recurring: z.boolean(),
+    })
+    // Transfer: destination ≠ origin
+    .refine(
+      (v) => v.kind !== "transfer" || (v.to_account_id && v.to_account_id !== v.account_id),
+      { message: "La cuenta destino debe ser distinta", path: ["to_account_id"] }
+    )
+    // Transfer: destination amount required
+    .refine(
+      (v) => v.kind !== "transfer" || (v.to_amount !== null && v.to_amount > 0),
+      { message: "Ingresá el monto destino", path: ["to_amount"] }
+    )
+    // Income cannot use a credit card account
+    .refine(
+      (v) => {
+        if (v.kind !== "income" || !v.account_id) return true
+        const acc = accountMap.get(v.account_id)
+        return acc?.type !== "tarjeta_credito"
+      },
+      { message: "Los ingresos no se pueden registrar en una tarjeta de crédito", path: ["account_id"] }
+    )
+    // Currency must match account currency unless account is credit card or it's a transfer
+    .refine(
+      (v) => {
+        if (v.kind === "transfer" || !v.account_id) return true
+        const acc = accountMap.get(v.account_id)
+        if (!acc || acc.type === "tarjeta_credito") return true
+        return v.currency === acc.currency
+      },
+      { message: "La moneda debe coincidir con la de la cuenta seleccionada", path: ["currency"] }
+    )
+    // Transfer: origin account cannot be a credit card
+    .refine(
+      (v) => {
+        if (v.kind !== "transfer" || !v.account_id) return true
+        const acc = accountMap.get(v.account_id)
+        return acc?.type !== "tarjeta_credito"
+      },
+      { message: "Las transferencias no pueden usar una tarjeta de crédito como origen", path: ["account_id"] }
+    )
+    // Transfer: destination account cannot be a credit card
+    .refine(
+      (v) => {
+        if (v.kind !== "transfer" || !v.to_account_id) return true
+        const acc = accountMap.get(v.to_account_id)
+        return acc?.type !== "tarjeta_credito"
+      },
+      { message: "Las transferencias no pueden usar una tarjeta de crédito como destino", path: ["to_account_id"] }
+    )
+    // Custom frequency requires interval_days >= 1
+    .refine(
+      (v) => v.frequency !== "custom" || (v.interval_days != null && v.interval_days >= 1),
+      { message: "Ingresá un intervalo de al menos 1 día", path: ["interval_days"] }
+    )
+}
 
 interface RecurringFormProps {
   accounts: Account[]
@@ -116,7 +166,7 @@ export function RecurringForm({
     formState: { errors },
   } = useForm<RecurringFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(schema) as unknown as Resolver<RecurringFormValues, any>,
+    resolver: zodResolver(buildSchema(accounts)) as unknown as Resolver<RecurringFormValues, any>,
     defaultValues: {
       kind: "expense",
       amount: 0,
@@ -130,6 +180,7 @@ export function RecurringForm({
       day_of_week: 1,
       day_of_month: 1,
       month_of_year: 1,
+      interval_days: 30,
       weekend_handling: "as_is",
       start_date: today,
       end_date: null,
@@ -152,10 +203,44 @@ export function RecurringForm({
   const dayOfMonth = watch("day_of_month")
   const monthOfYear = watch("month_of_year")
   const isCardRecurring = watch("is_card_recurring")
+  const intervalDays = watch("interval_days")
 
   const fromAccount = accounts.find((a) => a.id === accountId)
   const toAccount = accounts.find((a) => a.id === toAccountId)
   const isTransfer = kind === "transfer"
+
+  // ── Credit-card + currency logic (mirroring movement-form) ────────────────
+  const isCreditCard = fromAccount?.type === "tarjeta_credito"
+
+  // Accounts allowed for income: exclude credit cards
+  const incomeAccounts = accounts.filter((a) => a.type !== "tarjeta_credito")
+  // Accounts allowed for transfers: exclude credit cards (both sides)
+  const transferAccounts = accounts.filter((a) => a.type !== "tarjeta_credito")
+
+  // When account changes and it's not a credit card, force currency to match account
+  useEffect(() => {
+    if (fromAccount && !isCreditCard) {
+      setValue("currency", fromAccount.currency, { shouldValidate: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId])
+
+  // In transfer mode, always force currency = source account's currency (no toggle)
+  useEffect(() => {
+    if (isTransfer && fromAccount) {
+      setValue("currency", fromAccount.currency, { shouldValidate: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTransfer, accountId])
+
+  // When switching to income and the selected account is a credit card, clear account_id
+  useEffect(() => {
+    if (kind === "income" && isCreditCard) {
+      setValue("account_id", "", { shouldValidate: true })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind])
+
   const isCrossCurrency =
     isTransfer && !!fromAccount && !!toAccount && fromAccount.currency !== toAccount.currency
 
@@ -204,6 +289,7 @@ export function RecurringForm({
         day_of_week: dayOfWeek,
         day_of_month: dayOfMonth,
         month_of_year: monthOfYear,
+        interval_days: intervalDays,
         weekend_handling: weekendHandling,
         start_date: startDate,
       } as RecurringTransaction
@@ -285,15 +371,18 @@ export function RecurringForm({
         )}
       </div>
 
-      {/* Currency toggle — always visible */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground font-medium">Moneda</Label>
-        <CurrencyToggle
-          value={currency}
-          onChange={(v) => setValue("currency", v, { shouldValidate: true })}
-          className="w-full"
-        />
-      </div>
+      {/* Currency toggle — only for credit cards (non-transfer). For regular accounts
+          the currency is forced to match the account; for transfers it follows the source. */}
+      {isCreditCard && !isTransfer && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Moneda</Label>
+          <CurrencyToggle
+            value={currency}
+            onChange={(v) => setValue("currency", v, { shouldValidate: true })}
+            className="w-full"
+          />
+        </div>
+      )}
 
       {/* Account */}
       <div className="space-y-1.5">
@@ -303,7 +392,13 @@ export function RecurringForm({
         <MangoSelect
           value={accountId}
           onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-          options={accounts.map((a) => ({
+          options={(
+            isTransfer
+              ? transferAccounts
+              : kind === "income"
+              ? incomeAccounts
+              : accounts
+          ).map((a) => ({
             value: a.id,
             label: a.name,
             leading: <AccountIconChip icon={a.icon} />,
@@ -326,7 +421,7 @@ export function RecurringForm({
             <MangoSelect
               value={toAccountId ?? ""}
               onChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
-              options={accounts.map((a) => ({
+              options={transferAccounts.map((a) => ({
                 value: a.id,
                 label: a.name,
                 leading: <AccountIconChip icon={a.icon} />,
@@ -492,6 +587,26 @@ export function RecurringForm({
         </div>
       )}
 
+      {/* Interval days — only for custom frequency */}
+      {frequency === "custom" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="interval_days" className="text-xs text-muted-foreground font-medium">
+            Repetir cada (días)
+          </Label>
+          <Input
+            id="interval_days"
+            type="number"
+            min="1"
+            inputMode="numeric"
+            placeholder="30"
+            {...register("interval_days")}
+          />
+          {errors.interval_days && (
+            <p className="text-xs text-destructive">{errors.interval_days.message}</p>
+          )}
+        </div>
+      )}
+
       {/* Weekend handling */}
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground font-medium">
@@ -554,7 +669,7 @@ export function RecurringForm({
           <MangoDatePicker
             value={endDate ? parseISO(endDate) : null}
             onChange={(d) => setValue("end_date", format(d, "yyyy-MM-dd"))}
-            placeholder="Sin vencimiento"
+            placeholder="No vence"
           />
         </div>
       </div>
@@ -639,6 +754,7 @@ export function recurringToFormValues(rec: RecurringTransaction): RecurringFormV
     day_of_week: rec.day_of_week ?? null,
     day_of_month: rec.day_of_month ?? null,
     month_of_year: rec.month_of_year ?? null,
+    interval_days: rec.interval_days ?? null,
     weekend_handling: rec.weekend_handling,
     start_date: rec.start_date,
     end_date: rec.end_date ?? null,

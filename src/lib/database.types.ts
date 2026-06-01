@@ -853,6 +853,7 @@ export type Database = {
           end_date: string | null
           frequency: Database["public"]["Enums"]["recurring_frequency"]
           id: string
+          interval_days: number | null
           is_card_recurring: boolean
           kind: Database["public"]["Enums"]["txn_kind"]
           month_of_year: number | null
@@ -877,6 +878,7 @@ export type Database = {
           end_date?: string | null
           frequency: Database["public"]["Enums"]["recurring_frequency"]
           id?: string
+          interval_days?: number | null
           is_card_recurring?: boolean
           kind: Database["public"]["Enums"]["txn_kind"]
           month_of_year?: number | null
@@ -901,6 +903,7 @@ export type Database = {
           end_date?: string | null
           frequency?: Database["public"]["Enums"]["recurring_frequency"]
           id?: string
+          interval_days?: number | null
           is_card_recurring?: boolean
           kind?: Database["public"]["Enums"]["txn_kind"]
           month_of_year?: number | null
@@ -1342,6 +1345,7 @@ export type Database = {
         | "monthly"
         | "bimonthly"
         | "annual"
+        | "custom"
       recurring_status: "active" | "paused" | "inactive"
       rule_field: "note" | "amount" | "account" | "type"
       rule_match: "all" | "any"
@@ -1509,6 +1513,7 @@ export const Constants = {
         "monthly",
         "bimonthly",
         "annual",
+        "custom",
       ],
       recurring_status: ["active", "paused", "inactive"],
       rule_field: ["note", "amount", "account", "type"],
