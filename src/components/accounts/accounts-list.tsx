@@ -6,6 +6,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight, Search, X, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { bulkDelete } from "@/lib/bulk-delete"
 import {
   Dialog,
   DialogContent,
@@ -320,25 +323,48 @@ function AccountCard({
   account,
   balance,
   userId,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   account: Account
   balance: AccountBalance | undefined
   userId?: string
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const currentBalance = balance?.current_balance ?? account.initial_balance
 
+  function handleCardClick() {
+    if (selectionMode && onToggle) onToggle(account.id)
+  }
+
   return (
     <div
+      onClick={selectionMode ? handleCardClick : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "rounded-2xl border border-border/60 bg-card px-4 py-4 flex items-center gap-3",
         "hover:border-primary/20 hover:shadow-sm transition-all duration-150",
-        account.is_hidden && "opacity-60"
+        account.is_hidden && "opacity-60",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
       )}
     >
-      {/* Icon */}
-      <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60 overflow-hidden">
-        {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground", logoFill: true })}
-      </div>
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(account.id)}
+          label={`Seleccionar ${account.name}`}
+        />
+      ) : (
+        <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60 overflow-hidden">
+          {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground", logoFill: true })}
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -369,8 +395,8 @@ function AccountCard({
         </p>
       </div>
 
-      {/* Credit card shortcut */}
-      {account.type === "tarjeta_credito" && (
+      {/* Credit card shortcut — hidden in selection mode */}
+      {!selectionMode && account.type === "tarjeta_credito" && (
         <Link
           href="/app/cards"
           className={cn(
@@ -385,11 +411,13 @@ function AccountCard({
         </Link>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0">
-        <EditAccountDialog account={account} userId={userId} />
-        <DeleteAccountDialog account={account} />
-      </div>
+      {/* Actions — hidden in selection mode */}
+      {!selectionMode && (
+        <div className="flex gap-0.5 flex-shrink-0">
+          <EditAccountDialog account={account} userId={userId} />
+          <DeleteAccountDialog account={account} />
+        </div>
+      )}
     </div>
   )
 }
@@ -695,9 +723,33 @@ export function AccountsList() {
 
   const [filters, setFilters] = useState<AccountFilters>(DEFAULT_FILTERS)
 
+  // ── Multi-select ────────────────────────────────────────────
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
+  const queryClient = useQueryClient()
+
   const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
 
   const filtersActive = isFiltersActive(filters)
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("accounts", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+    queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} cuenta${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(
+        `Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar (tienen movimientos).`
+      )
+    }
+  }
 
   // When filters are active, flatten all accounts into one filtered + sorted list.
   // When idle, keep the original visible / hidden section split.
@@ -745,6 +797,13 @@ export function AccountsList() {
   const visible = accounts?.filter((a) => !a.is_hidden) ?? []
   const hidden = accounts?.filter((a) => a.is_hidden) ?? []
 
+  // Visible IDs for toggleAll
+  const visibleIds = useMemo(() => {
+    if (!accounts) return []
+    if (filtersActive) return filteredAccounts.map((a) => a.id)
+    return accounts.map((a) => a.id)
+  }, [accounts, filtersActive, filteredAccounts])
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -755,7 +814,12 @@ export function AccountsList() {
         >
           Cuentas
         </h1>
-        <CreateAccountDialog userId={userId} />
+        <div className="flex items-center gap-2">
+          {!loadingAccounts && accounts && accounts.length > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
+          )}
+          {!ms.selectionMode && <CreateAccountDialog userId={userId} />}
+        </div>
       </div>
 
       {/* Patrimonio hero — always reflects all non-hidden accounts */}
@@ -834,6 +898,9 @@ export function AccountsList() {
               account={account}
               balance={balanceMap.get(account.id) ?? undefined}
               userId={userId}
+              selectionMode={ms.selectionMode}
+              isSelected={ms.isSelected(account.id)}
+              onToggle={ms.toggle}
             />
           ))}
         </div>
@@ -855,6 +922,9 @@ export function AccountsList() {
                     account={account}
                     balance={balanceMap.get(account.id) ?? undefined}
                     userId={userId}
+                    selectionMode={ms.selectionMode}
+                    isSelected={ms.isSelected(account.id)}
+                    onToggle={ms.toggle}
                   />
                 ))}
               </div>
@@ -874,6 +944,9 @@ export function AccountsList() {
                     account={account}
                     balance={balanceMap.get(account.id) ?? undefined}
                     userId={userId}
+                    selectionMode={ms.selectionMode}
+                    isSelected={ms.isSelected(account.id)}
+                    onToggle={ms.toggle}
                   />
                 ))}
               </div>
@@ -882,6 +955,47 @@ export function AccountsList() {
         </>
       )}
 
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={visibleIds.length}
+          onSelectAll={() => ms.toggleAll(visibleIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <MangoSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar cuentas"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={bulkPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={bulkPending}
+              className="press-effect"
+            >
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} cuenta{ms.count !== 1 ? "s" : ""}? Las que tengan movimientos registrados no se podrán eliminar y se te informará el resultado. Esta acción no se puede deshacer.
+        </p>
+      </MangoSheet>
     </div>
   )
 }

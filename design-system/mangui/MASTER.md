@@ -36,10 +36,12 @@ The brand is fixed by the logo (mango with sunglasses): **lime/green + orange**.
 
 ### Typography
 
-- **Heading Font:** Calistoga (warm, rounded display) — for hero/section headings and big balance numbers, giving the friendly mango personality. Use sparingly.
-- **Body / UI Font:** IBM Plex Sans — trustworthy, financial; great legibility.
-- **Numbers / money:** ALWAYS use tabular figures (`font-variant-numeric: tabular-nums` / Tailwind `tabular-nums`) on balances, amounts, rates and tables to prevent layout shift and align columns.
-- **Mood:** trustworthy + warm. Professional financial body, friendly display accents.
+- **Single Typeface:** iA Writer Quattro S (local woff2, OFL licensed) — available in 400/normal, 400/italic, 700/normal, 700/italic. No 500/600 files; browsers map 500→400, 600→700, which is fine.
+- **Display / headings:** weight 700 — hero headings, section titles, big balance numbers, brand wordmark.
+- **Body / UI:** weight 400 — body copy, labels, inputs, metadata.
+- **CSS vars:** `--font-sans` and `--font-display` both resolve to `var(--font-quattro)` (the Next.js local-font variable). Existing `font-family: var(--font-display)` and `var(--font-sans)` usages automatically use iA Writer Quattro.
+- **Numbers / money:** ALWAYS use tabular figures (`font-variant-numeric: tabular-nums` / Tailwind `tabular-nums`) on balances, amounts, rates and tables to prevent layout shift and align columns. iA Writer Quattro figures are already aligned.
+- **Mood:** trustworthy + warm. Single-typeface system: visual hierarchy via size + weight (400 body, 700 headings/display).
 
 ### Platform / Stack note (this project is WEB, not React Native)
 
@@ -49,12 +51,7 @@ The skill's mobile guidance (Reanimated, BlurView, haptics, FAB) maps to web equ
 - Haptic/scale-press → subtle CSS `scale(0.97)` active state + 150–250ms transitions.
 - **Navigation:** desktop ≥1024px = persistent left **sidebar**; mobile = bottom nav (≤5 top-level items: Inicio, Movimientos, Cuentas, Stats, Más). Don't mix patterns at the same level.
 - Mobile-first, installable PWA; respect safe areas (`env(safe-area-inset-*)`) for the bottom nav.
-- **Google Fonts:** [IBM Plex Sans + IBM Plex Sans](https://fonts.google.com/share?selection.family=IBM+Plex+Sans:wght@300;400;500;600;700)
-
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
-```
+- **Font files:** `src/app/fonts/iAWriterQuattroS-{Regular,Italic,Bold,BoldItalic}.woff2` (OFL licensed; see `src/app/fonts/NOTICE.md`). Loaded via `next/font/local` in `src/app/layout.tsx` — no Google Fonts, no external network requests.
 
 ### Spacing Variables
 
@@ -173,7 +170,7 @@ The skill's mobile guidance (Reanimated, BlurView, haptics, FAB) maps to web equ
 
 **Style:** SaaS Mobile (High-Tech Boutique)
 
-**Keywords:** saas, electric blue, gradient, fintech, spring animation, dual font, glassmorphism, boutique, premium, calistoga, inter, mono, tactile, haptic, bento
+**Keywords:** saas, electric blue, gradient, fintech, spring animation, single font, glassmorphism, boutique, premium, ia-writer-quattro, mono, tactile, haptic, bento
 
 **Best For:** B2B SaaS mobile dashboards, fintech apps, developer tool mobile companions, marketing analytics apps, HR/operations apps, modern business productivity
 

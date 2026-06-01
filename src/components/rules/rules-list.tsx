@@ -12,6 +12,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
@@ -103,6 +107,9 @@ interface RuleCardProps {
   onDelete: () => void
   onToggleActive: (active: boolean) => void
   isToggling: boolean
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
 }
 
 function RuleCard({
@@ -114,6 +121,9 @@ function RuleCard({
   onDelete,
   onToggleActive,
   isToggling,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: RuleCardProps) {
   const summary = ruleSummary(rule, conditions, { categories, accounts })
 
@@ -123,18 +133,32 @@ function RuleCard({
 
   return (
     <div
+      onClick={selectionMode ? () => onToggleSelect?.(rule.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "flex items-start gap-3 p-4 border-b border-border/60 last:border-b-0 transition-colors duration-150",
-        !rule.is_active && "opacity-60"
+        !rule.is_active && "opacity-60",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
       )}
     >
-      {/* Icon */}
-      <div className={cn(
-        "mt-0.5 h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
-        "bg-primary/10 text-primary"
-      )}>
-        <Zap className="h-4 w-4" />
-      </div>
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <div className="mt-0.5 shrink-0">
+          <RowCheckbox
+            checked={!!isSelected}
+            onChange={() => onToggleSelect?.(rule.id)}
+          />
+        </div>
+      ) : (
+        <div className={cn(
+          "mt-0.5 h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
+          "bg-primary/10 text-primary"
+        )}>
+          <Zap className="h-4 w-4" />
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-w-0">
@@ -161,31 +185,33 @@ function RuleCard({
         )}
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Switch
-          checked={rule.is_active}
-          onCheckedChange={onToggleActive}
-          disabled={isToggling}
-          aria-label={rule.is_active ? "Desactivar regla" : "Activar regla"}
-        />
-        <button
-          type="button"
-          onClick={onEdit}
-          className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Editar regla"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Eliminar regla"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {/* Controls — hidden in selection mode */}
+      {!selectionMode && (
+        <div className="flex items-center gap-2 shrink-0">
+          <Switch
+            checked={rule.is_active}
+            onCheckedChange={onToggleActive}
+            disabled={isToggling}
+            aria-label={rule.is_active ? "Desactivar regla" : "Activar regla"}
+          />
+          <button
+            type="button"
+            onClick={onEdit}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Editar regla"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Eliminar regla"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -226,6 +252,9 @@ export function RulesList() {
   const [editingRule, setEditingRule] = useState<AutoRule | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AutoRule | null>(null)
   const [prefillSuggestion, setPrefillSuggestion] = useState<SuggestedRule | null>(null)
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
 
   // Queries
   const { data: rules = [], isLoading: rulesLoading } = useQuery({
@@ -276,6 +305,24 @@ export function RulesList() {
     if (filter === "inactivas") return rules.filter((r) => !r.is_active)
     return rules
   }, [rules, filter])
+
+  const filteredRuleIds = filteredRules.map((r) => r.id)
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("auto_rules", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: RULES_KEY })
+    queryClient.invalidateQueries({ queryKey: RULE_CONDITIONS_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} regla${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -493,19 +540,26 @@ export function RulesList() {
             {rules.length} reglas · {activeCount} activas
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => openNewForm()}
-          className={cn(
-            "h-9 w-9 rounded-full flex items-center justify-center",
-            "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
-            "hover:bg-primary/90 transition-all duration-150 cursor-pointer",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        <div className="flex items-center gap-2">
+          {!isLoading && rules.length > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
           )}
-          aria-label="Nueva regla"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
+          {!ms.selectionMode && (
+            <button
+              type="button"
+              onClick={() => openNewForm()}
+              className={cn(
+                "h-9 w-9 rounded-full flex items-center justify-center",
+                "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
+                "hover:bg-primary/90 transition-all duration-150 cursor-pointer",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              )}
+              aria-label="Nueva regla"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Suggested rules */}
@@ -597,6 +651,9 @@ export function RulesList() {
                 toggleMutation.mutate({ id: rule.id, is_active: active })
               }
               isToggling={toggleMutation.isPending}
+              selectionMode={ms.selectionMode}
+              isSelected={ms.isSelected(rule.id)}
+              onToggleSelect={ms.toggle}
             />
           ))
         )}
@@ -700,6 +757,37 @@ export function RulesList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={filteredRuleIds.length}
+          onSelectAll={() => ms.toggleAll(filteredRuleIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar reglas"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} regla{ms.count !== 1 ? "s" : ""} y sus condiciones? Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }

@@ -14,6 +14,10 @@ import {
   Play,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import {
   Dialog,
   DialogContent,
@@ -113,6 +117,9 @@ function BudgetCard({
   onEdit,
   onToggleStatus,
   isTogglingStatus,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
   budget: Budget
   movements: Movement[]
@@ -121,6 +128,9 @@ function BudgetCard({
   onEdit: (b: Budget) => void
   onToggleStatus: (b: Budget) => void
   isTogglingStatus: boolean
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
 }) {
   const progress = computeBudgetProgress(budget, movements)
   const scope = scopeLabel(budget, { categories, accounts })
@@ -135,10 +145,15 @@ function BudgetCard({
 
   return (
     <div
+      onClick={selectionMode ? () => onToggleSelect?.(budget.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "rounded-2xl border border-border/60 bg-card overflow-hidden",
         "transition-opacity duration-150",
-        isPaused && "opacity-60"
+        isPaused && "opacity-60",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
       )}
     >
       {/* Header row */}
@@ -178,25 +193,34 @@ function BudgetCard({
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Pause/Resume switch */}
-          <Switch
-            checked={!isPaused}
-            onCheckedChange={() => onToggleStatus(budget)}
-            disabled={isTogglingStatus}
-            aria-label={isPaused ? "Reanudar presupuesto" : "Pausar presupuesto"}
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onEdit(budget)}
-            title="Editar"
-            className="press-effect cursor-pointer"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        {/* Actions — hidden in selection mode */}
+        {!selectionMode && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Switch
+              checked={!isPaused}
+              onCheckedChange={() => onToggleStatus(budget)}
+              disabled={isTogglingStatus}
+              aria-label={isPaused ? "Reanudar presupuesto" : "Pausar presupuesto"}
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={(e) => { e.stopPropagation(); onEdit(budget) }}
+              title="Editar"
+              className="press-effect cursor-pointer"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+        {selectionMode && (
+          <div className="flex items-center shrink-0">
+            <RowCheckbox
+              checked={!!isSelected}
+              onChange={() => onToggleSelect?.(budget.id)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Progress */}
@@ -572,6 +596,9 @@ function SummaryBar({ budgets, movements }: { budgets: Budget[]; movements: Move
 
 export function BudgetsList() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
 
   const { data: budgets = [], isLoading: loadingBudgets } = useQuery({
     queryKey: BUDGETS_KEY,
@@ -628,6 +655,23 @@ export function BudgetsList() {
     },
   })
 
+  const budgetIds = budgets.map((b) => b.id)
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("budgets", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: BUDGETS_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} presupuesto${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
+
   return (
     <div className="space-y-5 max-w-2xl animate-fade-in">
       {/* Header */}
@@ -645,7 +689,12 @@ export function BudgetsList() {
             </div>
           )}
         </div>
-        <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} />
+        <div className="flex items-center gap-2">
+          {!loadingBudgets && budgets.length > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
+          )}
+          {!ms.selectionMode && <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} />}
+        </div>
       </div>
 
       {/* Skeleton */}
@@ -701,6 +750,9 @@ export function BudgetsList() {
               onEdit={setEditingBudget}
               onToggleStatus={(b) => toggleStatusMutation.mutate(b)}
               isTogglingStatus={toggleStatusMutation.isPending}
+              selectionMode={ms.selectionMode}
+              isSelected={ms.isSelected(budget.id)}
+              onToggleSelect={ms.toggle}
             />
           ))}
         </div>
@@ -720,6 +772,37 @@ export function BudgetsList() {
           onOpenChange={(v) => { if (!v) setEditingBudget(null) }}
         />
       )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={budgetIds.length}
+          onSelectAll={() => ms.toggleAll(budgetIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar presupuestos"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} presupuesto{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }

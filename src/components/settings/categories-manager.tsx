@@ -8,6 +8,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, Pencil, Trash2, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -149,21 +153,43 @@ function CategoryRow({
   category,
   onEdit,
   onDelete,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   category: Category
   onEdit: (c: Category) => void
   onDelete: (c: Category) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 px-3 group rounded-xl hover:bg-muted/40 transition-colors">
-      {/* Icon or fallback */}
-      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-base">
-        {category.icon ? (
-          <span>{category.icon}</span>
-        ) : (
-          <Tag className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
+    <div
+      onClick={selectionMode ? () => onToggle?.(category.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
+      className={cn(
+        "flex items-center gap-3 py-2.5 px-3 group rounded-xl hover:bg-muted/40 transition-colors",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
+      )}
+    >
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(category.id)}
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-base">
+          {category.icon ? (
+            <span>{category.icon}</span>
+          ) : (
+            <Tag className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{category.name}</p>
@@ -172,27 +198,29 @@ function CategoryRow({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Editar"
-          className="press-effect cursor-pointer"
-          onClick={() => onEdit(category)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Eliminar"
-          className="press-effect cursor-pointer"
-          onClick={() => onDelete(category)}
-        >
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
+      {/* Actions — hidden in selection mode */}
+      {!selectionMode && (
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Editar"
+            className="press-effect cursor-pointer"
+            onClick={() => onEdit(category)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Eliminar"
+            className="press-effect cursor-pointer"
+            onClick={() => onDelete(category)}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -206,6 +234,9 @@ function CategorySection({
   onEdit,
   onDelete,
   onAdd,
+  selectionMode,
+  selectedIds,
+  onToggle,
 }: {
   title: string
   categories: Category[]
@@ -213,6 +244,9 @@ function CategorySection({
   onEdit: (c: Category) => void
   onDelete: (c: Category) => void
   onAdd: (type: CategoryType) => void
+  selectionMode?: boolean
+  selectedIds?: Set<string>
+  onToggle?: (id: string) => void
 }) {
   return (
     <div className="space-y-2">
@@ -252,6 +286,9 @@ function CategorySection({
               category={cat}
               onEdit={onEdit}
               onDelete={onDelete}
+              selectionMode={selectionMode}
+              isSelected={selectedIds?.has(cat.id)}
+              onToggle={onToggle}
             />
           ))}
         </div>
@@ -267,6 +304,9 @@ export function CategoriesManager() {
   const [addDialog, setAddDialog] = useState<CategoryType | null>(null)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null)
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
 
   const { data: categories = [], isLoading } = useQuery({
     queryKey: CATEGORIES_KEY,
@@ -275,6 +315,7 @@ export function CategoriesManager() {
 
   const incomeCategories = categories.filter((c) => c.type === "income")
   const expenseCategories = categories.filter((c) => c.type === "expense")
+  const allCategoryIds = categories.map((c) => c.id)
 
   // ── Create ─────────────────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -383,6 +424,22 @@ export function CategoriesManager() {
     },
   })
 
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("categories", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: CATEGORIES_KEY })
+    queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} categoría${result.deleted !== 1 ? "s" : ""}. Los movimientos quedan sin categoría.`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -395,6 +452,13 @@ export function CategoriesManager() {
 
   return (
     <div className="space-y-6">
+      {/* Select entry button */}
+      {!isLoading && categories.length > 0 && !ms.selectionMode && (
+        <div className="flex justify-end">
+          <SelectButton onClick={ms.enter} />
+        </div>
+      )}
+
       <CategorySection
         title="Ingresos"
         categories={incomeCategories}
@@ -402,6 +466,9 @@ export function CategoriesManager() {
         onEdit={setEditingCategory}
         onDelete={setDeletingCategory}
         onAdd={(type) => setAddDialog(type)}
+        selectionMode={ms.selectionMode}
+        selectedIds={ms.selectedIds}
+        onToggle={ms.toggle}
       />
       <CategorySection
         title="Gastos"
@@ -410,6 +477,9 @@ export function CategoriesManager() {
         onEdit={setEditingCategory}
         onDelete={setDeletingCategory}
         onAdd={(type) => setAddDialog(type)}
+        selectionMode={ms.selectionMode}
+        selectedIds={ms.selectedIds}
+        onToggle={ms.toggle}
       />
 
       {/* Add dialog */}
@@ -486,6 +556,37 @@ export function CategoriesManager() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={allCategoryIds.length}
+          onSelectAll={() => ms.toggleAll(allCategoryIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar categorías"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} categoría{ms.count !== 1 ? "s" : ""}? Los movimientos quedarán sin categoría. Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }

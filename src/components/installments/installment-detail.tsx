@@ -15,6 +15,10 @@ import {
   Circle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import {
   Dialog,
   DialogContent,
@@ -259,21 +263,43 @@ function CuotaRow({
   movement,
   currency,
   onDelete,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   movement: Movement
   currency: "ARS" | "USD"
   onDelete: (m: Movement) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const status = getCuotaStatus(movement)
   const StatusIcon = STATUS_ICONS[status]
   const displayAmount = movement.converted_amount ?? movement.amount
 
   return (
-    <div className="flex items-center gap-3 py-3 group px-4">
-      {/* Status icon */}
-      <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0", STATUS_COLORS[status].split(" ")[0])}>
-        <StatusIcon className={cn("h-4 w-4", STATUS_COLORS[status].split(" ")[1])} />
-      </div>
+    <div
+      onClick={selectionMode ? () => onToggle?.(movement.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
+      className={cn(
+        "flex items-center gap-3 py-3 group px-4",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
+      )}
+    >
+      {/* Checkbox (selection mode) or Status icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(movement.id)}
+        />
+      ) : (
+        <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0", STATUS_COLORS[status].split(" ")[0])}>
+          <StatusIcon className={cn("h-4 w-4", STATUS_COLORS[status].split(" ")[1])} />
+        </div>
+      )}
 
       {/* Date + cuota number */}
       <div className="flex-1 min-w-0">
@@ -295,20 +321,22 @@ function CuotaRow({
         − {formatCurrency(displayAmount, currency)}
       </p>
 
-      {/* Delete action */}
-      <button
-        type="button"
-        title="Eliminar cuota"
-        onClick={() => onDelete(movement)}
-        className={cn(
-          "h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0",
-          "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-          "hover:bg-destructive/10 text-muted-foreground hover:text-destructive",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-        )}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {/* Delete action — hidden in selection mode */}
+      {!selectionMode && (
+        <button
+          type="button"
+          title="Eliminar cuota"
+          onClick={() => onDelete(movement)}
+          className={cn(
+            "h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0",
+            "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+            "hover:bg-destructive/10 text-muted-foreground hover:text-destructive",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          )}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -319,6 +347,10 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
   const router = useRouter()
   const [deletePurchaseOpen, setDeletePurchaseOpen] = useState(false)
   const [deletingCuota, setDeletingCuota] = useState<Movement | null>(null)
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: purchase, isLoading: loadingPurchase } = useQuery({
     queryKey: ["installment_purchase", purchaseId],
@@ -348,6 +380,25 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
   // Count non-future (paid/upcoming) cuotas
   const paidCount = movements?.filter((m) => !m.is_future).length ?? 0
   const currency = (purchase?.currency as "ARS" | "USD") ?? "ARS"
+  const movementIds = movements?.map((m) => m.id) ?? []
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("movements", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+    queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+    queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+    queryClient.invalidateQueries({ queryKey: ["installment_movements", purchaseId] })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} cuota${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -450,9 +501,14 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
       {/* Cuotas list */}
       {movements && movements.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-            Todas las cuotas
-          </p>
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Todas las cuotas
+            </p>
+            {!ms.selectionMode && (
+              <SelectButton onClick={ms.enter} />
+            )}
+          </div>
           <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
             {movements.map((m) => (
               <CuotaRow
@@ -460,6 +516,9 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
                 movement={m}
                 currency={currency}
                 onDelete={setDeletingCuota}
+                selectionMode={ms.selectionMode}
+                isSelected={ms.isSelected(m.id)}
+                onToggle={ms.toggle}
               />
             ))}
           </div>
@@ -499,6 +558,37 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
           onOpenChange={(v) => { if (!v) setDeletingCuota(null) }}
         />
       )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={movementIds.length}
+          onSelectAll={() => ms.toggleAll(movementIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar cuotas"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} cuota{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }

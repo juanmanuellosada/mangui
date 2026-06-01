@@ -19,6 +19,10 @@ import {
   Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
@@ -186,11 +190,17 @@ function ScheduledRow({
   accounts,
   categories,
   onDelete,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   txn: ScheduledTransaction
   accounts: Account[]
   categories: Category[]
   onDelete: (t: ScheduledTransaction) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const queryClient = useQueryClient()
   const account = accounts.find((a) => a.id === txn.account_id)
@@ -230,23 +240,39 @@ function ScheduledRow({
   const isPending = txn.status === "pending"
 
   return (
-    <div className="flex items-center gap-3 py-3 px-4">
-      {/* Icon */}
-      <div
-        className={cn(
-          "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
-          txn.kind === "income" ? "bg-success/10" :
-          txn.kind === "expense" ? "bg-destructive/10" : "bg-muted"
-        )}
-      >
-        {txn.kind === "income" ? (
-          <ArrowUpCircle className="h-5 w-5 text-success" />
-        ) : txn.kind === "expense" ? (
-          <ArrowDownCircle className="h-5 w-5 text-destructive" />
-        ) : (
-          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
+    <div
+      onClick={selectionMode ? () => onToggle?.(txn.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
+      className={cn(
+        "flex items-center gap-3 py-3 px-4",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
+      )}
+    >
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(txn.id)}
+        />
+      ) : (
+        <div
+          className={cn(
+            "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
+            txn.kind === "income" ? "bg-success/10" :
+            txn.kind === "expense" ? "bg-destructive/10" : "bg-muted"
+          )}
+        >
+          {txn.kind === "income" ? (
+            <ArrowUpCircle className="h-5 w-5 text-success" />
+          ) : txn.kind === "expense" ? (
+            <ArrowDownCircle className="h-5 w-5 text-destructive" />
+          ) : (
+            <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -273,8 +299,8 @@ function ScheduledRow({
         {formatCurrency(txn.amount, txn.currency)}
       </p>
 
-      {/* Actions — only for pending */}
-      {isPending && (
+      {/* Actions — hidden in selection mode */}
+      {!selectionMode && isPending && (
         <div className="flex gap-1 flex-shrink-0">
           <Button
             size="icon-sm"
@@ -298,7 +324,7 @@ function ScheduledRow({
           </Button>
         </div>
       )}
-      {!isPending && (
+      {!selectionMode && !isPending && (
         <Button
           size="icon-sm"
           variant="ghost"
@@ -648,6 +674,10 @@ export function ScheduledList() {
   const [createOpen, setCreateOpen] = useState(false)
   const [deletingTxn, setDeletingTxn] = useState<ScheduledTransaction | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: scheduled = [], isLoading } = useQuery({
     queryKey: SCHEDULED_KEY,
@@ -686,6 +716,23 @@ export function ScheduledList() {
     rejected: "Rechazadas",
   }
 
+  const filteredIds = filtered.map((t) => t.id)
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("scheduled_transactions", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: SCHEDULED_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} programada${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
+
   return (
     <div className="space-y-5 max-w-3xl">
       {/* Header */}
@@ -696,14 +743,21 @@ export function ScheduledList() {
         >
           Programadas
         </h1>
-        <div className="hidden lg:block">
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="gap-2 press-effect font-semibold shadow-sm shadow-primary/20"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Nueva programada
-          </Button>
+        <div className="flex items-center gap-2">
+          {!isLoading && scheduled.length > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
+          )}
+          <div className="hidden lg:block">
+            {!ms.selectionMode && (
+              <Button
+                onClick={() => setCreateOpen(true)}
+                className="gap-2 press-effect font-semibold shadow-sm shadow-primary/20"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Nueva programada
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -791,6 +845,9 @@ export function ScheduledList() {
               accounts={accounts}
               categories={categories}
               onDelete={setDeletingTxn}
+              selectionMode={ms.selectionMode}
+              isSelected={ms.isSelected(t.id)}
+              onToggle={ms.toggle}
             />
           ))}
         </div>
@@ -826,6 +883,37 @@ export function ScheduledList() {
           onOpenChange={(v) => { if (!v) setDeletingTxn(null) }}
         />
       )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={filteredIds.length}
+          onSelectAll={() => ms.toggleAll(filteredIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar programadas"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} programada{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }

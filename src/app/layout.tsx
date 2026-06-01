@@ -1,19 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, Calistoga } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const ibmPlexSans = IBM_Plex_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-});
-
-const calistoga = Calistoga({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: "400",
+const iaWriterQuattro = localFont({
+  src: [
+    {
+      path: "./fonts/iAWriterQuattroS-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/iAWriterQuattroS-Italic.woff2",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "./fonts/iAWriterQuattroS-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "./fonts/iAWriterQuattroS-BoldItalic.woff2",
+      weight: "700",
+      style: "italic",
+    },
+  ],
+  variable: "--font-quattro",
   display: "swap",
 });
 
@@ -80,7 +93,7 @@ export default function RootLayout({
   return (
     <html
       lang="es-AR"
-      className={`${ibmPlexSans.variable} ${calistoga.variable} h-full antialiased`}
+      className={`${iaWriterQuattro.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

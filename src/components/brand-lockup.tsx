@@ -16,7 +16,7 @@ interface BrandLockupProps {
 }
 
 /**
- * Brand lockup: original logo icon + "mangui" wordmark in Calistoga display font.
+ * Brand lockup: original logo icon + "mangui" wordmark in iA Writer Quattro (bold, display weight).
  * Works on light and dark backgrounds via theme tokens.
  * The final "i" is accented in the brand orange (--color-accent).
  */
@@ -32,10 +32,11 @@ export function BrandLockup({ size = 28, showWord = true, wordClassName, classNa
       />
       {showWord && (
         <span
-          className={cn("text-foreground leading-none select-none", wordClassName)}
+          className={cn("text-foreground leading-none select-none font-bold", wordClassName)}
           style={{
             fontFamily: "var(--font-display)",
             fontSize: size * 0.75,
+            fontWeight: 700,
           }}
         >
           mangu<span className="text-accent">i</span>

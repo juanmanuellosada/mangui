@@ -13,6 +13,10 @@ import {
   CalendarDays,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import {
   Dialog,
   DialogContent,
@@ -86,6 +90,9 @@ function SavingGoalCard({
   accounts,
   onEdit,
   onMarkComplete,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
   goal: Goal
   movements: Movement[]
@@ -93,6 +100,9 @@ function SavingGoalCard({
   accounts: Account[]
   onEdit: (g: Goal) => void
   onMarkComplete: (g: Goal) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
 }) {
   const progress = computeSavingProgress(goal, movements)
   const category = goal.category_id ? categories.find((c) => c.id === goal.category_id) : null
@@ -102,23 +112,34 @@ function SavingGoalCard({
 
   return (
     <div
+      onClick={selectionMode ? () => onToggleSelect?.(goal.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "rounded-2xl border border-border/60 bg-card overflow-hidden",
-        isCompleted && "opacity-75"
+        isCompleted && "opacity-75",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
       )}
     >
       <div className="px-4 pt-4 pb-3 space-y-3">
         {/* Header */}
         <div className="flex items-start gap-2">
-          <div className={cn(
-            "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
-            isCompleted ? "bg-success/10" : "bg-primary/10"
-          )}>
-            {isCompleted
-              ? <CheckCircle2 className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
-              : <TrendingUp className="h-4.5 w-4.5 text-primary" style={{ width: "1.125rem", height: "1.125rem" }} />
-            }
-          </div>
+          {selectionMode ? (
+            <div className="mt-0.5 shrink-0">
+              <RowCheckbox checked={!!isSelected} onChange={() => onToggleSelect?.(goal.id)} />
+            </div>
+          ) : (
+            <div className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
+              isCompleted ? "bg-success/10" : "bg-primary/10"
+            )}>
+              {isCompleted
+                ? <CheckCircle2 className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
+                : <TrendingUp className="h-4.5 w-4.5 text-primary" style={{ width: "1.125rem", height: "1.125rem" }} />
+              }
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-sm truncate">{goal.name}</h3>
@@ -148,27 +169,29 @@ function SavingGoalCard({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {!isCompleted && (
-              <button
-                type="button"
-                onClick={() => onMarkComplete(goal)}
-                title="Marcar como completada"
-                className="text-[10px] font-semibold text-muted-foreground hover:text-success transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-success/10"
+          {!selectionMode && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {!isCompleted && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onMarkComplete(goal) }}
+                  title="Marcar como completada"
+                  className="text-[10px] font-semibold text-muted-foreground hover:text-success transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-success/10"
+                >
+                  Completar
+                </button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(e) => { e.stopPropagation(); onEdit(goal) }}
+                title="Editar"
+                className="press-effect cursor-pointer"
               >
-                Completar
-              </button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onEdit(goal)}
-              title="Editar"
-              className="press-effect cursor-pointer"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Amounts */}
@@ -220,6 +243,9 @@ function ReductionGoalCard({
   accounts,
   onEdit,
   onMarkComplete,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: {
   goal: Goal
   movements: Movement[]
@@ -227,6 +253,9 @@ function ReductionGoalCard({
   accounts: Account[]
   onEdit: (g: Goal) => void
   onMarkComplete: (g: Goal) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
 }) {
   const progress = computeReductionProgress(goal, movements)
   const category = goal.category_id ? categories.find((c) => c.id === goal.category_id) : null
@@ -238,23 +267,34 @@ function ReductionGoalCard({
 
   return (
     <div
+      onClick={selectionMode ? () => onToggleSelect?.(goal.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "rounded-2xl border border-border/60 bg-card overflow-hidden",
-        isCompleted && "opacity-75"
+        isCompleted && "opacity-75",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
       )}
     >
       <div className="px-4 pt-4 pb-3 space-y-3">
         {/* Header */}
         <div className="flex items-start gap-2">
-          <div className={cn(
-            "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
-            isCompleted ? "bg-success/10" : "bg-accent/10"
-          )}>
-            {isCompleted
-              ? <CheckCircle2 className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
-              : <TrendingDown className="h-4.5 w-4.5 text-accent" style={{ width: "1.125rem", height: "1.125rem" }} />
-            }
-          </div>
+          {selectionMode ? (
+            <div className="mt-0.5 shrink-0">
+              <RowCheckbox checked={!!isSelected} onChange={() => onToggleSelect?.(goal.id)} />
+            </div>
+          ) : (
+            <div className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
+              isCompleted ? "bg-success/10" : "bg-accent/10"
+            )}>
+              {isCompleted
+                ? <CheckCircle2 className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
+                : <TrendingDown className="h-4.5 w-4.5 text-accent" style={{ width: "1.125rem", height: "1.125rem" }} />
+              }
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-sm truncate">{goal.name}</h3>
@@ -284,27 +324,29 @@ function ReductionGoalCard({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {!isCompleted && (
-              <button
-                type="button"
-                onClick={() => onMarkComplete(goal)}
-                title="Marcar como completada"
-                className="text-[10px] font-semibold text-muted-foreground hover:text-success transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-success/10"
+          {!selectionMode && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {!isCompleted && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onMarkComplete(goal) }}
+                  title="Marcar como completada"
+                  className="text-[10px] font-semibold text-muted-foreground hover:text-success transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-success/10"
+                >
+                  Completar
+                </button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={(e) => { e.stopPropagation(); onEdit(goal) }}
+                title="Editar"
+                className="press-effect cursor-pointer"
               >
-                Completar
-              </button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onEdit(goal)}
-              title="Editar"
-              className="press-effect cursor-pointer"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Reduction indicator */}
@@ -700,6 +742,9 @@ function GoalFilterTabs({
 export function GoalsList() {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [filter, setFilter] = useState<GoalFilter>("all")
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
 
   const { data: goals = [], isLoading: loadingGoals } = useQuery({
     queryKey: GOALS_KEY,
@@ -758,6 +803,23 @@ export function GoalsList() {
     return true // "all"
   })
 
+  const filteredGoalIds = filteredGoals.map((g) => g.id)
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("goals", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: GOALS_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} meta${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
+
   return (
     <div className="space-y-5 max-w-2xl animate-fade-in">
       {/* Header */}
@@ -768,7 +830,12 @@ export function GoalsList() {
         >
           Metas
         </h1>
-        <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} />
+        <div className="flex items-center gap-2">
+          {!loadingGoals && goals.length > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
+          )}
+          {!ms.selectionMode && <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} />}
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -839,6 +906,9 @@ export function GoalsList() {
                 accounts={accounts}
                 onEdit={setEditingGoal}
                 onMarkComplete={(g) => markCompleteMutation.mutate(g)}
+                selectionMode={ms.selectionMode}
+                isSelected={ms.isSelected(goal.id)}
+                onToggleSelect={ms.toggle}
               />
             ) : (
               <ReductionGoalCard
@@ -849,6 +919,9 @@ export function GoalsList() {
                 accounts={accounts}
                 onEdit={setEditingGoal}
                 onMarkComplete={(g) => markCompleteMutation.mutate(g)}
+                selectionMode={ms.selectionMode}
+                isSelected={ms.isSelected(goal.id)}
+                onToggleSelect={ms.toggle}
               />
             )
           )}
@@ -869,6 +942,37 @@ export function GoalsList() {
           onOpenChange={(v) => { if (!v) setEditingGoal(null) }}
         />
       )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={filteredGoalIds.length}
+          onSelectAll={() => ms.toggleAll(filteredGoalIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar metas"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} meta{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }

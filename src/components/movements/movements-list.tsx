@@ -18,6 +18,9 @@ import {
   CreditCard,
   Sparkles,
 } from "lucide-react"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { bulkDelete } from "@/lib/bulk-delete"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -132,12 +135,18 @@ function MovementRow({
   category,
   onEdit,
   onDelete,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   movement: Movement
   account: Account | undefined
   category: Category | undefined
   onEdit: (m: Movement) => void
   onDelete: (m: Movement) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const isIncome = movement.type === "income"
   const displayAmount = movement.converted_amount ?? movement.amount
@@ -146,20 +155,36 @@ function MovementRow({
   const isCuota = movement.installment_purchase_id !== null
 
   return (
-    <div className="flex items-center gap-3 py-3 group">
-      {/* Icon */}
-      <div
-        className={cn(
-          "h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0",
-          isIncome ? "bg-success/10" : "bg-destructive/10"
-        )}
-      >
-        {isIncome ? (
-          <ArrowUpCircle className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
-        ) : (
-          <ArrowDownCircle className="h-4.5 w-4.5 text-destructive" style={{ width: "1.125rem", height: "1.125rem" }} />
-        )}
-      </div>
+    <div
+      onClick={selectionMode ? () => onToggle?.(movement.id) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
+      className={cn(
+        "flex items-center gap-3 py-3 group",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
+      )}
+    >
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(movement.id)}
+        />
+      ) : (
+        <div
+          className={cn(
+            "h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0",
+            isIncome ? "bg-success/10" : "bg-destructive/10"
+          )}
+        >
+          {isIncome ? (
+            <ArrowUpCircle className="h-4.5 w-4.5 text-success" style={{ width: "1.125rem", height: "1.125rem" }} />
+          ) : (
+            <ArrowDownCircle className="h-4.5 w-4.5 text-destructive" style={{ width: "1.125rem", height: "1.125rem" }} />
+          )}
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -208,27 +233,29 @@ function MovementRow({
         )}
       </div>
 
-      {/* Actions — visible on hover */}
-      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Editar"
-          className="press-effect cursor-pointer"
-          onClick={() => onEdit(movement)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Eliminar"
-          className="press-effect cursor-pointer"
-          onClick={() => onDelete(movement)}
-        >
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
+      {/* Actions — visible on hover, hidden in selection mode */}
+      {!selectionMode && (
+        <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Editar"
+            className="press-effect cursor-pointer"
+            onClick={() => onEdit(movement)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Eliminar"
+            className="press-effect cursor-pointer"
+            onClick={() => onDelete(movement)}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -241,22 +268,47 @@ function TransferRow({
   toAccount,
   onEdit,
   onDelete,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   transfer: Transfer
   fromAccount: Account | undefined
   toAccount: Account | undefined
   onEdit: (t: Transfer) => void
   onDelete: (t: Transfer) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const isCross =
     fromAccount && toAccount && fromAccount.currency !== toAccount.currency
 
+  // Transfers use a "t-{id}" prefix in the selection set to avoid collisions
+  const selectionId = `t-${transfer.id}`
+
   return (
-    <div className="flex items-center gap-3 py-3 group">
-      {/* Icon — neutral */}
-      <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted">
-        <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-      </div>
+    <div
+      onClick={selectionMode ? () => onToggle?.(selectionId) : undefined}
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
+      className={cn(
+        "flex items-center gap-3 py-3 group",
+        selectionMode && "cursor-pointer",
+        isSelected && selectedItemCn(true)
+      )}
+    >
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(selectionId)}
+        />
+      ) : (
+        <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted">
+          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -286,27 +338,29 @@ function TransferRow({
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Editar"
-          className="press-effect cursor-pointer"
-          onClick={() => onEdit(transfer)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="Eliminar"
-          className="press-effect cursor-pointer"
-          onClick={() => onDelete(transfer)}
-        >
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      </div>
+      {/* Actions — hidden in selection mode */}
+      {!selectionMode && (
+        <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Editar"
+            className="press-effect cursor-pointer"
+            onClick={() => onEdit(transfer)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Eliminar"
+            className="press-effect cursor-pointer"
+            onClick={() => onDelete(transfer)}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1413,6 +1467,10 @@ export function MovementsList() {
   const [deletingMovement, setDeletingMovement] = useState<Movement | null>(null)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
   const [deletingTransfer, setDeletingTransfer] = useState<Transfer | null>(null)
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: movements, isLoading: loadingMovements } = useQuery({
     queryKey: MOVEMENTS_KEY,
@@ -1510,6 +1568,47 @@ export function MovementsList() {
 
   const totalItems = filteredFeed.length
 
+  // Feed item IDs for "select all"
+  const feedItemIds = useMemo(
+    () => filteredFeed.map((fi) => (fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`)),
+    [filteredFeed]
+  )
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const selected = Array.from(ms.selectedIds)
+    const movementIds = selected.filter((id) => !id.startsWith("t-"))
+    const transferIds = selected.filter((id) => id.startsWith("t-")).map((id) => id.slice(2))
+
+    let deletedCount = 0
+    let failedCount = 0
+
+    if (movementIds.length > 0) {
+      const res = await bulkDelete("movements", movementIds)
+      deletedCount += res.deleted
+      failedCount += res.failed
+    }
+    if (transferIds.length > 0) {
+      const res = await bulkDelete("transfers", transferIds)
+      deletedCount += res.deleted
+      failedCount += res.failed
+    }
+
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+    queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
+    queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+    queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+
+    if (failedCount === 0) {
+      toast.success(`Se eliminaron ${deletedCount} elemento${deletedCount !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${deletedCount}. ${failedCount} no se pud${failedCount !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
+
   return (
     <div className="space-y-5 max-w-3xl animate-fade-in">
       {/* Header */}
@@ -1521,6 +1620,9 @@ export function MovementsList() {
           Movimientos
         </h1>
         <div className="flex items-center gap-2">
+          {!isLoading && totalItems > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
+          )}
           <button
             type="button"
             onClick={() => setShowFilters((v) => !v)}
@@ -1616,30 +1718,39 @@ export function MovementsList() {
                 </p>
                 {/* Items card */}
                 <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-                  {dayItems.map((fi) => (
-                    <div
-                      key={fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`}
-                      className="px-4"
-                    >
-                      {fi.kind === "movement" ? (
-                        <MovementRow
-                          movement={fi.item}
-                          account={accountMap.get(fi.item.account_id)}
-                          category={fi.item.category_id ? categoryMap.get(fi.item.category_id) : undefined}
-                          onEdit={setEditingMovement}
-                          onDelete={setDeletingMovement}
-                        />
-                      ) : (
-                        <TransferRow
-                          transfer={fi.item}
-                          fromAccount={accountMap.get(fi.item.from_account_id)}
-                          toAccount={accountMap.get(fi.item.to_account_id)}
-                          onEdit={setEditingTransfer}
-                          onDelete={setDeletingTransfer}
-                        />
-                      )}
-                    </div>
-                  ))}
+                  {dayItems.map((fi) => {
+                    const feedId = fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`
+                    return (
+                      <div
+                        key={feedId}
+                        className="px-4"
+                      >
+                        {fi.kind === "movement" ? (
+                          <MovementRow
+                            movement={fi.item}
+                            account={accountMap.get(fi.item.account_id)}
+                            category={fi.item.category_id ? categoryMap.get(fi.item.category_id) : undefined}
+                            onEdit={setEditingMovement}
+                            onDelete={setDeletingMovement}
+                            selectionMode={ms.selectionMode}
+                            isSelected={ms.isSelected(fi.item.id)}
+                            onToggle={ms.toggle}
+                          />
+                        ) : (
+                          <TransferRow
+                            transfer={fi.item}
+                            fromAccount={accountMap.get(fi.item.from_account_id)}
+                            toAccount={accountMap.get(fi.item.to_account_id)}
+                            onEdit={setEditingTransfer}
+                            onDelete={setDeletingTransfer}
+                            selectionMode={ms.selectionMode}
+                            isSelected={ms.isSelected(`t-${fi.item.id}`)}
+                            onToggle={ms.toggle}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -1693,6 +1804,48 @@ export function MovementsList() {
           onOpenChange={(v) => { if (!v) setDeletingTransfer(null) }}
         />
       )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={feedItemIds.length}
+          onSelectAll={() => ms.toggleAll(feedItemIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <MangoSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar elementos"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={bulkPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={bulkPending}
+              className="press-effect"
+            >
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} elemento{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
+        </p>
+      </MangoSheet>
     </div>
   )
 }

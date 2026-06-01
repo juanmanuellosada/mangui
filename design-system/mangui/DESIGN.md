@@ -15,13 +15,13 @@
 - **Double-bezel cards** (premium sections): outer shell subtle bg + hairline + `p-1.5/2` + `rounded-2xl`; inner core distinct bg + inset highlight + smaller radius. **Data-dense lists/tables: skip bezel**, use dividers.
 - **Radius scale locked:** 4px inputs/small UI · 8–12px buttons/cards · 16px large cards · `rounded-full` only buttons/badges/avatars (never large containers). Cards max 16px; 24px+ only on big containers.
 - **Spacing:** section `py-24`→`py-40` desktop, `clamp(3rem,8vw,6rem)` mobile; card padding 24–40px; gaps 8/16/24. Intentional, varied (slightly more bottom than top).
-- **Font-weight hierarchy (IBM Plex Sans):** 300 meta · 400 body · 500 UI labels · 600 buttons/feature titles · 700 display. Calistoga display sparingly (hero, big balances).
+- **Font-weight hierarchy (iA Writer Quattro S):** 400 body/labels/inputs/meta · 700 display/headings/big-numbers/brand-wordmark. Browsers map 500→400 and 600→700 (no intermediate files). Single-typeface system; hierarchy via size + weight only.
 
 ## 2. Typography
-- Body/UI **IBM Plex Sans**; display/big-numbers **Calistoga**; micro/mono optional IBM Plex Mono.
-- Scale (clamped): H1 Calistoga `clamp(2rem,5vw,3.5rem)`/lh1.1/-0.02em/700 · H2 `clamp(1.5rem,4vw,2.5rem)`/lh1.15 · H3 Plex 600 18–24px · H4 16px 600 · Body 16px(15 mobile)/lh1.6/max 65ch · Small/UI 14px/500/0.02em · Micro 12px/0.05em.
-- **Tabular figures (`tabular-nums`) on ALL money/amounts/rates/dates/columns.**
-- No all-caps body (only ≤4-word labels/badges). No serif on data surfaces. Hero ≤3 lines. `next/font` + display:swap.
+- **Single typeface: iA Writer Quattro S** (local woff2, OFL). 400/normal · 400/italic · 700/normal · 700/italic. No 500/600 files — browsers map naturally. Loaded via `next/font/local`; `--font-sans` and `--font-display` both resolve to `var(--font-quattro)`.
+- Scale (clamped): H1 `clamp(2rem,5vw,3.5rem)`/lh1.1/-0.02em/700 · H2 `clamp(1.5rem,4vw,2.5rem)`/lh1.15/700 · H3 18–24px/700 · H4 16px/700 · Body 16px(15 mobile)/400/lh1.6/max 65ch · Small/UI 14px/400/0.02em · Micro 12px/0.05em.
+- **Tabular figures (`tabular-nums`) on ALL money/amounts/rates/dates/columns.** iA Writer Quattro figures are naturally aligned.
+- No all-caps body (only ≤4-word labels/badges). No serif on data surfaces. Hero ≤3 lines. `next/font/local` + display:swap.
 
 ## 3. Color & theming
 - Locked OKLCH in `globals.css`. Primary lime `#65A30D`(light)/`#84CC16`(dark); accent orange `#F97316`; success `#16A34A`; destructive `#DC2626`; bg `#FAFAF9`/`#0B1410`; fg `#1C1917`/`#F5F5F4`; muted stone; border subtle; ring lime.
@@ -60,4 +60,4 @@ Gradient text · default glassmorphism · hero-metric cliché · identical card 
 No `// ...`/`// TODO`/"rest of code"/placeholder skeletons. Generate every deliverable completely. Lock deliverable count up front, cross-check before finishing. If near token limit, end at a clean breakpoint with `[PAUSED — X of Y complete, resume from: <section>]` and continue exactly there on "continue".
 
 ## 9. Implementation checklist (ship gate)
-Typography (Plex+Calistoga, hierarchy, tabular money, 65ch, swap) · Color (locked tokens, teal-charcoal dark, one accent, tinted shadows, AA) · Layout (≤1 eyebrow/3, ≤2 zigzags, no centered hero, dense bento no empty cells, mobile 1-col, dvh, no h-scroll) · Components (button active .97, label-above inputs, bezel premium/divider dense, modal scale+blur, semantic tables, composed empty states) · Motion (no keyboard anim, named transitions, no scale(0)/ease-in, reduced-motion) · A11y (focus rings, `@media(hover)`, alt, keyboard, color-not-alone) · Code (no hardcoded px, semantic HTML, z-index scale, no dead code, deps in package.json, lucide not emoji as structural icons).
+Typography (iA Writer Quattro 400/700, single-typeface, tabular money, 65ch, swap) · Color (locked tokens, teal-charcoal dark, one accent, tinted shadows, AA) · Layout (≤1 eyebrow/3, ≤2 zigzags, no centered hero, dense bento no empty cells, mobile 1-col, dvh, no h-scroll) · Components (button active .97, label-above inputs, bezel premium/divider dense, modal scale+blur, semantic tables, composed empty states) · Motion (no keyboard anim, named transitions, no scale(0)/ease-in, reduced-motion) · A11y (focus rings, `@media(hover)`, alt, keyboard, color-not-alone) · Code (no hardcoded px, semantic HTML, z-index scale, no dead code, deps in package.json, lucide not emoji as structural icons).

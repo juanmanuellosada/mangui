@@ -15,6 +15,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { useMultiSelect } from "@/hooks/use-multi-select"
+import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
+import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
+import { bulkDelete } from "@/lib/bulk-delete"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
@@ -109,10 +113,16 @@ function RecurringRow({
   rec,
   accounts,
   onEdit,
+  selectionMode,
+  isSelected,
+  onToggle,
 }: {
   rec: RecurringTransaction
   accounts: Account[]
   onEdit: (r: RecurringTransaction) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }) {
   const queryClient = useQueryClient()
 
@@ -148,27 +158,38 @@ function RecurringRow({
   })
 
   return (
-    <button
-      type="button"
-      className="flex items-center gap-3 py-3 px-4 w-full text-left hover:bg-muted/40 transition-colors duration-150 cursor-pointer group"
-      onClick={() => onEdit(rec)}
+    <div
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? isSelected : undefined}
+      onClick={selectionMode ? () => onToggle?.(rec.id) : () => onEdit(rec)}
+      className={cn(
+        "flex items-center gap-3 py-3 px-4 w-full text-left hover:bg-muted/40 transition-colors duration-150 cursor-pointer group",
+        isSelected && selectedItemCn(true)
+      )}
     >
-      {/* Icon */}
-      <div
-        className={cn(
-          "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
-          rec.kind === "income" ? "bg-success/10" :
-          rec.kind === "expense" ? "bg-destructive/10" : "bg-muted"
-        )}
-      >
-        {rec.kind === "income" ? (
-          <ArrowUpCircle className="h-5 w-5 text-success" />
-        ) : rec.kind === "expense" ? (
-          <ArrowDownCircle className="h-5 w-5 text-destructive" />
-        ) : (
-          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
+      {/* Checkbox (selection mode) or Icon */}
+      {selectionMode ? (
+        <RowCheckbox
+          checked={!!isSelected}
+          onChange={() => onToggle?.(rec.id)}
+        />
+      ) : (
+        <div
+          className={cn(
+            "h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0",
+            rec.kind === "income" ? "bg-success/10" :
+            rec.kind === "expense" ? "bg-destructive/10" : "bg-muted"
+          )}
+        >
+          {rec.kind === "income" ? (
+            <ArrowUpCircle className="h-5 w-5 text-success" />
+          ) : rec.kind === "expense" ? (
+            <ArrowDownCircle className="h-5 w-5 text-destructive" />
+          ) : (
+            <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -204,22 +225,24 @@ function RecurringRow({
         </p>
       </div>
 
-      {/* Status switch */}
-      <div
-        className="flex-shrink-0"
-        onClick={(e) => {
-          e.stopPropagation()
-          const newStatus = rec.status === "active" ? "paused" : "active"
-          statusMutation.mutate(newStatus)
-        }}
-      >
-        <Switch
-          checked={rec.status === "active"}
-          disabled={statusMutation.isPending}
-          aria-label={rec.status === "active" ? "Pausar recurrente" : "Activar recurrente"}
-        />
-      </div>
-    </button>
+      {/* Status switch — hidden in selection mode */}
+      {!selectionMode && (
+        <div
+          className="flex-shrink-0"
+          onClick={(e) => {
+            e.stopPropagation()
+            const newStatus = rec.status === "active" ? "paused" : "active"
+            statusMutation.mutate(newStatus)
+          }}
+        >
+          <Switch
+            checked={rec.status === "active"}
+            disabled={statusMutation.isPending}
+            aria-label={rec.status === "active" ? "Pausar recurrente" : "Activar recurrente"}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -413,6 +436,10 @@ export function RecurringList() {
   const [filter, setFilter] = useState<Filter>("all")
   const [editingRec, setEditingRec] = useState<RecurringTransaction | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const ms = useMultiSelect()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [bulkPending, setBulkPending] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: recurring = [], isLoading: loadingRec } = useQuery({
     queryKey: RECURRING_KEY,
@@ -452,12 +479,31 @@ export function RecurringList() {
     })
   }, [recurring, filter])
 
+  const filteredIds = filtered.map((r) => r.id)
+
+  async function handleBulkDelete() {
+    setBulkPending(true)
+    const ids = Array.from(ms.selectedIds)
+    const result = await bulkDelete("recurring_transactions", ids)
+    setBulkPending(false)
+    setConfirmOpen(false)
+    ms.exit()
+    queryClient.invalidateQueries({ queryKey: RECURRING_KEY })
+    queryClient.invalidateQueries({ queryKey: OCCURRENCES_KEY })
+    if (result.failed === 0) {
+      toast.success(`Se eliminaron ${result.deleted} recurrente${result.deleted !== 1 ? "s" : ""}`)
+    } else {
+      toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
+    }
+  }
+
   const openCreate = () => {
     setEditingRec(null)
     setDialogOpen(true)
   }
 
   const openEdit = (r: RecurringTransaction) => {
+    if (ms.selectionMode) return
     setEditingRec(r)
     setDialogOpen(true)
   }
@@ -472,14 +518,21 @@ export function RecurringList() {
         >
           Recurrentes
         </h1>
-        <div className="hidden lg:block">
-          <Button
-            onClick={openCreate}
-            className="gap-2 press-effect font-semibold shadow-sm shadow-primary/20"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Nueva recurrente
-          </Button>
+        <div className="flex items-center gap-2">
+          {!loadingRec && recurring.length > 0 && !ms.selectionMode && (
+            <SelectButton onClick={ms.enter} />
+          )}
+          <div className="hidden lg:block">
+            {!ms.selectionMode && (
+              <Button
+                onClick={openCreate}
+                className="gap-2 press-effect font-semibold shadow-sm shadow-primary/20"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Nueva recurrente
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -561,6 +614,9 @@ export function RecurringList() {
               rec={r}
               accounts={accounts}
               onEdit={openEdit}
+              selectionMode={ms.selectionMode}
+              isSelected={ms.isSelected(r.id)}
+              onToggle={ms.toggle}
             />
           ))}
         </div>
@@ -593,6 +649,39 @@ export function RecurringList() {
           if (!v) setEditingRec(null)
         }}
       />
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={filteredIds.length}
+          onSelectAll={() => ms.toggleAll(filteredIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar recurrentes"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} recurrente{ms.count !== 1 ? "s" : ""}? Se eliminarán también sus ocurrencias. Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
     </div>
   )
 }
