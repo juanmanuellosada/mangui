@@ -1,7 +1,7 @@
 -- =============================================================
--- 0018_transfer_attachments.sql
+-- 0020_transfer_attachments.sql
 -- Extiende movement_attachments para soportar también transfers.
--- Depende de: 0004 (transfers), 0017 (movement_attachments)
+-- Depende de: 0004 (transfers), 0019 (movement_attachments)
 -- =============================================================
 
 
