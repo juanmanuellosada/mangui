@@ -672,8 +672,17 @@ function EditTransferDialog({
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: async (values: TransferFormValues) => {
+    mutationFn: async ({
+      values,
+      pendingComprobante,
+    }: {
+      values: TransferFormValues
+      pendingComprobante?: File | null
+    }) => {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+
       const { data, error } = await supabase
         .from("transfers")
         .update({
@@ -690,9 +699,23 @@ function EditTransferDialog({
         .select()
         .single()
       if (error) throw error
+
+      // Upload new comprobante if provided (non-blocking on failure)
+      if (pendingComprobante) {
+        const result = await uploadAttachment({
+          file: pendingComprobante,
+          userId: user.id,
+          kind: "comprobante",
+          transferId: transfer.id,
+        })
+        if (result.error) {
+          toast.warning(`Transferencia actualizada, pero no se pudo adjuntar el comprobante: ${result.error}`)
+        }
+      }
+
       return data
     },
-    onMutate: async (values) => {
+    onMutate: async ({ values }) => {
       await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
       const previous = queryClient.getQueryData<Transfer[]>(TRANSFERS_KEY)
       queryClient.setQueryData<Transfer[]>(TRANSFERS_KEY, (old = []) =>
@@ -719,6 +742,7 @@ function EditTransferDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
+      queryClient.invalidateQueries({ queryKey: ["transfer_attachments", transfer.id] })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
       toast.success("Transferencia actualizada")
@@ -736,9 +760,15 @@ function EditTransferDialog({
       <TransferForm
         accounts={accounts}
         defaultValues={transferToFormValues(transfer)}
-        onSubmit={async (v) => { await mutation.mutateAsync(v) }}
+        onSubmit={async (v, pendingComprobante) => {
+          await mutation.mutateAsync({ values: v, pendingComprobante })
+        }}
         isLoading={mutation.isPending}
         submitLabel="Guardar cambios"
+        transferId={transfer.id}
+        onAttachmentDeleted={() => {
+          queryClient.invalidateQueries({ queryKey: ["transfer_attachments", transfer.id] })
+        }}
       />
     </MangoSheet>
   )

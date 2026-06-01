@@ -269,7 +269,13 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   })
 
   const transferMutation = useMutation({
-    mutationFn: async (values: TransferFormValues) => {
+    mutationFn: async ({
+      values,
+      pendingComprobante,
+    }: {
+      values: TransferFormValues
+      pendingComprobante?: File | null
+    }) => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
@@ -292,6 +298,20 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         .select()
         .single()
       if (error) throw error
+
+      // Upload comprobante if provided (non-blocking on failure)
+      if (pendingComprobante) {
+        const result = await uploadAttachment({
+          file: pendingComprobante,
+          userId: user.id,
+          kind: "comprobante",
+          transferId: data.id,
+        })
+        if (result.error) {
+          toast.warning(`Transferencia creada, pero no se pudo adjuntar el comprobante: ${result.error}`)
+        }
+      }
+
       return data
     },
     onSuccess: () => {
@@ -365,7 +385,11 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
             onSubmit={async (v, pending) => {
               await movementMutation.mutateAsync({ values: v, pending })
             }}
-            onTransferSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
+            onTransferSubmit={
+              (async (v: TransferFormValues, pendingComprobante?: File | null) => {
+                await transferMutation.mutateAsync({ values: v, pendingComprobante })
+              }) as (v: TransferFormValues) => Promise<void>
+            }
             isLoading={movementMutation.isPending}
             transferLoading={transferMutation.isPending}
             submitLabel="Crear movimiento"
