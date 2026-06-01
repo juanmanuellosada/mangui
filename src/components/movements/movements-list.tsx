@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useTransition } from "react"
-import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { useState, useMemo, useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -11,11 +10,14 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   ArrowLeftRight,
-  X,
-  SlidersHorizontal,
   Clock,
   Search,
   Sparkles,
+  Bookmark,
+  Plus,
+  SlidersHorizontal,
+  X,
+  ChevronDown,
 } from "lucide-react"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
@@ -30,16 +32,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MangoSelect } from "@/components/ui/mango-select"
+import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
+import { DateRangeFilter, defaultDateRange } from "@/components/ui/date-range-filter"
+import type { DateRangeValue } from "@/components/ui/date-range-filter"
 import { MovementForm, movementToFormValues, type MovementFormValues, type PendingAttachments } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
+import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
 import {
   MOVEMENTS_KEY,
@@ -47,6 +60,11 @@ import {
   ACCOUNTS_KEY,
   BALANCES_KEY,
   CATEGORIES_KEY,
+  fetchMovements,
+  fetchTransfers,
+  filterKey,
+  type MovementsFilter,
+  type MovementsFilterType,
 } from "@/lib/movements"
 import {
   format,
@@ -63,37 +81,60 @@ import { isFutureDate } from "@/lib/date-utils"
 type Movement = Tables<"movements">
 type Transfer = Tables<"transfers">
 type Category = Tables<"categories">
+type SavedView = Tables<"saved_views">
+
+const FETCH_LIMIT = 200
 
 // Discriminated union for unified feed
 type FeedItem =
   | { kind: "movement"; item: Movement }
   | { kind: "transfer"; item: Transfer }
 
-// ── Data fetchers ─────────────────────────────────────────────────────────────
+// ── Default filter ────────────────────────────────────────────────────────────
 
-async function fetchMovements(): Promise<Movement[]> {
+function defaultFilter(): MovementsFilter {
+  return {
+    search: "",
+    type: "all",
+    date: defaultDateRange(),
+    accountIds: [],
+    categoryIds: [],
+  }
+}
+
+// ── Saved views DB helpers ────────────────────────────────────────────────────
+
+const SAVED_VIEWS_KEY = ["saved_views", "movements"] as const
+
+async function fetchMovementsSavedViews(): Promise<SavedView[]> {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from("movements")
+    .from("saved_views")
     .select("*")
-    .order("date", { ascending: false })
+    .eq("scope", "movements")
     .order("created_at", { ascending: false })
-    .limit(100)
   if (error) throw error
   return data
 }
 
-async function fetchTransfers(): Promise<Transfer[]> {
+async function createMovementsSavedView(name: string, filters: MovementsFilter): Promise<void> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from("transfers")
-    .select("*")
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(100)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("No autenticado")
+  const { error } = await supabase
+    .from("saved_views")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .insert({ name, filters: filters as any, user_id: user.id, scope: "movements" })
   if (error) throw error
-  return data
 }
+
+async function deleteMovementsSavedView(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.from("saved_views").delete().eq("id", id)
+  if (error) throw error
+}
+
+// ── Accounts / categories data fetchers ──────────────────────────────────────
 
 async function fetchAccounts(): Promise<Account[]> {
   const supabase = createClient()
@@ -362,153 +403,7 @@ function TransferRow({
   )
 }
 
-// ── Filters panel ─────────────────────────────────────────────────────────────
-
-function FiltersPanel({
-  accounts,
-  categories,
-  onClose,
-}: {
-  accounts: Account[]
-  categories: Category[]
-  onClose: () => void
-}) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const [, startTransition] = useTransition()
-
-  const updateParam = useCallback(
-    (key: string, value: string | null) => {
-      const params = new URLSearchParams(searchParams.toString())
-      if (value) params.set(key, value)
-      else params.delete(key)
-      startTransition(() => {
-        router.push(`${pathname}?${params.toString()}`, { scroll: false })
-      })
-    },
-    [router, pathname, searchParams]
-  )
-
-  const typeValue = searchParams.get("type") ?? "all"
-  const accountValue = searchParams.get("account") ?? "all"
-  const categoryValue = searchParams.get("category") ?? "all"
-  const dateFrom = searchParams.get("from") ?? ""
-  const dateTo = searchParams.get("to") ?? ""
-  const searchValue = searchParams.get("q") ?? ""
-
-  const hasFilters =
-    typeValue !== "all" ||
-    accountValue !== "all" ||
-    categoryValue !== "all" ||
-    dateFrom ||
-    dateTo ||
-    searchValue
-
-  return (
-    <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-semibold">Filtros</p>
-        </div>
-        <div className="flex items-center gap-1">
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                startTransition(() => {
-                  router.push(pathname, { scroll: false })
-                })
-              }}
-              className="text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <X className="h-3 w-3" />
-              Limpiar
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* Account */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Cuenta</Label>
-          <MangoSelect
-            value={accountValue}
-            onChange={(v) => updateParam("account", v === "all" ? null : v)}
-            options={[
-              { value: "all", label: "Todas" },
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
-            aria-label="Filtrar por cuenta"
-          />
-        </div>
-
-        {/* Category */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Categoría</Label>
-          <MangoSelect
-            value={categoryValue}
-            onChange={(v) => updateParam("category", v === "all" ? null : v)}
-            options={[
-              { value: "all", label: "Todas" },
-              ...categories.map((c) => ({ value: c.id, label: c.name })),
-            ]}
-            aria-label="Filtrar por categoría"
-          />
-        </div>
-
-        {/* Date from */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Desde</Label>
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => updateParam("from", e.target.value || null)}
-            className="text-xs"
-          />
-        </div>
-
-        {/* Date to */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Hasta</Label>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => updateParam("to", e.target.value || null)}
-            className="text-xs"
-          />
-        </div>
-
-        {/* Search */}
-        <div className="space-y-1.5 col-span-2 sm:col-span-2">
-          <Label className="text-xs">Buscar en nota</Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar…"
-              value={searchValue}
-              onChange={(e) => updateParam("q", e.target.value || null)}
-              className="text-xs pl-8"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Quick-add menu (desktop header, movements page) ───────────────────────────
-// Delegates to the global QuickAddProvider — no local modal state needed.
 
 function QuickAddMenu({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -585,8 +480,7 @@ function QuickAddMenu({ accounts }: { accounts: Account[] }) {
   )
 }
 
-// ── Mobile FAB (movements page only) ──────────────────────────────────────────
-// Delegates to the global QuickAddProvider — no local modal state needed.
+// ── Mobile FAB ────────────────────────────────────────────────────────────────
 
 function FABQuickAdd({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -693,7 +587,6 @@ function EditTransferDialog({
         .single()
       if (error) throw error
 
-      // Upload new comprobante if provided (non-blocking on failure)
       if (pendingComprobante) {
         const result = await uploadAttachment({
           file: pendingComprobante,
@@ -710,8 +603,8 @@ function EditTransferDialog({
     },
     onMutate: async ({ values }) => {
       await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
-      const previous = queryClient.getQueryData<Transfer[]>(TRANSFERS_KEY)
-      queryClient.setQueryData<Transfer[]>(TRANSFERS_KEY, (old = []) =>
+      const previousAll = queryClient.getQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY })
+      queryClient.setQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY }, (old = []) =>
         old.map((t) =>
           t.id === transfer.id
             ? {
@@ -727,10 +620,14 @@ function EditTransferDialog({
             : t
         )
       )
-      return { previous }
+      return { previousAll }
     },
     onError: (err: Error, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(TRANSFERS_KEY, context.previous)
+      if (context?.previousAll) {
+        for (const [key, data] of context.previousAll) {
+          queryClient.setQueryData(key, data)
+        }
+      }
       toast.error("Error al actualizar la transferencia", { description: err.message })
     },
     onSuccess: () => {
@@ -789,14 +686,18 @@ function DeleteTransferDialog({
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
-      const previous = queryClient.getQueryData<Transfer[]>(TRANSFERS_KEY)
-      queryClient.setQueryData<Transfer[]>(TRANSFERS_KEY, (old = []) =>
+      const previousAll = queryClient.getQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY })
+      queryClient.setQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY }, (old = []) =>
         old.filter((t) => t.id !== transfer.id)
       )
-      return { previous }
+      return { previousAll }
     },
     onError: (err: Error, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(TRANSFERS_KEY, context.previous)
+      if (context?.previousAll) {
+        for (const [key, data] of context.previousAll) {
+          queryClient.setQueryData(key, data)
+        }
+      }
       toast.error("Error al eliminar la transferencia", { description: err.message })
     },
     onSuccess: () => {
@@ -855,7 +756,6 @@ function EditMovementDialog({
 }) {
   const queryClient = useQueryClient()
 
-  // 4.4 — Load existing attachments for this movement
   const { data: existingAttachments = [], refetch: refetchAttachments } = useQuery({
     queryKey: ["movement_attachments", movement.id],
     queryFn: async () => {
@@ -879,8 +779,6 @@ function EditMovementDialog({
 
       const account = accounts.find((a) => a.id === values.account_id)
       const isCross = account && values.original_currency !== account.currency
-
-      // Derive is_future from the date
       const is_future = isFutureDate(values.date)
 
       const { data, error } = await supabase
@@ -903,7 +801,6 @@ function EditMovementDialog({
         .single()
       if (error) throw error
 
-      // Upload any newly chosen files (empty slots)
       const uploads: Array<{ file: File; kind: "factura" | "recibo" | "comprobante" }> = []
       if (values.type === "expense") {
         if (pending.factura) uploads.push({ file: pending.factura, kind: "factura" })
@@ -922,8 +819,8 @@ function EditMovementDialog({
     },
     onMutate: async ({ values }) => {
       await queryClient.cancelQueries({ queryKey: MOVEMENTS_KEY })
-      const previous = queryClient.getQueryData<Movement[]>(MOVEMENTS_KEY)
-      queryClient.setQueryData<Movement[]>(MOVEMENTS_KEY, (old = []) =>
+      const previousAll = queryClient.getQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY })
+      queryClient.setQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY }, (old = []) =>
         old.map((m) =>
           m.id === movement.id
             ? {
@@ -940,10 +837,14 @@ function EditMovementDialog({
             : m
         )
       )
-      return { previous }
+      return { previousAll }
     },
     onError: (err: Error, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(MOVEMENTS_KEY, context.previous)
+      if (context?.previousAll) {
+        for (const [key, data] of context.previousAll) {
+          queryClient.setQueryData(key, data)
+        }
+      }
       toast.error("Error al actualizar", { description: err.message })
     },
     onSuccess: () => {
@@ -998,14 +899,18 @@ function DeleteMovementDialog({
     },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: MOVEMENTS_KEY })
-      const previous = queryClient.getQueryData<Movement[]>(MOVEMENTS_KEY)
-      queryClient.setQueryData<Movement[]>(MOVEMENTS_KEY, (old = []) =>
+      const previousAll = queryClient.getQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY })
+      queryClient.setQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY }, (old = []) =>
         old.filter((m) => m.id !== movement.id)
       )
-      return { previous }
+      return { previousAll }
     },
     onError: (err: Error, _vars, context) => {
-      if (context?.previous) queryClient.setQueryData(MOVEMENTS_KEY, context.previous)
+      if (context?.previousAll) {
+        for (const [key, data] of context.previousAll) {
+          queryClient.setQueryData(key, data)
+        }
+      }
       toast.error("Error al eliminar", { description: err.message })
     },
     onSuccess: () => {
@@ -1047,50 +952,359 @@ function DeleteMovementDialog({
   )
 }
 
-// ── Type filter pills ─────────────────────────────────────────────────────────
+// ── Movements filter bar ──────────────────────────────────────────────────────
 
-function TypeFilterPills() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const [, startTransition] = useTransition()
+const TYPE_OPTIONS: { value: MovementsFilterType; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "expense", label: "Gastos" },
+  { value: "income", label: "Ingresos" },
+  { value: "transfer", label: "Transferencias" },
+]
 
-  const current = searchParams.get("type") ?? "all"
+interface MovementsFilterBarProps {
+  filter: MovementsFilter
+  onChange: (f: MovementsFilter) => void
+  accounts: Account[]
+  categories: Category[]
+}
 
-  const pills = [
-    { value: "all", label: "Todos" },
-    { value: "expense", label: "Gastos" },
-    { value: "income", label: "Ingresos" },
-    { value: "transfer", label: "Transferencias" },
-  ]
+function MovementsFilterBar({ filter, onChange, accounts, categories }: MovementsFilterBarProps) {
+  const queryClient = useQueryClient()
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [saveName, setSaveName] = useState("")
+  // Mobile: expanded state for the secondary filters panel
+  const [mobileExpanded, setMobileExpanded] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
-  const setType = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value === "all") params.delete("type")
-    else params.set("type", value)
-    startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`, { scroll: false })
-    })
+  const { data: savedViews = [] } = useQuery({
+    queryKey: SAVED_VIEWS_KEY,
+    queryFn: fetchMovementsSavedViews,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: ({ name, f }: { name: string; f: MovementsFilter }) =>
+      createMovementsSavedView(name, f),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SAVED_VIEWS_KEY })
+      toast.success("Vista guardada")
+      setSaveDialogOpen(false)
+      setSaveName("")
+    },
+    onError: () => toast.error("No se pudo guardar la vista"),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteMovementsSavedView,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SAVED_VIEWS_KEY })
+      toast.success("Vista eliminada")
+    },
+    onError: () => toast.error("No se pudo eliminar"),
+  })
+
+  function loadView(view: SavedView) {
+    const f = view.filters as unknown as MovementsFilter
+    onChange(f)
   }
 
+  const accountOptions = accounts.map((a) => ({
+    value: a.id,
+    label: a.name,
+    leading: <AccountIconChip icon={a.icon} />,
+  }))
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: c.name,
+    leading: <CategoryIconChip icon={c.icon} />,
+  }))
+
+  // Active filter chips for mobile compact row
+  const activeChips: string[] = []
+  if (filter.type !== "all") {
+    activeChips.push(TYPE_OPTIONS.find((t) => t.value === filter.type)?.label ?? "")
+  }
+  if (filter.date.preset !== "all_time") {
+    activeChips.push(filter.date.label)
+  }
+  if (filter.accountIds.length > 0) {
+    activeChips.push(`${filter.accountIds.length} cuenta${filter.accountIds.length !== 1 ? "s" : ""}`)
+  }
+  if (filter.categoryIds.length > 0) {
+    activeChips.push(`${filter.categoryIds.length} categoría${filter.categoryIds.length !== 1 ? "s" : ""}`)
+  }
+
+  const hasActiveFilters =
+    filter.type !== "all" ||
+    filter.date.preset !== "all_time" ||
+    filter.date.from !== null ||
+    filter.date.to !== null ||
+    filter.accountIds.length > 0 ||
+    filter.categoryIds.length > 0 ||
+    filter.search !== ""
+
+  function clearAll() {
+    onChange(defaultFilter())
+  }
+
+  // ── Secondary filters (shared between desktop always-visible and mobile expanded) ──
+  const secondaryFilters = (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Type pills */}
+      <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {TYPE_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onChange({ ...filter, type: value })}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 press-effect cursor-pointer",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                filter.type === value
+                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Date range */}
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label className="text-xs">Fecha</Label>
+        <DateRangeFilter
+          value={filter.date}
+          onChange={(date: DateRangeValue) => onChange({ ...filter, date })}
+        />
+      </div>
+
+      {/* Accounts */}
+      <div className="space-y-1.5">
+        <Label className="text-xs">Cuentas</Label>
+        <MangoMultiSelect
+          values={filter.accountIds}
+          onChange={(accountIds) => onChange({ ...filter, accountIds })}
+          options={accountOptions}
+          placeholder="Todas las cuentas"
+          showSearch
+          aria-label="Filtrar por cuenta"
+        />
+      </div>
+
+      {/* Categories */}
+      <div className="space-y-1.5">
+        <Label className="text-xs">Categorías</Label>
+        <MangoMultiSelect
+          values={filter.categoryIds}
+          onChange={(categoryIds) => onChange({ ...filter, categoryIds })}
+          options={categoryOptions}
+          placeholder={filter.type === "transfer" ? "No aplica" : "Todas las categorías"}
+          showSearch
+          disabled={filter.type === "transfer"}
+          aria-label="Filtrar por categoría"
+        />
+      </div>
+    </div>
+  )
+
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-      {pills.map(({ value, label }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setType(value)}
-          className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-150 press-effect cursor-pointer",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            current === value
-              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-              : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+    <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
+      {/* Top row: search + actions */}
+      <div className="flex items-center gap-2">
+        {/* Search input */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Buscar por nota, categoría o cuenta…"
+            value={filter.search}
+            onChange={(e) => onChange({ ...filter, search: e.target.value })}
+            className={cn(
+              "w-full h-9 pl-9 pr-3 rounded-lg text-sm",
+              "bg-background border border-input",
+              "placeholder:text-muted-foreground/60",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-ring",
+              "transition-colors duration-150"
+            )}
+          />
+          {filter.search && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...filter, search: "" })}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           )}
+        </div>
+
+        {/* Mobile: "Filtros" button */}
+        <button
+          type="button"
+          onClick={() => setMobileExpanded((v) => !v)}
+          className={cn(
+            "lg:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium",
+            "border transition-colors duration-150 press-effect cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            mobileExpanded || hasActiveFilters
+              ? "bg-primary/10 border-primary/40 text-primary"
+              : "border-input bg-background text-muted-foreground hover:text-foreground"
+          )}
+          aria-label="Filtros"
         >
-          {label}
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span>Filtros</span>
+          {activeChips.length > 0 && (
+            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+              {activeChips.length}
+            </span>
+          )}
+          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-150", mobileExpanded && "rotate-180")} />
         </button>
-      ))}
+
+        {/* Saved views */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border border-input bg-background">
+            <Bookmark className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Vistas</span>
+            {savedViews.length > 0 && (
+              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">
+                {savedViews.length}
+              </span>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {savedViews.length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Sin vistas guardadas</div>
+            )}
+            {savedViews.map((view) => (
+              <div key={view.id} className="flex items-center gap-1 px-1">
+                <DropdownMenuItem
+                  className="flex-1"
+                  onSelect={() => loadView(view)}
+                >
+                  <span className="truncate">{view.name}</span>
+                </DropdownMenuItem>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    deleteMutation.mutate(view.id)
+                  }}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Eliminar vista ${view.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)} className="gap-2">
+              <Plus className="h-3.5 w-3.5" />
+              Guardar filtros actuales
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Clear all */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+            aria-label="Limpiar filtros"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Mobile active chips */}
+      {!mobileExpanded && activeChips.length > 0 && (
+        <div className="lg:hidden flex flex-wrap gap-1.5">
+          {activeChips.map((chip, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium"
+            >
+              {chip}
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={clearAll}
+            className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-muted text-muted-foreground hover:text-destructive text-xs transition-colors cursor-pointer"
+          >
+            <X className="h-3 w-3" />
+            Limpiar
+          </button>
+        </div>
+      )}
+
+      {/* Desktop: always show secondary filters */}
+      <div className="hidden lg:block">
+        {secondaryFilters}
+      </div>
+
+      {/* Mobile: show secondary filters when expanded */}
+      {mobileExpanded && (
+        <div className="lg:hidden">
+          {secondaryFilters}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpiar todos los filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Save view dialog */}
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Guardar vista</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="view-name-movements">Nombre de la vista</Label>
+              <Input
+                id="view-name-movements"
+                placeholder="Gastos de enero…"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && saveName.trim()) {
+                    createMutation.mutate({ name: saveName.trim(), f: filter })
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setSaveDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={!saveName.trim() || createMutation.isPending}
+              onClick={() => createMutation.mutate({ name: saveName.trim(), f: filter })}
+            >
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1098,8 +1312,7 @@ function TypeFilterPills() {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function MovementsList() {
-  const searchParams = useSearchParams()
-  const [showFilters, setShowFilters] = useState(false)
+  const [filter, setFilter] = useState<MovementsFilter>(defaultFilter)
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
   const [deletingMovement, setDeletingMovement] = useState<Movement | null>(null)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
@@ -1109,16 +1322,6 @@ export function MovementsList() {
   const [bulkPending, setBulkPending] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: movements, isLoading: loadingMovements } = useQuery({
-    queryKey: MOVEMENTS_KEY,
-    queryFn: fetchMovements,
-  })
-
-  const { data: transfers, isLoading: loadingTransfers } = useQuery({
-    queryKey: TRANSFERS_KEY,
-    queryFn: fetchTransfers,
-  })
-
   const { data: accounts = [] } = useQuery({
     queryKey: ACCOUNTS_KEY,
     queryFn: fetchAccounts,
@@ -1127,6 +1330,21 @@ export function MovementsList() {
   const { data: categories = [] } = useQuery({
     queryKey: CATEGORIES_KEY,
     queryFn: fetchCategories,
+  })
+
+  // Derive the stable filter key once so both queries share it
+  const fKey = filterKey(filter)
+
+  const { data: movements, isLoading: loadingMovements } = useQuery({
+    queryKey: [...MOVEMENTS_KEY, fKey],
+    queryFn: () => fetchMovements(filter, accounts, categories),
+    enabled: accounts.length > 0, // wait for lookups to be loaded
+  })
+
+  const { data: transfers, isLoading: loadingTransfers } = useQuery({
+    queryKey: [...TRANSFERS_KEY, fKey],
+    queryFn: () => fetchTransfers(filter, accounts),
+    enabled: accounts.length > 0,
   })
 
   const accountMap = useMemo(
@@ -1140,52 +1358,18 @@ export function MovementsList() {
 
   const isLoading = loadingMovements || loadingTransfers
 
-  // ── Apply filters to unified feed ─────────────────────────────────────────
-  const filteredFeed = useMemo<FeedItem[]>(() => {
-    const typeFilter = searchParams.get("type")
-    const accountFilter = searchParams.get("account")
-    const categoryFilter = searchParams.get("category")
-    const fromFilter = searchParams.get("from")
-    const toFilter = searchParams.get("to")
-    const searchFilter = searchParams.get("q")?.toLowerCase()
-
-    const movementItems: FeedItem[] = (movements ?? [])
-      .filter((m) => {
-        if (typeFilter === "transfer") return false
-        if (typeFilter && typeFilter !== "transfer" && m.type !== typeFilter) return false
-        if (accountFilter && m.account_id !== accountFilter) return false
-        if (categoryFilter && m.category_id !== categoryFilter) return false
-        if (fromFilter && m.date < fromFilter) return false
-        if (toFilter && m.date > toFilter) return false
-        if (searchFilter && !(m.note ?? "").toLowerCase().includes(searchFilter)) return false
-        return true
-      })
-      .map((item) => ({ kind: "movement", item }) as FeedItem)
-
-    const transferItems: FeedItem[] = (transfers ?? [])
-      .filter((t) => {
-        if (typeFilter && typeFilter !== "transfer" && typeFilter !== "all") return false
-        if (
-          accountFilter &&
-          t.from_account_id !== accountFilter &&
-          t.to_account_id !== accountFilter
-        ) return false
-        if (categoryFilter) return false // transfers have no category
-        if (fromFilter && t.date < fromFilter) return false
-        if (toFilter && t.date > toFilter) return false
-        if (searchFilter && !(t.note ?? "").toLowerCase().includes(searchFilter)) return false
-        return true
-      })
-      .map((item) => ({ kind: "transfer", item }) as FeedItem)
-
+  // ── Build unified feed ─────────────────────────────────────────────────────
+  const feed = useMemo<FeedItem[]>(() => {
+    const movementItems: FeedItem[] = (movements ?? []).map((item) => ({ kind: "movement", item }) as FeedItem)
+    const transferItems: FeedItem[] = (transfers ?? []).map((item) => ({ kind: "transfer", item }) as FeedItem)
     return [...movementItems, ...transferItems]
-  }, [movements, transfers, searchParams])
+  }, [movements, transfers])
 
   // ── Group by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
     const map = new Map<string, FeedItem[]>()
-    for (const fi of filteredFeed) {
-      const date = fi.kind === "movement" ? fi.item.date : fi.item.date
+    for (const fi of feed) {
+      const date = fi.item.date
       const day = startOfDay(parseISO(date)).toISOString()
       if (!map.has(day)) map.set(day, [])
       map.get(day)!.push(fi)
@@ -1193,23 +1377,28 @@ export function MovementsList() {
     return [...map.entries()]
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, items]) => [key, items] as [string, FeedItem[]])
-  }, [filteredFeed])
+  }, [feed])
+
+  const totalItems = feed.length
 
   const hasActiveFilters =
-    searchParams.get("type") ||
-    searchParams.get("account") ||
-    searchParams.get("category") ||
-    searchParams.get("from") ||
-    searchParams.get("to") ||
-    searchParams.get("q")
-
-  const totalItems = filteredFeed.length
+    filter.type !== "all" ||
+    filter.date.preset !== "all_time" ||
+    filter.date.from !== null ||
+    filter.date.to !== null ||
+    filter.accountIds.length > 0 ||
+    filter.categoryIds.length > 0 ||
+    filter.search !== ""
 
   // Feed item IDs for "select all"
   const feedItemIds = useMemo(
-    () => filteredFeed.map((fi) => (fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`)),
-    [filteredFeed]
+    () => feed.map((fi) => (fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`)),
+    [feed]
   )
+
+  // Whether results are at the limit (suggesting truncation)
+  const movementsAtLimit = (movements?.length ?? 0) >= FETCH_LIMIT
+  const transfersAtLimit = (transfers?.length ?? 0) >= FETCH_LIMIT
 
   async function handleBulkDelete() {
     setBulkPending(true)
@@ -1260,40 +1449,19 @@ export function MovementsList() {
           {!isLoading && totalItems > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          <button
-            type="button"
-            onClick={() => setShowFilters((v) => !v)}
-            className={cn(
-              "inline-flex items-center justify-center h-8 w-8 rounded-xl transition-all duration-150 press-effect cursor-pointer",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              showFilters || hasActiveFilters
-                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                : "bg-muted text-muted-foreground hover:text-foreground"
-            )}
-            title="Filtros"
-            aria-label="Filtros"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
           <div className="hidden lg:block">
             <QuickAddMenu accounts={accounts} />
           </div>
         </div>
       </div>
 
-      {/* Feed content — capped at max-w-3xl for readability */}
-      <div className="w-full max-w-3xl space-y-5">
-      {/* Type filter pills */}
-      <TypeFilterPills />
-
-      {/* Filters panel */}
-      {showFilters && (
-        <FiltersPanel
-          accounts={accounts}
-          categories={categories}
-          onClose={() => setShowFilters(false)}
-        />
-      )}
+      {/* Filter bar — always visible */}
+      <MovementsFilterBar
+        filter={filter}
+        onChange={setFilter}
+        accounts={accounts}
+        categories={categories}
+      />
 
       {/* Loading skeleton */}
       {isLoading && (
@@ -1346,9 +1514,7 @@ export function MovementsList() {
       {!isLoading && grouped.length > 0 && (
         <div className="space-y-5">
           {grouped.map(([dayKey, dayItems]) => {
-            const firstDate = dayItems[0].kind === "movement"
-              ? dayItems[0].item.date
-              : dayItems[0].item.date
+            const firstDate = dayItems[0].item.date
             return (
               <div key={dayKey}>
                 {/* Date header */}
@@ -1360,10 +1526,7 @@ export function MovementsList() {
                   {dayItems.map((fi) => {
                     const feedId = fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`
                     return (
-                      <div
-                        key={feedId}
-                        className="px-4"
-                      >
+                      <div key={feedId} className="px-4">
                         {fi.kind === "movement" ? (
                           <MovementRow
                             movement={fi.item}
@@ -1397,13 +1560,12 @@ export function MovementsList() {
         </div>
       )}
 
-      {/* Load more hint */}
-      {!isLoading && totalItems >= 100 && (
+      {/* Load more / truncation notice */}
+      {!isLoading && (movementsAtLimit || transfersAtLimit) && (
         <p className="text-xs text-center text-muted-foreground pt-2">
-          Mostrando los últimos 100 registros. Usá los filtros de fecha para ver más.
+          Mostrando los primeros {FETCH_LIMIT} registros. Usá los filtros de fecha para ver períodos anteriores.
         </p>
       )}
-      </div>{/* end feed max-w-3xl */}
 
       {/* Mobile FAB */}
       {accounts.length > 0 && (

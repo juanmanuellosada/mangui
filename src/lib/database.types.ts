@@ -972,6 +972,7 @@ export type Database = {
           filters: Json
           id: string
           name: string
+          scope: string
           updated_at: string
           user_id: string
         }
@@ -980,6 +981,7 @@ export type Database = {
           filters?: Json
           id?: string
           name: string
+          scope?: string
           updated_at?: string
           user_id: string
         }
@@ -988,6 +990,7 @@ export type Database = {
           filters?: Json
           id?: string
           name?: string
+          scope?: string
           updated_at?: string
           user_id?: string
         }
