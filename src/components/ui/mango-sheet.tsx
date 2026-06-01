@@ -237,8 +237,8 @@ export function MangoSheet({
           // Mobile: bottom sheet, slides up from bottom
           isMobile
             ? "rounded-t-2xl max-h-[92dvh]"
-            : // Desktop: centered dialog, max width, rounded all sides
-              "rounded-xl max-w-[calc(100%-2rem)] sm:max-w-md mx-4",
+            : // Desktop: centered dialog, max width, rounded all sides, bounded height
+              "rounded-xl max-w-[calc(100%-2rem)] sm:max-w-md mx-4 max-h-[88dvh]",
           // Desktop enter animation
           !isMobile && !reducedMotion && "animate-in fade-in-0 zoom-in-95 duration-200"
         )}
