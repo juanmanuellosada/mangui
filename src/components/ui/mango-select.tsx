@@ -9,8 +9,16 @@
 
 import * as React from "react"
 import { useEffect, useRef, useState, useCallback } from "react"
-import { CheckIcon, ChevronDownIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon, SearchIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+/** Normalize a string: lowercase + strip diacritics. */
+function normalizeLabel(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+}
 
 export interface MangoSelectOption {
   value: string
@@ -34,6 +42,12 @@ export interface MangoSelectProps {
   "aria-label"?: string
   "aria-describedby"?: string
   "aria-invalid"?: boolean
+  /**
+   * When true, renders a search input at the top of the open popover.
+   * The input is auto-focused and filters options by label (case- and
+   * accent-insensitive). Default: false — no change to existing behavior.
+   */
+  showSearch?: boolean
 }
 
 export function MangoSelect({
@@ -48,20 +62,29 @@ export function MangoSelect({
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
+  showSearch = false,
 }: MangoSelectProps) {
   const [open, setOpen] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
+  const [searchQuery, setSearchQuery] = useState("")
   const triggerRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const selectedOption = options.find((o) => o.value === value)
 
-  const enabledOptions = options.filter((o) => !o.disabled)
+  // When showSearch is active, filter by normalized label; otherwise use all options.
+  const filteredOptions = showSearch && searchQuery
+    ? options.filter((o) =>
+        normalizeLabel(o.label).includes(normalizeLabel(searchQuery))
+      )
+    : options
 
   const openDropdown = useCallback(() => {
     if (disabled) return
     setOpen(true)
+    setSearchQuery("")
     const idx = options.findIndex((o) => o.value === value)
     setFocusedIndex(idx >= 0 ? idx : 0)
   }, [disabled, options, value])
@@ -69,6 +92,7 @@ export function MangoSelect({
   const closeDropdown = useCallback(() => {
     setOpen(false)
     setFocusedIndex(-1)
+    setSearchQuery("")
     triggerRef.current?.focus()
   }, [])
 
@@ -92,12 +116,28 @@ export function MangoSelect({
     return () => document.removeEventListener("mousedown", handleClick)
   }, [open, closeDropdown])
 
-  // Focus list item when focusedIndex changes
+  // Auto-focus the search input when the dropdown opens (showSearch only).
+  useEffect(() => {
+    if (open && showSearch) {
+      searchRef.current?.focus()
+    }
+  }, [open, showSearch])
+
+  // Focus list item when focusedIndex changes (only when search input is not active).
   useEffect(() => {
     if (!open || focusedIndex < 0) return
+    // If the search input is focused, don't steal focus away from it.
+    if (showSearch && document.activeElement === searchRef.current) return
     const items = listRef.current?.querySelectorAll<HTMLLIElement>("[role='option']")
     items?.[focusedIndex]?.focus()
-  }, [open, focusedIndex])
+  }, [open, focusedIndex, showSearch])
+
+  // When the search query changes, reset focusedIndex to the first result.
+  useEffect(() => {
+    if (!open || !showSearch) return
+    setFocusedIndex(filteredOptions.length > 0 ? 0 : -1)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery])
 
   function handleTriggerKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
@@ -107,8 +147,13 @@ export function MangoSelect({
     if (e.key === "Escape") closeDropdown()
   }
 
+  /**
+   * handleOptionKeyDown operates over filteredOptions (the rendered list).
+   * `idx` is the index within filteredOptions.
+   */
   function handleOptionKeyDown(e: React.KeyboardEvent, idx: number) {
-    const enabledIdxs = options
+    const list = filteredOptions
+    const enabledIdxs = list
       .map((o, i) => (!o.disabled ? i : null))
       .filter((i): i is number => i !== null)
 
@@ -116,7 +161,7 @@ export function MangoSelect({
 
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault()
-      if (!options[idx].disabled) selectOption(options[idx].value)
+      if (!list[idx].disabled) selectOption(list[idx].value)
     }
     if (e.key === "Escape") {
       e.preventDefault()
@@ -129,6 +174,11 @@ export function MangoSelect({
     }
     if (e.key === "ArrowUp") {
       e.preventDefault()
+      // ArrowUp from first item: move focus back to the search input (if showSearch).
+      if (currentEnabledPos === 0 && showSearch) {
+        searchRef.current?.focus()
+        return
+      }
       const prev =
         enabledIdxs[currentEnabledPos - 1] ?? enabledIdxs[enabledIdxs.length - 1]
       if (prev !== undefined) setFocusedIndex(prev)
@@ -140,6 +190,35 @@ export function MangoSelect({
     if (e.key === "End") {
       e.preventDefault()
       if (enabledIdxs.length) setFocusedIndex(enabledIdxs[enabledIdxs.length - 1])
+    }
+  }
+
+  /** Key handler for the search input. Only handles navigation keys; typing falls through naturally. */
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault()
+      closeDropdown()
+      return
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      // Move focus into the list at the first enabled item.
+      const enabledIdxs = filteredOptions
+        .map((o, i) => (!o.disabled ? i : null))
+        .filter((i): i is number => i !== null)
+      if (enabledIdxs.length) {
+        setFocusedIndex(enabledIdxs[0])
+        // Immediately focus the element — the useEffect won't fire because
+        // activeElement is still the input at that point.
+        const items = listRef.current?.querySelectorAll<HTMLLIElement>("[role='option']")
+        items?.[enabledIdxs[0]]?.focus()
+      }
+      return
+    }
+    if (e.key === "Enter") {
+      // Select the first enabled filtered option on Enter.
+      const first = filteredOptions.find((o) => !o.disabled)
+      if (first) selectOption(first.value)
     }
   }
 
@@ -218,52 +297,85 @@ export function MangoSelect({
             dropUp ? "bottom-full mb-1" : "top-full mt-1"
           )}
         >
-          <ul
-            ref={listRef}
-            role="listbox"
-            aria-label={ariaLabel ?? "Opciones"}
+          <div
             className={cn(
-              "max-h-60 overflow-y-auto rounded-lg border border-border/80",
+              "rounded-lg border border-border/80",
               "bg-popover text-popover-foreground shadow-lg",
               // Animation
               "animate-in fade-in-0 zoom-in-95 duration-150",
               dropUp ? "origin-bottom" : "origin-top"
             )}
           >
-            {options.map((option, idx) => {
-              const isSelected = option.value === value
-              return (
-                <li
-                  key={option.value}
-                  role="option"
-                  aria-selected={isSelected}
-                  aria-disabled={option.disabled}
-                  tabIndex={option.disabled ? -1 : 0}
-                  onClick={() => !option.disabled && selectOption(option.value)}
-                  onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+            {/* Search input — only rendered when showSearch=true */}
+            {showSearch && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60">
+                <SearchIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  role="searchbox"
+                  aria-label="Buscar opción"
+                  autoComplete="off"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Buscar…"
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none",
-                    "transition-colors duration-100 outline-none",
-                    // Hover / focus
-                    !option.disabled &&
-                      "hover:bg-accent/10 focus:bg-accent/10",
-                    // Selected
-                    isSelected && "font-semibold text-primary",
-                    // Disabled
-                    option.disabled && "opacity-40 cursor-not-allowed"
+                    "flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
                   )}
+                />
+              </div>
+            )}
+            <ul
+              ref={listRef}
+              role="listbox"
+              aria-label={ariaLabel ?? "Opciones"}
+              className="max-h-60 overflow-y-auto"
+            >
+              {filteredOptions.length === 0 ? (
+                <li
+                  role="presentation"
+                  className="px-3 py-3 text-sm text-muted-foreground text-center select-none"
                 >
-                  {option.leading && (
-                    <span className="flex items-center shrink-0">{option.leading}</span>
-                  )}
-                  <span className="flex-1 truncate">{option.label}</span>
-                  {isSelected && (
-                    <CheckIcon className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
-                  )}
+                  Sin resultados
                 </li>
-              )
-            })}
-          </ul>
+              ) : (
+                filteredOptions.map((option, idx) => {
+                  const isSelected = option.value === value
+                  return (
+                    <li
+                      key={option.value}
+                      role="option"
+                      aria-selected={isSelected}
+                      aria-disabled={option.disabled}
+                      tabIndex={option.disabled ? -1 : 0}
+                      onClick={() => !option.disabled && selectOption(option.value)}
+                      onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none",
+                        "transition-colors duration-100 outline-none",
+                        // Hover / focus
+                        !option.disabled &&
+                          "hover:bg-accent/10 focus:bg-accent/10",
+                        // Selected
+                        isSelected && "font-semibold text-primary",
+                        // Disabled
+                        option.disabled && "opacity-40 cursor-not-allowed"
+                      )}
+                    >
+                      {option.leading && (
+                        <span className="flex items-center shrink-0">{option.leading}</span>
+                      )}
+                      <span className="flex-1 truncate">{option.label}</span>
+                      {isSelected && (
+                        <CheckIcon className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden />
+                      )}
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </div>
         </div>
       )}
     </div>

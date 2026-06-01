@@ -4,14 +4,17 @@ import { useEffect, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { parseISO } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
+import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
-import type { Account } from "@/lib/accounts"
+import { renderAccountIcon, type Account } from "@/lib/accounts"
+import { isFutureDate } from "@/lib/date-utils"
 import type { Tables } from "@/lib/database.types"
 
 export type TransferFormValues = {
@@ -81,7 +84,7 @@ export function TransferForm({
   const toAccountId = watch("to_account_id")
   const fromAmount = watch("from_amount")
   const toAmount = watch("to_amount")
-  const isFuture = watch("is_future")
+  const dateStr = watch("date")
 
   const fromAccount = accounts.find((a) => a.id === fromAccountId)
   const toAccount = accounts.find((a) => a.id === toAccountId)
@@ -95,7 +98,6 @@ export function TransferForm({
   // When accounts change, reset to_amount and fetch rate for cross-currency
   useEffect(() => {
     if (!isCrossCurrency) {
-      // Same currency: keep to_amount in sync with from_amount
       setValue("to_amount", fromAmount || 0)
       setImpliedRate(null)
       setRateFetched(false)
@@ -120,8 +122,6 @@ export function TransferForm({
       const rateData = rates["blue"]
       if (!rateData) return
       setRateFetched(true)
-      // fromAccount → ARS, toAccount → USD: sell rate (ARS → USD)
-      // fromAccount → USD, toAccount → ARS: buy rate (USD → ARS)
       const fromCurrency = fromAccount?.currency
       const toCurrency = toAccount?.currency
       if (fromCurrency === "ARS" && toCurrency === "USD") {
@@ -146,28 +146,55 @@ export function TransferForm({
     const fromCurrency = fromAccount?.currency
     const toCurrency = toAccount?.currency
     if (fromCurrency === "ARS" && toCurrency === "USD") {
-      // to_amount is USD, from_amount is ARS: rate = ARS per USD
       return toAmount > 0 ? fromAmount / toAmount : null
     } else if (fromCurrency === "USD" && toCurrency === "ARS") {
-      // from_amount is USD, to_amount is ARS: rate = ARS per USD
       return fromAmount > 0 ? toAmount / fromAmount : null
     }
     return null
   })()
 
+  // 5.3 — Submit derives is_future from the date (no manual checkbox)
+  const handleFormSubmit = handleSubmit(async (values) => {
+    await onSubmit({
+      ...values,
+      is_future: isFutureDate(values.date),
+    })
+  })
+
+  // Account options with icons + currency label
+  const accountOptions = accounts.map((a) => ({
+    value: a.id,
+    label: `${a.name} (${a.currency})`,
+    leading: renderAccountIcon(a.icon, { size: "h-4 w-4" }),
+  }))
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {/* From account */}
+    <form onSubmit={handleFormSubmit} className="space-y-4">
+      {/* 5.3 — Date FIRST, using MangoDatePicker */}
       <div className="space-y-1.5">
-        <Label>Cuenta origen</Label>
+        <Label className="text-xs text-muted-foreground font-medium">Fecha</Label>
+        <MangoDatePicker
+          value={dateStr ? parseISO(dateStr) : null}
+          onChange={(d) => {
+            setValue("date", d.toISOString().split("T")[0], { shouldValidate: true })
+          }}
+          placeholder="Seleccioná una fecha"
+          aria-invalid={!!errors.date}
+        />
+        {errors.date && (
+          <p className="text-xs text-destructive">{errors.date.message}</p>
+        )}
+      </div>
+
+      {/* 5.3 — From account with icon + showSearch, separate row */}
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground font-medium">Cuenta origen</Label>
         <MangoSelect
           value={fromAccountId}
           onChange={(v) => v && setValue("from_account_id", v, { shouldValidate: true })}
-          options={accounts.map((a) => ({
-            value: a.id,
-            label: `${a.name} (${a.currency})`,
-          }))}
+          options={accountOptions}
           placeholder="Seleccioná cuenta origen"
+          showSearch
           aria-invalid={!!errors.from_account_id}
         />
         {errors.from_account_id && (
@@ -175,18 +202,20 @@ export function TransferForm({
         )}
       </div>
 
-      {/* To account */}
+      {/* 5.3 + 5.4 — To account with icon + showSearch; same account disabled */}
       <div className="space-y-1.5">
-        <Label>Cuenta destino</Label>
+        <Label className="text-xs text-muted-foreground font-medium">Cuenta destino</Label>
         <MangoSelect
           value={toAccountId}
           onChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
           options={accounts.map((a) => ({
             value: a.id,
             label: `${a.name} (${a.currency})`,
+            leading: renderAccountIcon(a.icon, { size: "h-4 w-4" }),
             disabled: a.id === fromAccountId,
           }))}
           placeholder="Seleccioná cuenta destino"
+          showSearch
           aria-invalid={!!errors.to_account_id}
         />
         {errors.to_account_id && (
@@ -205,7 +234,7 @@ export function TransferForm({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label htmlFor="from_amount">
+              <Label htmlFor="from_amount" className="text-xs text-muted-foreground font-medium">
                 Monto en {fromAccount?.currency}
               </Label>
               <MoneyInput
@@ -224,7 +253,7 @@ export function TransferForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="to_amount">
+              <Label htmlFor="to_amount" className="text-xs text-muted-foreground font-medium">
                 Monto en {toAccount?.currency}
               </Label>
               <MoneyInput
@@ -243,7 +272,6 @@ export function TransferForm({
             </div>
           </div>
 
-          {/* Implied rate */}
           {effectiveRate !== null && (
             <p className="text-xs text-muted-foreground">
               Tasa implícita:{" "}
@@ -260,7 +288,9 @@ export function TransferForm({
         </div>
       ) : (
         <div className="space-y-1.5">
-          <Label htmlFor="from_amount">Monto</Label>
+          <Label htmlFor="from_amount" className="text-xs text-muted-foreground font-medium">
+            Monto
+          </Label>
           <MoneyInput
             id="from_amount"
             step="0.01"
@@ -277,23 +307,11 @@ export function TransferForm({
         </div>
       )}
 
-      {/* Date */}
-      <div className="space-y-1.5">
-        <Label htmlFor="date">Fecha</Label>
-        <Input
-          id="date"
-          type="date"
-          {...register("date")}
-          aria-invalid={!!errors.date}
-        />
-        {errors.date && (
-          <p className="text-xs text-destructive">{errors.date.message}</p>
-        )}
-      </div>
-
       {/* Note */}
       <div className="space-y-1.5">
-        <Label htmlFor="note">Nota (opcional)</Label>
+        <Label htmlFor="note" className="text-xs text-muted-foreground font-medium">
+          Nota (opcional)
+        </Label>
         <Input
           id="note"
           placeholder="Ej: ahorro mensual, cambio de dólares…"
@@ -302,21 +320,7 @@ export function TransferForm({
         />
       </div>
 
-      {/* Future toggle */}
-      <div className="flex items-center gap-2">
-        <input
-          id="is_future"
-          type="checkbox"
-          className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
-          checked={isFuture}
-          onChange={(e) => setValue("is_future", e.target.checked)}
-        />
-        <Label htmlFor="is_future" className="cursor-pointer font-normal">
-          Transferencia futura (programada)
-        </Label>
-      </div>
-
-      <Button type="submit" className="w-full press-effect" disabled={isLoading}>
+      <Button type="submit" className="w-full press-effect font-semibold h-11" disabled={isLoading}>
         {isLoading ? "Guardando…" : submitLabel}
       </Button>
     </form>

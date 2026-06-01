@@ -7,8 +7,9 @@
  * `useQuickAdd().open(mode?, type?)` to open the modal, regardless of route.
  *
  * Supported modes:
- *  - "movement" (default) — opens MovementForm; optionally pre-selects "income"|"expense"
- *  - "transfer"           — opens TransferForm
+ *  - "movement" (default) — opens MovementForm with a 3-way toggle
+ *    (Gasto / Ingreso / Transferencia) so the user can switch inline.
+ *  - "transfer"           — opens directly in transfer mode (same sheet)
  *  - "installment"        — opens InstallmentForm
  *  - "ai"                 — opens AiQuickAddSheet
  */
@@ -17,8 +18,8 @@ import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { MangoSheet } from "@/components/ui/mango-sheet"
-import { MovementForm, type MovementFormValues } from "@/components/movements/movement-form"
-import { TransferForm, type TransferFormValues } from "@/components/transfers/transfer-form"
+import { MovementForm, type MovementFormValues, type PendingAttachments, type MovementMode } from "@/components/movements/movement-form"
+import type { TransferFormValues } from "@/components/transfers/transfer-form"
 import { InstallmentForm, type InstallmentFormValues } from "@/components/installments/installment-form"
 import { AiQuickAddSheet } from "@/components/ai/ai-quick-add-sheet"
 import { createClient } from "@/lib/supabase/client"
@@ -33,6 +34,8 @@ import {
   type DollarType,
 } from "@/lib/movements"
 import { INSTALLMENTS_KEY, computeInstallmentAmounts, computeInstallmentDate, isInstallmentFuture } from "@/lib/installments"
+import { isFutureDate } from "@/lib/date-utils"
+import { uploadAttachment } from "@/lib/attachments"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 
 type Category = Tables<"categories">
@@ -176,18 +179,44 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   })
 
   const open = React.useCallback((m: QuickAddMode = "movement", type: "income" | "expense" = "expense") => {
-    setMode(m)
+    // Both "movement" and "transfer" are served by the same MovementForm sheet now.
+    // Map "transfer" to "movement" mode so the sheet opens with the 3-way toggle,
+    // but store the intended initial mode so MovementForm starts on the transfer tab.
+    setMode(m === "transfer" ? "movement" : m)
     setDefaultType(type)
     setIsOpen(true)
   }, [])
 
+
+  // Re-derive on every open call using a ref to capture the original QuickAddMode.
+  const [openedAsTransfer, setOpenedAsTransfer] = React.useState(false)
+
+  const openWithTransferTracking = React.useCallback(
+    (m: QuickAddMode = "movement", type: "income" | "expense" = "expense") => {
+      setOpenedAsTransfer(m === "transfer")
+      open(m, type)
+    },
+    [open]
+  )
+
   const movementMutation = useMutation({
-    mutationFn: async (values: MovementFormValues) => {
+    mutationFn: async ({
+      values,
+      pending,
+    }: {
+      values: MovementFormValues
+      pending: PendingAttachments
+    }) => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
+
       const account = accounts.find((a) => a.id === values.account_id)
       const isCross = account && values.original_currency !== account.currency
+
+      // 3.2 — derive is_future from the date
+      const is_future = isFutureDate(values.date)
+
       const { data, error } = await supabase
         .from("movements")
         .insert({
@@ -199,13 +228,32 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           category_id: values.category_id,
           date: values.date,
           note: values.note || null,
-          is_future: values.is_future,
+          is_future,
           dollar_type: isCross ? values.dollar_type : null,
           converted_amount: isCross ? values.converted_amount : null,
         })
         .select()
         .single()
       if (error) throw error
+
+      // 4.3 — upload pending attachments (non-blocking on failure)
+      const movementId = data.id
+      const uploads: Array<{ file: File; kind: "factura" | "recibo" | "comprobante" }> = []
+      if (values.type === "expense") {
+        if (pending.factura) uploads.push({ file: pending.factura, kind: "factura" })
+        if (pending.recibo) uploads.push({ file: pending.recibo, kind: "recibo" })
+      } else if (values.type === "income") {
+        if (pending.comprobante) uploads.push({ file: pending.comprobante, kind: "comprobante" })
+      }
+
+      for (const { file, kind } of uploads) {
+        const result = await uploadAttachment({ file, userId: user.id, movementId, kind })
+        if (result.error) {
+          // D4: toast but don't fail — the movement was already created
+          toast.warning(`Movimiento creado, pero no se pudo adjuntar "${file.name}": ${result.error}`)
+        }
+      }
+
       return data
     },
     onSuccess: () => {
@@ -225,6 +273,10 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
+
+      // 3.2 — derive is_future from the date
+      const is_future = isFutureDate(values.date)
+
       const { data, error } = await supabase
         .from("transfers")
         .insert({
@@ -235,7 +287,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           to_amount: values.to_amount,
           date: values.date,
           note: values.note || null,
-          is_future: values.is_future,
+          is_future,
         })
         .select()
         .single()
@@ -270,22 +322,23 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     },
   })
 
+  // Determine initial movement mode for the 3-way toggle
+  const movementInitialMode: MovementMode = openedAsTransfer
+    ? "transfer"
+    : defaultType
+
   const sheetTitle =
     mode === "movement"
-      ? (defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto")
-      : mode === "transfer"
-      ? "Nueva transferencia"
+      ? "Nuevo movimiento"
       : "Nuevo gasto en cuotas"
 
   const sheetDescription =
     mode === "movement"
-      ? "Registrá un movimiento en una de tus cuentas."
-      : mode === "transfer"
-      ? "Mové saldo entre tus cuentas."
+      ? "Registrá un movimiento o transferencia."
       : "Dividí una compra en cuotas mensuales."
 
   return (
-    <QuickAddContext.Provider value={{ open }}>
+    <QuickAddContext.Provider value={{ open: openWithTransferTracking }}>
       {children}
 
       {/* AI Quick Add Sheet */}
@@ -296,7 +349,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         categories={categories}
       />
 
-      {/* MangoSheet — movement / transfer / installment */}
+      {/* MangoSheet — movement (3-way) / installment */}
       <MangoSheet
         open={isOpen && mode !== "ai"}
         onOpenChange={setIsOpen}
@@ -304,21 +357,20 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         description={sheetDescription}
       >
         {mode === "movement" ? (
+          /* 5.1/5.2 — MovementForm handles the 3-way toggle (Gasto/Ingreso/Transferencia) */
           <MovementForm
             accounts={accounts}
             categories={categories}
             defaultValues={{ type: defaultType }}
-            onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
+            onSubmit={async (v, pending) => {
+              await movementMutation.mutateAsync({ values: v, pending })
+            }}
+            onTransferSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
             isLoading={movementMutation.isPending}
+            transferLoading={transferMutation.isPending}
             submitLabel="Crear movimiento"
             isCreateMode
-          />
-        ) : mode === "transfer" ? (
-          <TransferForm
-            accounts={accounts}
-            onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
-            isLoading={transferMutation.isPending}
-            submitLabel="Crear transferencia"
+            initialMode={movementInitialMode}
           />
         ) : (
           <InstallmentForm
