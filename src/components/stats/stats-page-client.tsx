@@ -31,7 +31,7 @@ import { WeekdayPatternBars } from "./weekday-pattern-chart"
 import { BudgetComplianceStrip } from "./budget-compliance-strip"
 import { CompareTab } from "./compare-tab"
 import type { Tables } from "@/lib/database.types"
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns"
+import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 
 type Movement = Tables<"movements">
@@ -269,10 +269,11 @@ export function StatsPageClient() {
   )
 
   const periodLabel = useMemo(() => {
-    const from = filter.dateFrom ? format(new Date(filter.dateFrom + "T12:00:00"), "d MMM", { locale: es }) : ""
-    const to = filter.dateTo ? format(new Date(filter.dateTo + "T12:00:00"), "d MMM", { locale: es }) : ""
-    return from && to ? `${from} – ${to}` : ""
-  }, [filter.dateFrom, filter.dateTo])
+    if (filter.date.label) return filter.date.label
+    const from = filter.date.from ? format(parseISO(filter.date.from), "d MMM", { locale: es }) : ""
+    const to = filter.date.to ? format(parseISO(filter.date.to), "d MMM", { locale: es }) : ""
+    return from && to ? `${from} – ${to}` : from || to
+  }, [filter.date])
 
   function setTab(tab: TabKey) {
     const params = new URLSearchParams(searchParams.toString())
@@ -469,7 +470,19 @@ export function StatsPageClient() {
 
       {/* Comparar tab */}
       {!isLoading && activeTab === "comparar" && (
-        <CompareTab movements={movements} categories={categories} currency={currency} />
+        <CompareTab
+          movements={movements}
+          categories={categories}
+          currency={currency}
+          sharedFilter={{
+            type: filter.type,
+            categoryIds: filter.categoryIds,
+            accountIds: filter.accountIds,
+          }}
+          onRestoreSharedFilter={(sf) =>
+            setFilter((f) => ({ ...f, type: sf.type, categoryIds: sf.categoryIds, accountIds: sf.accountIds, currency: sf.currency }))
+          }
+        />
       )}
     </div>
   )
