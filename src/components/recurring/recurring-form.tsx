@@ -4,17 +4,21 @@ import { useEffect, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { parseISO, startOfDay } from "date-fns"
+import { parseISO, startOfDay, format } from "date-fns"
+import { ArrowLeftRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
 import { Switch } from "@/components/ui/switch"
 import { MangoSelect } from "@/components/ui/mango-select"
+import { CurrencyToggle } from "@/components/ui/currency-toggle"
+import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
-import type { Account } from "@/lib/accounts"
+import { AccountIconChip, type Account } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
 import {
   computeNextRun,
@@ -236,7 +240,7 @@ export function RecurringForm({
               }
             }}
             className={cn(
-              "flex-1 h-9 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer press-effect",
+              "flex-1 h-9 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer press-effect",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               kind === k
                 ? k === "income"
@@ -247,7 +251,12 @@ export function RecurringForm({
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {k === "income" ? "Ingreso" : k === "expense" ? "Gasto" : "Transferencia"}
+            {k === "income" ? "Ingreso" : k === "expense" ? "Gasto" : (
+              <span className="flex items-center justify-center gap-1">
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Transferencia
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -257,39 +266,33 @@ export function RecurringForm({
         <Label htmlFor="amount" className="text-xs text-muted-foreground font-medium">
           Monto
         </Label>
-        <div className="relative">
-          <MoneyInput
-            id="amount"
-            step="0.01"
-            min="0.01"
-            placeholder="0"
-            currency={currency}
-            className={cn(
-              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
-              "focus:border-primary focus:ring-2 focus:ring-ring/30",
-              "pr-32"
-            )}
-            wrapperClassName="w-full"
-            {...register("amount")}
-            aria-invalid={!!errors.amount}
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <MangoSelect
-              value={currency}
-              onChange={(v) => setValue("currency", v as "ARS" | "USD", { shouldValidate: true })}
-              options={[
-                { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
-                { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
-              ]}
-              className="w-28"
-              triggerClassName="h-8 text-xs font-bold border-border/60 bg-muted/50"
-              aria-label="Moneda"
-            />
-          </div>
-        </div>
+        <MoneyInput
+          id="amount"
+          step="0.01"
+          min="0.01"
+          placeholder="0"
+          currency={currency}
+          className={cn(
+            "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+            "focus:border-primary focus:ring-2 focus:ring-ring/30",
+          )}
+          wrapperClassName="w-full"
+          {...register("amount")}
+          aria-invalid={!!errors.amount}
+        />
         {errors.amount && (
           <p className="text-xs text-destructive">{errors.amount.message}</p>
         )}
+      </div>
+
+      {/* Currency toggle — always visible */}
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground font-medium">Moneda</Label>
+        <CurrencyToggle
+          value={currency}
+          onChange={(v) => setValue("currency", v, { shouldValidate: true })}
+          className="w-full"
+        />
       </div>
 
       {/* Account */}
@@ -300,8 +303,14 @@ export function RecurringForm({
         <MangoSelect
           value={accountId}
           onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
-          options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+          options={accounts.map((a) => ({
+            value: a.id,
+            label: a.name,
+            leading: <AccountIconChip icon={a.icon} />,
+            disabled: isTransfer && a.id === toAccountId,
+          }))}
           placeholder="Seleccioná cuenta"
+          showSearch
           aria-invalid={!!errors.account_id}
         />
         {errors.account_id && (
@@ -319,10 +328,12 @@ export function RecurringForm({
               onChange={(v) => v && setValue("to_account_id", v, { shouldValidate: true })}
               options={accounts.map((a) => ({
                 value: a.id,
-                label: `${a.name} (${a.currency})`,
+                label: a.name,
+                leading: <AccountIconChip icon={a.icon} />,
                 disabled: a.id === accountId,
               }))}
               placeholder="Seleccioná cuenta destino"
+              showSearch
               aria-invalid={!!errors.to_account_id}
             />
             {errors.to_account_id && (
@@ -400,9 +411,14 @@ export function RecurringForm({
             onChange={(v) => setValue("category_id", v === "none" ? null : v)}
             options={[
               { value: "none", label: "Sin categoría" },
-              ...filteredCategories.map((c) => ({ value: c.id, label: c.name })),
+              ...filteredCategories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                leading: c.icon ? <CategoryIconChip icon={c.icon} /> : undefined,
+              })),
             ]}
             placeholder="Sin categoría"
+            showSearch
           />
         </div>
       )}
@@ -506,30 +522,39 @@ export function RecurringForm({
       {/* Vigencia */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="start_date" className="text-xs text-muted-foreground font-medium">
+          <Label className="text-xs text-muted-foreground font-medium">
             Vigencia desde
           </Label>
-          <Input
-            id="start_date"
-            type="date"
-            {...register("start_date")}
+          <MangoDatePicker
+            value={startDate ? parseISO(startDate) : null}
+            onChange={(d) => setValue("start_date", format(d, "yyyy-MM-dd"), { shouldValidate: true })}
+            placeholder="Seleccioná fecha"
             aria-invalid={!!errors.start_date}
-            className="text-sm"
           />
           {errors.start_date && (
             <p className="text-xs text-destructive">{errors.start_date.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="end_date" className="text-xs text-muted-foreground font-medium">
-            Hasta (opcional)
-          </Label>
-          <Input
-            id="end_date"
-            type="date"
-            value={endDate ?? ""}
-            onChange={(e) => setValue("end_date", e.target.value || null)}
-            className="text-sm"
+          <div className="flex items-center justify-between min-h-4">
+            <Label className="text-xs text-muted-foreground font-medium">
+              Hasta (opcional)
+            </Label>
+            {endDate && (
+              <button
+                type="button"
+                onClick={() => setValue("end_date", null)}
+                className="text-[10px] text-muted-foreground hover:text-destructive transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                aria-label="Quitar fecha de fin"
+              >
+                Quitar
+              </button>
+            )}
+          </div>
+          <MangoDatePicker
+            value={endDate ? parseISO(endDate) : null}
+            onChange={(d) => setValue("end_date", format(d, "yyyy-MM-dd"))}
+            placeholder="Sin vencimiento"
           />
         </div>
       </div>
