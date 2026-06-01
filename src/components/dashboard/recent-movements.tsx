@@ -2,29 +2,17 @@
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
 import { ChevronRight, ArrowUpCircle, ArrowDownCircle, PlusCircle } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import type { Tables } from "@/lib/database.types"
-import { MOVEMENTS_KEY, BALANCES_KEY, ACCOUNTS_KEY } from "@/lib/movements"
+import { MOVEMENTS_KEY, ACCOUNTS_KEY } from "@/lib/movements"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import { MovementForm, type MovementFormValues } from "@/components/movements/movement-form"
 import type { Account } from "@/lib/accounts"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { toast } from "sonner"
-import { useMutation } from "@tanstack/react-query"
+import { useQuickAdd } from "@/components/quick-add-provider"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -68,93 +56,9 @@ function formatDateShort(dateStr: string): string {
   return format(d, "d MMM", { locale: es })
 }
 
-function QuickAddDialog({
-  accounts,
-  categories,
-}: {
-  accounts: Account[]
-  categories: Category[]
-}) {
-  const [open, setOpen] = useState(false)
-  const queryClient = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: async (values: MovementFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-
-      const account = accounts.find((a) => a.id === values.account_id)
-      const isCross = account && values.original_currency !== account.currency
-
-      const { data, error } = await supabase
-        .from("movements")
-        .insert({
-          user_id: user.id,
-          type: values.type,
-          amount: values.amount,
-          original_currency: values.original_currency,
-          account_id: values.account_id,
-          category_id: values.category_id,
-          date: values.date,
-          note: values.note || null,
-          is_future: values.is_future,
-          dollar_type: isCross ? values.dollar_type : null,
-          converted_amount: isCross ? values.converted_amount : null,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Movimiento creado")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear el movimiento", { description: err.message })
-    },
-  })
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <button
-            type="button"
-            className={cn(
-              buttonVariants({ size: "sm" }),
-              "gap-1.5 cursor-pointer"
-            )}
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            Nuevo
-          </button>
-        }
-      />
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Nuevo movimiento</DialogTitle>
-          <DialogDescription>
-            Registrá un ingreso o gasto en una de tus cuentas.
-          </DialogDescription>
-        </DialogHeader>
-        <MovementForm
-          accounts={accounts}
-          categories={categories}
-          onSubmit={async (v) => { await mutation.mutateAsync(v) }}
-          isLoading={mutation.isPending}
-          submitLabel="Crear movimiento"
-        />
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 export function RecentMovements() {
+  const quickAdd = useQuickAdd()
+
   const { data: movements, isLoading: loadingMovements } = useQuery({
     queryKey: MOVEMENTS_KEY,
     queryFn: fetchRecentMovements,
@@ -180,7 +84,14 @@ export function RecentMovements() {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Actividad reciente</h3>
         {accounts.length > 0 && (
-          <QuickAddDialog accounts={accounts} categories={categories} />
+          <button
+            type="button"
+            onClick={() => quickAdd.open()}
+            className={cn(buttonVariants({ size: "sm" }), "gap-1.5 cursor-pointer")}
+          >
+            <PlusCircle className="h-3.5 w-3.5" />
+            Nuevo
+          </button>
         )}
       </div>
 

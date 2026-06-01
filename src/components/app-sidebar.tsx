@@ -23,6 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
+import { useQuickAdd } from "@/components/quick-add-provider";
 
 const navItems = [
   { icon: Home, label: "Inicio", href: "/app/dashboard" },
@@ -58,6 +59,7 @@ function getInitials(name: string): string {
  */
 export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
   const pathname = usePathname();
+  const quickAdd = useQuickAdd();
 
   return (
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar z-30 shadow-sm">
@@ -70,13 +72,14 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
 
       {/* Quick add */}
       <div className="px-4 pt-5">
-        <Link
-          href="/app/movements"
+        <button
+          type="button"
+          onClick={() => quickAdd.open()}
           className="w-full gap-2 justify-center font-semibold shadow-sm shadow-primary/20 press-effect inline-flex h-8 shrink-0 items-center rounded-lg border border-transparent bg-primary px-2.5 text-sm text-primary-foreground transition-all hover:bg-primary/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 cursor-pointer"
         >
           <PlusCircle className="h-4 w-4" />
           Nuevo movimiento
-        </Link>
+        </button>
       </div>
 
       {/* Nav */}

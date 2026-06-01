@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, PiggyBank, ArrowLeftRight, Settings } from "lucide-react";
+import { Home, PiggyBank, ArrowLeftRight, Settings, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuickAdd } from "@/components/quick-add-provider";
 
 const navItems = [
   { icon: Home, label: "Inicio", href: "/app/dashboard" },
   { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movements" },
+  null, // center slot — replaced by the "+" quick-add button
   { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
-  { icon: BarChart3, label: "Stats", href: "/app/stats" },
   { icon: Settings, label: "Más", href: "/app/settings" },
 ];
 
@@ -19,6 +20,7 @@ const navItems = [
  */
 export function AppBottomNav() {
   const pathname = usePathname();
+  const quickAdd = useQuickAdd();
 
   return (
     <nav
@@ -27,6 +29,26 @@ export function AppBottomNav() {
     >
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
+          // Center slot: quick-add button
+          if (item === null) {
+            return (
+              <button
+                key="quick-add"
+                type="button"
+                onClick={() => quickAdd.open()}
+                aria-label="Nuevo movimiento"
+                className={cn(
+                  "relative flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl transition-all duration-150 min-w-0",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <PlusCircle className="h-5 w-5 transition-transform duration-150" />
+                <span className="text-[10px] font-medium leading-none">Nuevo</span>
+              </button>
+            );
+          }
+
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
           return (

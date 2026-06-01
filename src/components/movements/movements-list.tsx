@@ -38,8 +38,6 @@ import { Label } from "@/components/ui/label"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
-import { InstallmentForm, type InstallmentFormValues } from "@/components/installments/installment-form"
-import { AiQuickAddSheet } from "@/components/ai/ai-quick-add-sheet"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
@@ -51,9 +49,6 @@ import {
   BALANCES_KEY,
   CATEGORIES_KEY,
 } from "@/lib/movements"
-import { INSTALLMENTS_KEY, computeInstallmentAmounts, computeInstallmentDate, isInstallmentFuture } from "@/lib/installments"
-import { fetchDolarRates } from "@/lib/rates/dolar"
-import type { DollarType } from "@/lib/movements"
 import {
   format,
   isToday,
@@ -62,6 +57,7 @@ import {
   startOfDay,
 } from "date-fns"
 import { es } from "date-fns/locale"
+import { useQuickAdd } from "@/components/quick-add-provider"
 
 type Movement = Tables<"movements">
 type Transfer = Tables<"transfers">
@@ -510,576 +506,151 @@ function FiltersPanel({
   )
 }
 
-// ── Quick-add menu ─────────────────────────────────────────────────────────────
+// ── Quick-add menu (desktop header, movements page) ───────────────────────────
+// Delegates to the global QuickAddProvider — no local modal state needed.
 
-type QuickAddMode = "movement" | "transfer" | "installment" | "ai"
-
-async function createInstallmentPurchaseWithMovements(
-  values: InstallmentFormValues,
-  accounts: Account[]
-): Promise<void> {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error("No autenticado")
-
-  const account = accounts.find((a) => a.id === values.account_id)
-  const accountCurrency = account?.currency ?? "ARS"
-  const isCross = values.currency !== accountCurrency
-
-  // Fetch rate once if cross-currency
-  let rateValue: number | null = null
-  if (isCross && values.dollar_type && values.dollar_type !== "tarjeta") {
-    try {
-      const rates = await fetchDolarRates()
-      const rateKey = values.dollar_type as Exclude<DollarType, "tarjeta">
-      const rateData = rates[rateKey]
-      if (rateData) {
-        rateValue = values.currency === "ARS" ? rateData.sell : rateData.buy
-      }
-    } catch {
-      // proceed without rate
-    }
-  }
-
-  // 1. INSERT installment_purchases
-  const { data: purchase, error: purchaseError } = await supabase
-    .from("installment_purchases")
-    .insert({
-      user_id: user.id,
-      description: values.description,
-      total_amount: values.total_amount,
-      installments_count: values.installments_count,
-      start_date: values.start_date,
-      account_id: values.account_id,
-      category_id: values.category_id,
-      currency: values.currency,
-      dollar_type: isCross ? values.dollar_type : null,
-    })
-    .select()
-    .single()
-
-  if (purchaseError) throw purchaseError
-
-  // 2. Compute per-cuota amounts
-  const { perAmount, lastAmount } = computeInstallmentAmounts(
-    values.total_amount,
-    values.installments_count
-  )
-
-  // 3. Build N movement rows
-  const movementRows = []
-  for (let i = 1; i <= values.installments_count; i++) {
-    const cuotaDate = computeInstallmentDate(values.start_date, i)
-    const isFuture = isInstallmentFuture(cuotaDate)
-    const cuotaAmount = i === values.installments_count ? lastAmount : perAmount
-
-    let convertedAmount: number | null = null
-    if (isCross && rateValue !== null) {
-      const raw = values.currency === "ARS" ? cuotaAmount / rateValue : cuotaAmount * rateValue
-      convertedAmount = Math.round(raw * 100) / 100
-    }
-
-    movementRows.push({
-      user_id: user.id,
-      type: "expense" as const,
-      amount: cuotaAmount,
-      original_currency: values.currency,
-      account_id: values.account_id,
-      category_id: values.category_id,
-      date: cuotaDate,
-      is_future: isFuture,
-      installment_purchase_id: purchase.id,
-      installment_number: i,
-      installment_total: values.installments_count,
-      dollar_type: isCross ? values.dollar_type : null,
-      converted_amount: convertedAmount,
-      note: null,
-    })
-  }
-
-  // 4. INSERT all movements in a single call
-  const { error: movError } = await supabase.from("movements").insert(movementRows)
-  if (movError) throw movError
-}
-
-function QuickAddMenu({
-  accounts,
-  categories,
-}: {
-  accounts: Account[]
-  categories: Category[]
-}) {
-  const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<QuickAddMode>("movement")
-  const [defaultType, setDefaultType] = useState<"income" | "expense">("expense")
+function QuickAddMenu({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const queryClient = useQueryClient()
+  const quickAdd = useQuickAdd()
 
-  const movementMutation = useMutation({
-    mutationFn: async (values: MovementFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-      const account = accounts.find((a) => a.id === values.account_id)
-      const isCross = account && values.original_currency !== account.currency
-      const { data, error } = await supabase
-        .from("movements")
-        .insert({
-          user_id: user.id,
-          type: values.type,
-          amount: values.amount,
-          original_currency: values.original_currency,
-          account_id: values.account_id,
-          category_id: values.category_id,
-          date: values.date,
-          note: values.note || null,
-          is_future: values.is_future,
-          dollar_type: isCross ? values.dollar_type : null,
-          converted_amount: isCross ? values.converted_amount : null,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Movimiento creado")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear el movimiento", { description: err.message })
-    },
-  })
-
-  const transferMutation = useMutation({
-    mutationFn: async (values: TransferFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-      const { data, error } = await supabase
-        .from("transfers")
-        .insert({
-          user_id: user.id,
-          from_account_id: values.from_account_id,
-          to_account_id: values.to_account_id,
-          from_amount: values.from_amount,
-          to_amount: values.to_amount,
-          date: values.date,
-          note: values.note || null,
-          is_future: values.is_future,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Transferencia creada")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear la transferencia", { description: err.message })
-    },
-  })
-
-  const installmentMutation = useMutation({
-    mutationFn: (values: InstallmentFormValues) =>
-      createInstallmentPurchaseWithMovements(values, accounts),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
-      toast.success("Compra en cuotas creada")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear las cuotas", { description: err.message })
-    },
-  })
-
-  const openDialog = (m: QuickAddMode, type?: "income" | "expense") => {
-    setMode(m)
-    if (type) setDefaultType(type)
+  const openDialog = (m: "movement" | "transfer" | "installment" | "ai", type?: "income" | "expense") => {
     setMenuOpen(false)
-    setOpen(true)
+    quickAdd.open(m, type)
   }
 
   if (!accounts.length) return null
 
   return (
-    <>
-      {/* Trigger + dropdown menu */}
-      <div className="relative">
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => openDialog("movement", "expense")}
-            className={cn(
-              "inline-flex h-8 items-center gap-2 rounded-l-lg border-r-0 px-2.5 text-sm font-semibold",
-              "bg-primary text-primary-foreground border border-transparent",
-              "shadow-sm shadow-primary/20 press-effect",
-              "hover:bg-primary/80 transition-all",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            )}
-          >
-            <PlusCircle className="h-4 w-4" />
-            Nuevo
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            className={cn(
-              "inline-flex h-8 items-center px-1.5 rounded-r-lg",
-              "bg-primary text-primary-foreground border border-transparent border-l border-primary-foreground/20",
-              "shadow-sm shadow-primary/20 press-effect",
-              "hover:bg-primary/80 transition-all",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            )}
-            aria-label="Opciones de nuevo registro"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6 9 6 6 6-6"/>
-            </svg>
-          </button>
-        </div>
-
-        {menuOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setMenuOpen(false)}
-            />
-            <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-border/60 bg-popover shadow-lg overflow-hidden">
-              <button
-                type="button"
-                onClick={() => openDialog("movement", "income")}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
-              >
-                <ArrowUpCircle className="h-4 w-4 text-success flex-shrink-0" />
-                <span className="font-medium">Ingreso</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => openDialog("movement", "expense")}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
-              >
-                <ArrowDownCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-                <span className="font-medium">Gasto</span>
-              </button>
-              <div className="h-px bg-border/60 mx-2" />
-              <button
-                type="button"
-                onClick={() => openDialog("transfer")}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
-              >
-                <ArrowLeftRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="font-medium">Transferencia</span>
-              </button>
-              <div className="h-px bg-border/60 mx-2" />
-              <button
-                type="button"
-                onClick={() => openDialog("installment")}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
-              >
-                <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
-                <span className="font-medium">Gasto en cuotas</span>
-              </button>
-              <div className="h-px bg-border/60 mx-2" />
-              <button
-                type="button"
-                onClick={() => openDialog("ai")}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer"
-              >
-                <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
-                <span className="font-medium">Cargar con IA</span>
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* AI Quick Add Sheet — rendered outside the dropdown */}
-      <AiQuickAddSheet
-        open={open && mode === "ai"}
-        onOpenChange={(v) => { if (!v) setOpen(false) }}
-        accounts={accounts}
-        categories={categories}
-      />
-
-      {/* MangoSheet — movement / transfer / installment */}
-      <MangoSheet
-        open={open && mode !== "ai"}
-        onOpenChange={setOpen}
-        title={
-          mode === "movement"
-            ? (defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto")
-            : mode === "transfer"
-            ? "Nueva transferencia"
-            : "Nuevo gasto en cuotas"
-        }
-        description={
-          mode === "movement"
-            ? "Registrá un movimiento en una de tus cuentas."
-            : mode === "transfer"
-            ? "Mové saldo entre tus cuentas."
-            : "Dividí una compra en cuotas mensuales."
-        }
-      >
-        {mode === "movement" ? (
-          <MovementForm
-            accounts={accounts}
-            categories={categories}
-            defaultValues={{ type: defaultType }}
-            onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
-            isLoading={movementMutation.isPending}
-            submitLabel="Crear movimiento"
-            isCreateMode
-          />
-        ) : mode === "transfer" ? (
-          <TransferForm
-            accounts={accounts}
-            onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
-            isLoading={transferMutation.isPending}
-            submitLabel="Crear transferencia"
-          />
-        ) : (
-          <InstallmentForm
-            accounts={accounts}
-            categories={categories}
-            onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
-            isLoading={installmentMutation.isPending}
-          />
-        )}
-      </MangoSheet>
-    </>
-  )
-}
-
-// ── Mobile FAB ─────────────────────────────────────────────────────────────────
-
-function FABQuickAdd({
-  accounts,
-  categories,
-}: {
-  accounts: Account[]
-  categories: Category[]
-}) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [mode, setMode] = useState<QuickAddMode>("movement")
-  const [defaultType, setDefaultType] = useState<"income" | "expense">("expense")
-  const queryClient = useQueryClient()
-
-  const movementMutation = useMutation({
-    mutationFn: async (values: MovementFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-      const account = accounts.find((a) => a.id === values.account_id)
-      const isCross = account && values.original_currency !== account.currency
-      const { data, error } = await supabase
-        .from("movements")
-        .insert({
-          user_id: user.id,
-          type: values.type,
-          amount: values.amount,
-          original_currency: values.original_currency,
-          account_id: values.account_id,
-          category_id: values.category_id,
-          date: values.date,
-          note: values.note || null,
-          is_future: values.is_future,
-          dollar_type: isCross ? values.dollar_type : null,
-          converted_amount: isCross ? values.converted_amount : null,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Movimiento creado")
-      setDialogOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear el movimiento", { description: err.message })
-    },
-  })
-
-  const transferMutation = useMutation({
-    mutationFn: async (values: TransferFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-      const { data, error } = await supabase
-        .from("transfers")
-        .insert({
-          user_id: user.id,
-          from_account_id: values.from_account_id,
-          to_account_id: values.to_account_id,
-          from_amount: values.from_amount,
-          to_amount: values.to_amount,
-          date: values.date,
-          note: values.note || null,
-          is_future: values.is_future,
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      toast.success("Transferencia creada")
-      setDialogOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear la transferencia", { description: err.message })
-    },
-  })
-
-  const installmentMutation = useMutation({
-    mutationFn: (values: InstallmentFormValues) =>
-      createInstallmentPurchaseWithMovements(values, accounts),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
-      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
-      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
-      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
-      toast.success("Compra en cuotas creada")
-      setDialogOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear las cuotas", { description: err.message })
-    },
-  })
-
-  const openDialog = (m: QuickAddMode, type?: "income" | "expense") => {
-    setMode(m)
-    if (type) setDefaultType(type)
-    setMenuOpen(false)
-    setDialogOpen(true)
-  }
-
-  if (!accounts.length) return null
-
-  return (
-    <>
-      {/* FAB + mini action menu */}
-      <div className="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30 flex flex-col items-end gap-2">
-        {menuOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-            <div className="relative z-20 flex flex-col items-end gap-2">
-              {(
-                [
-                  { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white" },
-                  { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
-                  { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
-                  { m: "installment" as const, type: undefined, icon: CreditCard, label: "En cuotas", color: "bg-primary text-primary-foreground" },
-                  { m: "ai" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground" },
-                ] as const
-              ).map(({ m, type, icon: Icon, label, color }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => openDialog(m, type as "income" | "expense" | undefined)}
-                  className={cn(
-                    "flex items-center gap-2 h-11 px-4 rounded-full shadow-md press-effect",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    color
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="text-sm font-semibold">{label}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
+    <div className="relative">
+      <div className="flex items-center gap-0.5">
+        <button
+          type="button"
+          onClick={() => openDialog("movement", "expense")}
+          className={cn(
+            "inline-flex h-8 items-center gap-2 rounded-l-lg border-r-0 px-2.5 text-sm font-semibold",
+            "bg-primary text-primary-foreground border border-transparent",
+            "shadow-sm shadow-primary/20 press-effect",
+            "hover:bg-primary/80 transition-all",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          )}
+        >
+          <PlusCircle className="h-4 w-4" />
+          Nuevo
+        </button>
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
           className={cn(
-            "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-            "shadow-lg shadow-primary/35 press-effect relative z-20",
-            "flex items-center justify-center",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            menuOpen && "rotate-45 transition-transform duration-150"
+            "inline-flex h-8 items-center px-1.5 rounded-r-lg",
+            "bg-primary text-primary-foreground border border-transparent border-l border-primary-foreground/20",
+            "shadow-sm shadow-primary/20 press-effect",
+            "hover:bg-primary/80 transition-all",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           )}
-          aria-label="Agregar"
+          aria-label="Opciones de nuevo registro"
         >
-          <PlusCircle className="h-6 w-6" />
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
         </button>
       </div>
 
-      {/* AI Quick Add Sheet */}
-      <AiQuickAddSheet
-        open={dialogOpen && mode === "ai"}
-        onOpenChange={(v) => { if (!v) setDialogOpen(false) }}
-        accounts={accounts}
-        categories={categories}
-      />
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-20 w-48 rounded-xl border border-border/60 bg-popover shadow-lg overflow-hidden">
+            <button type="button" onClick={() => openDialog("movement", "income")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
+              <ArrowUpCircle className="h-4 w-4 text-success flex-shrink-0" />
+              <span className="font-medium">Ingreso</span>
+            </button>
+            <button type="button" onClick={() => openDialog("movement", "expense")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
+              <ArrowDownCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+              <span className="font-medium">Gasto</span>
+            </button>
+            <div className="h-px bg-border/60 mx-2" />
+            <button type="button" onClick={() => openDialog("transfer")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
+              <ArrowLeftRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="font-medium">Transferencia</span>
+            </button>
+            <div className="h-px bg-border/60 mx-2" />
+            <button type="button" onClick={() => openDialog("installment")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
+              <CreditCard className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="font-medium">Gasto en cuotas</span>
+            </button>
+            <div className="h-px bg-border/60 mx-2" />
+            <button type="button" onClick={() => openDialog("ai")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
+              <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="font-medium">Cargar con IA</span>
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
-      {/* MangoSheet (non-AI modes) */}
-      <MangoSheet
-        open={dialogOpen && mode !== "ai"}
-        onOpenChange={setDialogOpen}
-        title={
-          mode === "movement"
-            ? (defaultType === "income" ? "Nuevo ingreso" : "Nuevo gasto")
-            : mode === "transfer"
-            ? "Nueva transferencia"
-            : "Nuevo gasto en cuotas"
-        }
-        description={
-          mode === "movement"
-            ? "Registrá un movimiento en una de tus cuentas."
-            : mode === "transfer"
-            ? "Mové saldo entre tus cuentas."
-            : "Dividí una compra en cuotas mensuales."
-        }
-      >
-        {mode === "movement" ? (
-          <MovementForm
-            accounts={accounts}
-            categories={categories}
-            defaultValues={{ type: defaultType }}
-            onSubmit={async (v) => { await movementMutation.mutateAsync(v) }}
-            isLoading={movementMutation.isPending}
-            submitLabel="Crear movimiento"
-            isCreateMode
-          />
-        ) : mode === "transfer" ? (
-          <TransferForm
-            accounts={accounts}
-            onSubmit={async (v) => { await transferMutation.mutateAsync(v) }}
-            isLoading={transferMutation.isPending}
-            submitLabel="Crear transferencia"
-          />
-        ) : (
-          <InstallmentForm
-            accounts={accounts}
-            categories={categories}
-            onSubmit={async (v) => { await installmentMutation.mutateAsync(v) }}
-            isLoading={installmentMutation.isPending}
-          />
+// ── Mobile FAB (movements page only) ──────────────────────────────────────────
+// Delegates to the global QuickAddProvider — no local modal state needed.
+
+function FABQuickAdd({ accounts }: { accounts: Account[] }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const quickAdd = useQuickAdd()
+
+  const openDialog = (m: "movement" | "transfer" | "installment" | "ai", type?: "income" | "expense") => {
+    setMenuOpen(false)
+    quickAdd.open(m, type)
+  }
+
+  if (!accounts.length) return null
+
+  return (
+    <div className="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30 flex flex-col items-end gap-2">
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+          <div className="relative z-20 flex flex-col items-end gap-2">
+            {(
+              [
+                { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white" },
+                { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
+                { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
+                { m: "installment" as const, type: undefined, icon: CreditCard, label: "En cuotas", color: "bg-primary text-primary-foreground" },
+                { m: "ai" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground" },
+              ] as const
+            ).map(({ m, type, icon: Icon, label, color }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => openDialog(m, type as "income" | "expense" | undefined)}
+                className={cn(
+                  "flex items-center gap-2 h-11 px-4 rounded-full shadow-md press-effect",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  color
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="text-sm font-semibold">{label}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setMenuOpen((v) => !v)}
+        className={cn(
+          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
+          "shadow-lg shadow-primary/35 press-effect relative z-20",
+          "flex items-center justify-center",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          menuOpen && "rotate-45 transition-transform duration-150"
         )}
-      </MangoSheet>
-    </>
+        aria-label="Agregar"
+      >
+        <PlusCircle className="h-6 w-6" />
+      </button>
+    </div>
   )
 }
 
@@ -1639,7 +1210,7 @@ export function MovementsList() {
             <SlidersHorizontal className="h-4 w-4" />
           </button>
           <div className="hidden lg:block">
-            <QuickAddMenu accounts={accounts} categories={categories} />
+            <QuickAddMenu accounts={accounts} />
           </div>
         </div>
       </div>
@@ -1767,7 +1338,7 @@ export function MovementsList() {
 
       {/* Mobile FAB */}
       {accounts.length > 0 && (
-        <FABQuickAdd accounts={accounts} categories={categories} />
+        <FABQuickAdd accounts={accounts} />
       )}
 
       {/* Edit dialogs */}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { QuickAddProvider } from "@/components/quick-add-provider";
 
 /**
  * Protected app shell layout.
@@ -30,21 +31,23 @@ export default async function AppLayout({
   const avatarUrl = (user.user_metadata?.avatar_url as string | undefined) ?? null;
 
   return (
-    <div className="min-h-screen flex bg-background">
-      {/* Desktop sidebar — active state handled client-side via usePathname */}
-      <AppSidebar name={name} email={email} avatarUrl={avatarUrl} />
+    <QuickAddProvider>
+      <div className="min-h-screen flex bg-background">
+        {/* Desktop sidebar — active state handled client-side via usePathname */}
+        <AppSidebar name={name} email={email} avatarUrl={avatarUrl} />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-screen lg:pl-64">
-        <main className="flex-1 pb-24 lg:pb-8 px-4 sm:px-6 lg:px-8 py-4 md:py-6">
-          <div className="mx-auto w-full max-w-6xl">
-            {children}
-          </div>
-        </main>
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col min-h-screen lg:pl-64">
+          <main className="flex-1 pb-24 lg:pb-8 px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+            <div className="mx-auto w-full max-w-6xl">
+              {children}
+            </div>
+          </main>
+        </div>
+
+        {/* Mobile bottom nav */}
+        <AppBottomNav />
       </div>
-
-      {/* Mobile bottom nav */}
-      <AppBottomNav />
-    </div>
+    </QuickAddProvider>
   );
 }

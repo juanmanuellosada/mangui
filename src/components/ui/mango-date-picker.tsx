@@ -40,6 +40,11 @@ export function MangoDatePicker({
   const [open, setOpen] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const [pos, setPos] = React.useState({ top: 0, left: 0, width: 0, placeAbove: false })
+  // `posReady` is set in useLayoutEffect so position is correct before first paint.
+  // `revealed` is set in useEffect so the opacity/scale transition plays after the
+  // first paint — the popover appears at the right spot, then gently fades/scales in.
+  const [posReady, setPosReady] = React.useState(false)
+  const [revealed, setRevealed] = React.useState(false)
 
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const popoverRef = React.useRef<HTMLDivElement>(null)
@@ -61,9 +66,17 @@ export function MangoDatePicker({
     })
   }, [])
 
-  React.useEffect(() => {
-    if (!open) return
+  // useLayoutEffect: compute position synchronously before browser paint.
+  // The element mounts invisible (opacity-0) but already at the correct coordinates,
+  // eliminating the "slide from top" jump that occurred with useEffect.
+  React.useLayoutEffect(() => {
+    if (!open) {
+      setPosReady(false)
+      setRevealed(false)
+      return
+    }
     updatePos()
+    setPosReady(true)
     window.addEventListener("scroll", updatePos, true)
     window.addEventListener("resize", updatePos)
     return () => {
@@ -71,6 +84,13 @@ export function MangoDatePicker({
       window.removeEventListener("resize", updatePos)
     }
   }, [open, updatePos])
+
+  // useEffect: trigger reveal transition AFTER the first paint so the
+  // opacity/scale animation is visible (not collapsed into pre-paint batch).
+  React.useEffect(() => {
+    if (!posReady) return
+    setRevealed(true)
+  }, [posReady])
 
   // Close on outside click
   React.useEffect(() => {
@@ -145,7 +165,13 @@ export function MangoDatePicker({
           aria-label="Seleccionar fecha"
           className={cn(
             "fixed z-[200] rounded-xl border border-border/60 bg-popover p-3 shadow-lg",
-            "animate-in fade-in-0 zoom-in-95 duration-150"
+            // Position is set before paint (useLayoutEffect). Visibility transitions after
+            // first paint (useEffect on posReady→revealed). This eliminates the first-open
+            // jump: the popover appears at the correct spot, then gently fades/scales in.
+            // prefers-reduced-motion: transition-none skips animation; opacity is still 0
+            // until revealed, so it snaps in place instantly.
+            "transition-[opacity,scale] duration-[150ms] ease-out motion-reduce:transition-none",
+            revealed ? "opacity-100 scale-100" : "opacity-0 scale-[0.97] pointer-events-none"
           )}
           style={{
             top: pos.top,
@@ -153,6 +179,7 @@ export function MangoDatePicker({
             minWidth: pos.width,
             maxWidth: "min(320px, calc(100vw - 2rem))",
             transform: pos.placeAbove ? "translateY(-100%)" : undefined,
+            transformOrigin: pos.placeAbove ? "bottom left" : "top left",
           }}
         >
           <DayPicker
