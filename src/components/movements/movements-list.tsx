@@ -36,7 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MangoSelect } from "@/components/ui/mango-select"
-import { MovementForm, movementToFormValues, type MovementFormValues } from "./movement-form"
+import { MovementForm, movementToFormValues, type MovementFormValues, type PendingAttachments } from "./movement-form"
 import { TransferForm, transferToFormValues, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -58,6 +58,8 @@ import {
 } from "date-fns"
 import { es } from "date-fns/locale"
 import { useQuickAdd } from "@/components/quick-add-provider"
+import { listAttachments, uploadAttachment } from "@/lib/attachments"
+import { isFutureDate } from "@/lib/date-utils"
 
 type Movement = Tables<"movements">
 type Transfer = Tables<"transfers">
@@ -681,7 +683,7 @@ function EditTransferDialog({
           to_amount: values.to_amount,
           date: values.date,
           note: values.note || null,
-          is_future: values.is_future,
+          is_future: isFutureDate(values.date),
           updated_at: new Date().toISOString(),
         })
         .eq("id", transfer.id)
@@ -704,7 +706,7 @@ function EditTransferDialog({
                 to_amount: values.to_amount,
                 date: values.date,
                 note: values.note || null,
-                is_future: values.is_future,
+                is_future: isFutureDate(values.date),
               }
             : t
         )
@@ -830,11 +832,34 @@ function EditMovementDialog({
 }) {
   const queryClient = useQueryClient()
 
+  // 4.4 — Load existing attachments for this movement
+  const { data: existingAttachments = [], refetch: refetchAttachments } = useQuery({
+    queryKey: ["movement_attachments", movement.id],
+    queryFn: async () => {
+      const { data } = await listAttachments(movement.id)
+      return data
+    },
+    enabled: open,
+  })
+
   const mutation = useMutation({
-    mutationFn: async (values: MovementFormValues) => {
+    mutationFn: async ({
+      values,
+      pending,
+    }: {
+      values: MovementFormValues
+      pending: PendingAttachments
+    }) => {
       const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+
       const account = accounts.find((a) => a.id === values.account_id)
       const isCross = account && values.original_currency !== account.currency
+
+      // Derive is_future from the date
+      const is_future = isFutureDate(values.date)
+
       const { data, error } = await supabase
         .from("movements")
         .update({
@@ -845,7 +870,7 @@ function EditMovementDialog({
           category_id: values.category_id,
           date: values.date,
           note: values.note || null,
-          is_future: values.is_future,
+          is_future,
           dollar_type: isCross ? values.dollar_type : null,
           converted_amount: isCross ? values.converted_amount : null,
           updated_at: new Date().toISOString(),
@@ -854,9 +879,25 @@ function EditMovementDialog({
         .select()
         .single()
       if (error) throw error
+
+      // Upload any newly chosen files (empty slots)
+      const uploads: Array<{ file: File; kind: "factura" | "recibo" | "comprobante" }> = []
+      if (values.type === "expense") {
+        if (pending.factura) uploads.push({ file: pending.factura, kind: "factura" })
+        if (pending.recibo) uploads.push({ file: pending.recibo, kind: "recibo" })
+      } else if (values.type === "income") {
+        if (pending.comprobante) uploads.push({ file: pending.comprobante, kind: "comprobante" })
+      }
+      for (const { file, kind } of uploads) {
+        const result = await uploadAttachment({ file, userId: user.id, movementId: movement.id, kind })
+        if (result.error) {
+          toast.warning(`Movimiento actualizado, pero no se pudo adjuntar "${file.name}": ${result.error}`)
+        }
+      }
+
       return data
     },
-    onMutate: async (values) => {
+    onMutate: async ({ values }) => {
       await queryClient.cancelQueries({ queryKey: MOVEMENTS_KEY })
       const previous = queryClient.getQueryData<Movement[]>(MOVEMENTS_KEY)
       queryClient.setQueryData<Movement[]>(MOVEMENTS_KEY, (old = []) =>
@@ -871,7 +912,7 @@ function EditMovementDialog({
                 category_id: values.category_id,
                 date: values.date,
                 note: values.note || null,
-                is_future: values.is_future,
+                is_future: isFutureDate(values.date),
               }
             : m
         )
@@ -902,9 +943,11 @@ function EditMovementDialog({
         accounts={accounts}
         categories={categories}
         defaultValues={movementToFormValues(movement)}
-        onSubmit={async (v) => { await mutation.mutateAsync(v) }}
+        onSubmit={async (v, pending) => { await mutation.mutateAsync({ values: v, pending }) }}
         isLoading={mutation.isPending}
         submitLabel="Guardar cambios"
+        existingAttachments={existingAttachments}
+        onAttachmentDeleted={() => refetchAttachments()}
       />
     </MangoSheet>
   )

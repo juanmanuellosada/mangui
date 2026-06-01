@@ -529,6 +529,60 @@ export type Database = {
           },
         ]
       }
+      movement_attachments: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_size: number | null
+          file_url: string
+          id: string
+          kind: Database["public"]["Enums"]["attachment_kind"]
+          mime_type: string | null
+          movement_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_size?: number | null
+          file_url: string
+          id?: string
+          kind: Database["public"]["Enums"]["attachment_kind"]
+          mime_type?: string | null
+          movement_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["attachment_kind"]
+          mime_type?: string | null
+          movement_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movement_attachments_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movement_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movements: {
         Row: {
           account_id: string
@@ -1251,6 +1305,7 @@ export type Database = {
       }
     }
     Enums: {
+      attachment_kind: "factura" | "recibo" | "comprobante"
       account_type:
         | "caja_ahorro"
         | "cuenta_corriente"
@@ -1416,6 +1471,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      attachment_kind: ["factura", "recibo", "comprobante"],
       account_type: [
         "caja_ahorro",
         "cuenta_corriente",
