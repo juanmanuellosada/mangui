@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Pencil, Tag, Search, X, ChevronUp, ChevronDown } from "lucide-react"
+import { Plus, Pencil, Trash2, Tag, Search, X, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -90,12 +90,14 @@ function CategoryForm({
   isLoading,
   submitLabel,
   userId,
+  onDelete,
 }: {
   defaultValues?: Partial<CategoryFormValues>
   onSubmit: (v: CategoryFormValues) => Promise<void>
   isLoading?: boolean
   submitLabel?: string
   userId?: string
+  onDelete?: () => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -196,9 +198,22 @@ function CategoryForm({
           </button>
         </div>
 
-        <Button type="submit" className="w-full press-effect" disabled={isLoading}>
-          {isLoading ? "Guardando…" : (submitLabel ?? "Guardar")}
-        </Button>
+        <div className={cn("flex gap-2", onDelete ? "flex-row items-center" : "")}>
+          {onDelete && (
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 press-effect text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+              Eliminar
+            </Button>
+          )}
+          <Button type="submit" className={cn("press-effect", onDelete ? "flex-1" : "w-full")} disabled={isLoading}>
+            {isLoading ? "Guardando…" : (submitLabel ?? "Guardar")}
+          </Button>
+        </div>
       </form>
 
       {/* Icon picker — rendered outside the form so it doesn't submit */}
@@ -233,12 +248,14 @@ function CategoryCardSkeleton() {
 function CategoryCard({
   category,
   onEdit,
+  onDeleteRequest,
   selectionMode,
   isSelected,
   onToggle,
 }: {
   category: Category
   onEdit: (c: Category) => void
+  onDeleteRequest: (c: Category) => void
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
@@ -286,9 +303,6 @@ function CategoryCard({
           >
             {category.type === "income" ? "Ingreso" : "Gasto"}
           </span>
-          {category.is_default && (
-            <span className="text-[10px] text-muted-foreground">· Predeterminada</span>
-          )}
         </div>
       </div>
 
@@ -303,6 +317,15 @@ function CategoryCard({
             onClick={() => onEdit(category)}
           >
             <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Eliminar categoría"
+            className="press-effect cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); onDeleteRequest(category) }}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
         </div>
       )}
@@ -532,10 +555,12 @@ function EditCategorySheet({
   category,
   userId,
   onClose,
+  onDelete,
 }: {
   category: Category
   userId?: string
   onClose: () => void
+  onDelete: () => void
 }) {
   const queryClient = useQueryClient()
 
@@ -594,6 +619,7 @@ function EditCategorySheet({
       isLoading={mutation.isPending}
       submitLabel="Guardar cambios"
       userId={userId}
+      onDelete={onDelete}
     />
   )
 }
@@ -622,6 +648,35 @@ export function CategoriesList() {
   const ms = useMultiSelect()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkPending, setBulkPending] = useState(false)
+
+  // ── Single delete ───────────────────────────────────────────
+  const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<Category | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
+
+  function requestDeleteCategory(cat: Category) {
+    setEditingCategory(null)
+    setConfirmDeleteCategory(cat)
+  }
+
+  async function handleSingleDelete() {
+    if (!confirmDeleteCategory) return
+    setDeletePending(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from("categories").delete().eq("id", confirmDeleteCategory.id)
+      if (error) throw error
+      queryClient.invalidateQueries({ queryKey: CATEGORIES_KEY })
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+      toast.success("Categoría eliminada. Los movimientos quedan sin categoría.")
+    } catch (err: unknown) {
+      toast.error("Error al eliminar la categoría", {
+        description: err instanceof Error ? err.message : undefined,
+      })
+    } finally {
+      setDeletePending(false)
+      setConfirmDeleteCategory(null)
+    }
+  }
 
   const filtersActive = isFiltersActive(filters)
 
@@ -754,6 +809,7 @@ export function CategoriesList() {
               key={category.id}
               category={category}
               onEdit={setEditingCategory}
+              onDeleteRequest={requestDeleteCategory}
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(category.id)}
               onToggle={ms.toggle}
@@ -805,6 +861,37 @@ export function CategoriesList() {
         </p>
       </MangoSheet>
 
+      {/* Single delete confirm */}
+      <MangoSheet
+        open={!!confirmDeleteCategory}
+        onOpenChange={(v) => { if (!v) setConfirmDeleteCategory(null) }}
+        title="Eliminar categoría"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDeleteCategory(null)}
+              disabled={deletePending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSingleDelete}
+              disabled={deletePending}
+              className="press-effect"
+            >
+              {deletePending ? "Eliminando…" : "Eliminar"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar <strong>{confirmDeleteCategory?.name}</strong>? Los movimientos de esta categoría quedarán{" "}
+          <em>Sin categoría</em> &mdash; no se eliminan. Esta acción no se puede deshacer.
+        </p>
+      </MangoSheet>
+
       {/* Edit sheet */}
       <MangoSheet
         open={!!editingCategory}
@@ -817,6 +904,7 @@ export function CategoriesList() {
             category={editingCategory}
             userId={userId}
             onClose={() => setEditingCategory(null)}
+            onDelete={() => requestDeleteCategory(editingCategory)}
           />
         )}
       </MangoSheet>
