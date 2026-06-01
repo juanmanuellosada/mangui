@@ -37,8 +37,10 @@ export function validateAttachmentFile(file: File): string | null {
 interface UploadAttachmentParams {
   file: File
   userId: string
-  movementId: string
   kind: AttachmentKind
+  /** Provide exactly one of movementId or transferId. */
+  movementId?: string
+  transferId?: string
 }
 
 interface UploadAttachmentResult {
@@ -50,6 +52,8 @@ interface UploadAttachmentResult {
  * Uploads a file to the "attachments" bucket and inserts a row in
  * movement_attachments. Stores the storage path (not a public URL).
  *
+ * Exactly one of movementId or transferId must be provided.
+ *
  * Upload-then-insert: if the insert fails after a successful upload,
  * the storage object remains (orphaned). The caller can retry from
  * the edit view — consistent with D4 in the design doc.
@@ -57,8 +61,9 @@ interface UploadAttachmentResult {
 export async function uploadAttachment({
   file,
   userId,
-  movementId,
   kind,
+  movementId,
+  transferId,
 }: UploadAttachmentParams): Promise<UploadAttachmentResult> {
   const validationError = validateAttachmentFile(file)
   if (validationError) {
@@ -81,7 +86,8 @@ export async function uploadAttachment({
     .from("movement_attachments")
     .insert({
       user_id: userId,
-      movement_id: movementId,
+      movement_id: movementId ?? null,
+      transfer_id: transferId ?? null,
       kind,
       file_url: path,
       file_name: file.name,
@@ -150,6 +156,25 @@ export async function listAttachments(movementId: string): Promise<ListAttachmen
     .from("movement_attachments")
     .select("*")
     .eq("movement_id", movementId)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    return { data: [], error: error.message }
+  }
+
+  return { data: data ?? [], error: null }
+}
+
+/**
+ * Returns all attachments for a given transfer, ordered by created_at.
+ */
+export async function listTransferAttachments(transferId: string): Promise<ListAttachmentsResult> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from("movement_attachments")
+    .select("*")
+    .eq("transfer_id", transferId)
     .order("created_at", { ascending: true })
 
   if (error) {

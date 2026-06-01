@@ -538,7 +538,8 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["attachment_kind"]
           mime_type: string | null
-          movement_id: string
+          movement_id: string | null
+          transfer_id: string | null
           updated_at: string
           user_id: string
         }
@@ -550,7 +551,8 @@ export type Database = {
           id?: string
           kind: Database["public"]["Enums"]["attachment_kind"]
           mime_type?: string | null
-          movement_id: string
+          movement_id?: string | null
+          transfer_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -562,7 +564,8 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["attachment_kind"]
           mime_type?: string | null
-          movement_id?: string
+          movement_id?: string | null
+          transfer_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -572,6 +575,13 @@ export type Database = {
             columns: ["movement_id"]
             isOneToOne: false
             referencedRelation: "movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movement_attachments_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "transfers"
             referencedColumns: ["id"]
           },
           {

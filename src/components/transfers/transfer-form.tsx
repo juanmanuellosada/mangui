@@ -5,17 +5,22 @@ import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { parseISO } from "date-fns"
+import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
+import { AttachmentSlot } from "@/components/ui/attachment-slot"
 import { formatCurrency } from "@/lib/utils"
-import { fetchDolarRates } from "@/lib/rates/dolar"
+import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar"
 import { AccountIconChip, type Account } from "@/lib/accounts"
 import { isFutureDate } from "@/lib/date-utils"
+import { listTransferAttachments, type MovementAttachment } from "@/lib/attachments"
+import { createClient } from "@/lib/supabase/client"
 import type { Tables } from "@/lib/database.types"
+import type { RateType } from "@/lib/rates/dolar"
 
 export type TransferFormValues = {
   from_account_id: string
@@ -42,12 +47,48 @@ const transferSchema = z
     path: ["to_account_id"],
   })
 
+// ── User preferences fetcher (reuses the ["preferences"] cache) ───────────────
+
+interface UserPrefs {
+  rate_type: RateType
+  manual_rate: number | null
+}
+
+async function fetchPreferences(): Promise<UserPrefs> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { rate_type: "blue", manual_rate: null }
+  const { data } = await supabase
+    .from("user_preferences")
+    .select("rate_type, manual_rate")
+    .eq("user_id", user.id)
+    .single()
+  return {
+    rate_type: (data?.rate_type as RateType) ?? "blue",
+    manual_rate: data?.manual_rate ?? null,
+  }
+}
+
+// ── Rate type labels (Spanish) ─────────────────────────────────────────────────
+
+const RATE_LABELS: Record<RateType, string> = {
+  oficial: "Oficial",
+  blue: "Blue",
+  mep: "MEP",
+  ccl: "CCL",
+  manual: "Manual",
+}
+
 interface TransferFormProps {
   accounts: Account[]
   defaultValues?: Partial<TransferFormValues>
-  onSubmit: (values: TransferFormValues) => Promise<void>
+  onSubmit: (values: TransferFormValues, pendingComprobante?: File | null) => Promise<void>
   isLoading?: boolean
   submitLabel?: string
+  /** Edit mode: pass the transfer id to load existing attachment */
+  transferId?: string
+  /** Edit mode: called after a persisted attachment is deleted */
+  onAttachmentDeleted?: () => void
 }
 
 export function TransferForm({
@@ -56,6 +97,8 @@ export function TransferForm({
   onSubmit,
   isLoading,
   submitLabel = "Guardar",
+  transferId,
+  onAttachmentDeleted,
 }: TransferFormProps) {
   const today = new Date().toISOString().split("T")[0]
 
@@ -94,21 +137,84 @@ export function TransferForm({
   const isCrossCurrency =
     !!fromAccount && !!toAccount && fromAccount.currency !== toAccount.currency
 
-  // Auto-suggest to_amount when same currency or on cross-currency rate fetch
-  const [impliedRate, setImpliedRate] = useState<number | null>(null)
-  const [rateFetched, setRateFetched] = useState(false)
+  // ── User preferences (rate_type + manual_rate) ────────────────────────────────
+  const { data: prefs } = useQuery({
+    queryKey: ["preferences"],
+    queryFn: fetchPreferences,
+  })
 
-  // When accounts change, reset to_amount and fetch rate for cross-currency
+  const configuredRateType: RateType = prefs?.rate_type ?? "blue"
+  const configuredManualRate: number | null = prefs?.manual_rate ?? null
+
+  // ── Exchange rate fetching ────────────────────────────────────────────────────
+  const { data: ratesMap } = useQuery<RatesMap>({
+    queryKey: ["dolar_rates"],
+    queryFn: fetchDolarRates,
+    staleTime: 30 * 60 * 1000, // 30 min
+  })
+
+  // Numeric rate being applied (for display)
+  const [appliedRate, setAppliedRate] = useState<number | null>(null)
+
+  // Compute to_amount from from_amount using the configured rate
+  const computeToAmount = (amount: number, fromCur: string, toCur: string): number | null => {
+    if (!amount || !isCrossCurrency) return null
+    if (configuredRateType === "manual") {
+      if (!configuredManualRate) return null
+      if (fromCur === "ARS" && toCur === "USD") {
+        return Math.round((amount / configuredManualRate) * 100) / 100
+      }
+      return Math.round(amount * configuredManualRate * 100) / 100
+    }
+    if (!ratesMap) return null
+    const rateData = ratesMap[configuredRateType]
+    if (!rateData) return null
+    if (fromCur === "ARS" && toCur === "USD") {
+      return Math.round((amount / rateData.sell) * 100) / 100
+    }
+    return Math.round(amount * rateData.buy * 100) / 100
+  }
+
+  // Update appliedRate whenever relevant inputs change
+  useEffect(() => {
+    if (!isCrossCurrency) {
+      setAppliedRate(null)
+      return
+    }
+    if (configuredRateType === "manual") {
+      setAppliedRate(configuredManualRate)
+      return
+    }
+    if (!ratesMap) return
+    const rateData = ratesMap[configuredRateType]
+    if (!rateData) return
+    const fromCur = fromAccount?.currency
+    const toCur = toAccount?.currency
+    if (fromCur === "ARS" && toCur === "USD") {
+      setAppliedRate(rateData.sell)
+    } else if (fromCur === "USD" && toCur === "ARS") {
+      setAppliedRate(rateData.buy)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCrossCurrency, configuredRateType, configuredManualRate, ratesMap, fromAccountId, toAccountId])
+
+  // When accounts change to cross-currency, pre-load to_amount if there's a from_amount
   useEffect(() => {
     if (!isCrossCurrency) {
       setValue("to_amount", fromAmount || 0)
-      setImpliedRate(null)
-      setRateFetched(false)
+      return
+    }
+    const fromCur = fromAccount?.currency
+    const toCur = toAccount?.currency
+    if (!fromCur || !toCur || !fromAmount) return
+    const computed = computeToAmount(fromAmount, fromCur, toCur)
+    if (computed !== null) {
+      setValue("to_amount", computed)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromAccountId, toAccountId, isCrossCurrency])
 
-  // Sync to_amount when from_amount changes and same currency
+  // Sync to_amount when same currency
   useEffect(() => {
     if (!isCrossCurrency) {
       setValue("to_amount", fromAmount || 0)
@@ -116,32 +222,18 @@ export function TransferForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromAmount])
 
-  // Fetch blue rate for cross-currency auto-suggest
+  // Recompute to_amount when from_amount changes and cross-currency
   useEffect(() => {
-    if (!isCrossCurrency || rateFetched) return
-    let cancelled = false
-    fetchDolarRates().then((rates) => {
-      if (cancelled) return
-      const rateData = rates["blue"]
-      if (!rateData) return
-      setRateFetched(true)
-      const fromCurrency = fromAccount?.currency
-      const toCurrency = toAccount?.currency
-      if (fromCurrency === "ARS" && toCurrency === "USD") {
-        setImpliedRate(rateData.sell)
-        if (!toAmount) {
-          setValue("to_amount", Math.round((fromAmount / rateData.sell) * 100) / 100)
-        }
-      } else if (fromCurrency === "USD" && toCurrency === "ARS") {
-        setImpliedRate(rateData.buy)
-        if (!toAmount) {
-          setValue("to_amount", Math.round(fromAmount * rateData.buy * 100) / 100)
-        }
-      }
-    })
-    return () => { cancelled = true }
+    if (!isCrossCurrency) return
+    const fromCur = fromAccount?.currency
+    const toCur = toAccount?.currency
+    if (!fromCur || !toCur) return
+    const computed = computeToAmount(fromAmount, fromCur, toCur)
+    if (computed !== null) {
+      setValue("to_amount", computed)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCrossCurrency, fromAccountId, toAccountId])
+  }, [fromAmount, configuredRateType, configuredManualRate, ratesMap])
 
   // Compute implied effective rate from what the user actually typed
   const effectiveRate = (() => {
@@ -156,20 +248,29 @@ export function TransferForm({
     return null
   })()
 
-  // 5.3 — Submit derives is_future from the date (no manual checkbox)
+  // ── Attachment state ──────────────────────────────────────────────────────────
+  const [pendingComprobante, setPendingComprobante] = useState<File | null>(null)
+
+  // Edit mode: load existing attachment
+  const { data: existingAttachments = [], refetch: refetchAttachments } = useQuery({
+    queryKey: ["transfer_attachments", transferId],
+    queryFn: async () => {
+      if (!transferId) return []
+      const { data } = await listTransferAttachments(transferId)
+      return data
+    },
+    enabled: !!transferId,
+  })
+  const existingComprobante: MovementAttachment | undefined = existingAttachments[0]
+
+  // ── Submit ────────────────────────────────────────────────────────────────────
   const handleFormSubmit = handleSubmit(async (values) => {
-    await onSubmit({
-      ...values,
-      is_future: isFutureDate(values.date),
-    })
+    await onSubmit(
+      { ...values, is_future: isFutureDate(values.date) },
+      pendingComprobante
+    )
   })
 
-  // Account options with icons + currency label
-  const accountOptions = transferAccounts.map((a) => ({
-    value: a.id,
-    label: `${a.name} (${a.currency})`,
-    leading: <AccountIconChip icon={a.icon} />,
-  }))
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -195,7 +296,12 @@ export function TransferForm({
         <MangoSelect
           value={fromAccountId}
           onChange={(v) => v && setValue("from_account_id", v, { shouldValidate: true })}
-          options={accountOptions}
+          options={transferAccounts.map((a) => ({
+            value: a.id,
+            label: `${a.name} (${a.currency})`,
+            leading: <AccountIconChip icon={a.icon} />,
+            disabled: a.id === toAccountId,
+          }))}
           placeholder="Seleccioná cuenta origen"
           showSearch
           aria-invalid={!!errors.from_account_id}
@@ -275,19 +381,37 @@ export function TransferForm({
             </div>
           </div>
 
-          {effectiveRate !== null && (
-            <p className="text-xs text-muted-foreground">
-              Tasa implícita:{" "}
-              <span className="font-semibold text-foreground tabular-nums">
-                1 USD = {formatCurrency(effectiveRate, "ARS")}
-              </span>
-              {impliedRate && (
-                <span className="ml-1">
-                  (blue: {formatCurrency(impliedRate, "ARS")})
+          {/* Rate info */}
+          <div className="space-y-0.5">
+            {appliedRate !== null ? (
+              <p className="text-xs text-muted-foreground">
+                Cotización{" "}
+                <span className="font-semibold text-foreground">
+                  {RATE_LABELS[configuredRateType]}
                 </span>
-              )}
-            </p>
-          )}
+                {": "}
+                <span className="tabular-nums font-semibold text-foreground">
+                  1 USD = {formatCurrency(appliedRate, "ARS")}
+                </span>
+                {configuredRateType === "manual" && !configuredManualRate && (
+                  <span className="ml-1 text-amber-600">(sin cotización manual configurada)</span>
+                )}
+              </p>
+            ) : configuredRateType === "manual" && !configuredManualRate ? (
+              <p className="text-xs text-amber-600">
+                No hay cotización manual configurada. Ingresá el monto destino manualmente o{" "}
+                configurá una cotización en Ajustes.
+              </p>
+            ) : null}
+            {effectiveRate !== null && (
+              <p className="text-xs text-muted-foreground">
+                Tasa implícita:{" "}
+                <span className="font-semibold text-foreground tabular-nums">
+                  1 USD = {formatCurrency(effectiveRate, "ARS")}
+                </span>
+              </p>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -322,6 +446,20 @@ export function TransferForm({
           maxLength={200}
         />
       </div>
+
+      {/* Attachment */}
+      <AttachmentSlot
+        label="Comprobante"
+        existingAttachment={existingComprobante ?? null}
+        pendingFile={pendingComprobante}
+        onSelect={(file) => setPendingComprobante(file)}
+        onClearPending={() => setPendingComprobante(null)}
+        onDeleted={() => {
+          onAttachmentDeleted?.()
+          refetchAttachments()
+        }}
+        disabled={isLoading}
+      />
 
       <Button type="submit" className="w-full press-effect font-semibold h-11" disabled={isLoading}>
         {isLoading ? "Guardando…" : submitLabel}
