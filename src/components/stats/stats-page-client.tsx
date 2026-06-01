@@ -23,7 +23,7 @@ import {
   weekdayPattern,
   recurringMonthlyProjection,
 } from "@/lib/stats"
-import { StatsFilterBar, defaultFilter, filterToStatsFilter, type FilterState } from "./stats-filter-bar"
+import { StatsFilterBar, defaultFilter, filterToStatsFilter, type FilterState, type DateRangeValue } from "./stats-filter-bar"
 import { SummaryCards } from "./summary-cards"
 import { CategoryDistributionChart } from "./category-distribution-chart"
 import { IncomeExpenseSeriesChart } from "./income-expense-series-chart"
@@ -32,6 +32,7 @@ import { BudgetComplianceStrip } from "./budget-compliance-strip"
 import { CompareTab } from "./compare-tab"
 import type { Tables } from "@/lib/database.types"
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns"
+import { getPreset } from "@/lib/date-ranges"
 import { es } from "date-fns/locale"
 
 type Movement = Tables<"movements">
@@ -211,6 +212,15 @@ export function StatsPageClient() {
   const [filter, setFilter] = useState<FilterState>(() => defaultFilter())
   const [isExporting, setIsExporting] = useState(false)
 
+  const [period1, setPeriod1] = useState<DateRangeValue>(() => {
+    const r = getPreset("this_month")
+    return { operator: "between", preset: "this_month", from: r.from, to: r.to, label: r.label }
+  })
+  const [period2, setPeriod2] = useState<DateRangeValue>(() => {
+    const r = getPreset("last_month")
+    return { operator: "between", preset: "last_month", from: r.from, to: r.to, label: r.label }
+  })
+
   const { data: movements = [], isLoading: loadingMovements } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchMovements,
@@ -337,6 +347,14 @@ export function StatsPageClient() {
         categories={categories}
         accounts={accounts}
         onChange={setFilter}
+        tab={activeTab}
+        period1={period1}
+        period2={period2}
+        onPeriod1Change={setPeriod1}
+        onPeriod2Change={setPeriod2}
+        onRestoreSharedFilter={(sf) =>
+          setFilter((f) => ({ ...f, type: sf.type, categoryIds: sf.categoryIds, accountIds: sf.accountIds, currency: sf.currency }))
+        }
       />
 
       {/* Tab switcher */}
@@ -474,14 +492,13 @@ export function StatsPageClient() {
           movements={movements}
           categories={categories}
           currency={currency}
+          period1={period1}
+          period2={period2}
           sharedFilter={{
             type: filter.type,
             categoryIds: filter.categoryIds,
             accountIds: filter.accountIds,
           }}
-          onRestoreSharedFilter={(sf) =>
-            setFilter((f) => ({ ...f, type: sf.type, categoryIds: sf.categoryIds, accountIds: sf.accountIds, currency: sf.currency }))
-          }
         />
       )}
     </div>

@@ -76,27 +76,38 @@ export function filterToStatsFilter(f: FilterState): StatsFilter {
   }
 }
 
+// ── Saved view payload types ──────────────────────────────────────────────────
+
+interface CompareSavedViewPayload {
+  period1: DateRangeValue
+  period2: DateRangeValue
+  type: "all" | "income" | "expense"
+  categoryIds: string[]
+  accountIds: string[]
+  currency: "ARS" | "USD" | "all"
+}
+
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
-async function fetchSavedViews(): Promise<SavedView[]> {
+async function fetchSavedViews(scope: "stats" | "stats_compare"): Promise<SavedView[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("saved_views")
     .select("*")
-    .eq("scope", "stats")
+    .eq("scope", scope)
     .order("created_at", { ascending: false })
   if (error) throw error
   return data
 }
 
-async function createSavedView(name: string, filters: FilterState): Promise<void> {
+async function createSavedView(name: string, filters: unknown, scope: "stats" | "stats_compare"): Promise<void> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("No autenticado")
   const { error } = await supabase
     .from("saved_views")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .insert({ name, filters: filters as any, user_id: user.id, scope: "stats" })
+    .insert({ name, filters: filters as any, user_id: user.id, scope })
   if (error) throw error
 }
 
@@ -231,23 +242,49 @@ interface StatsFilterBarProps {
   categories: Category[]
   accounts: Account[]
   onChange: (f: FilterState) => void
+  tab?: "resumen" | "comparar"
+  period1?: DateRangeValue
+  period2?: DateRangeValue
+  onPeriod1Change?: (v: DateRangeValue) => void
+  onPeriod2Change?: (v: DateRangeValue) => void
+  onRestoreSharedFilter?: (sf: {
+    type: "all" | "income" | "expense"
+    categoryIds: string[]
+    accountIds: string[]
+    currency: "ARS" | "USD" | "all"
+  }) => void
 }
 
-export function StatsFilterBar({ filter, categories, accounts, onChange }: StatsFilterBarProps) {
+export function StatsFilterBar({
+  filter,
+  categories,
+  accounts,
+  onChange,
+  tab = "resumen",
+  period1,
+  period2,
+  onPeriod1Change,
+  onPeriod2Change,
+  onRestoreSharedFilter,
+}: StatsFilterBarProps) {
   const queryClient = useQueryClient()
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState("")
 
+  const isCompare = tab === "comparar"
+  const viewsScope: "stats" | "stats_compare" = isCompare ? "stats_compare" : "stats"
+  const viewsQueryKey = ["saved_views", viewsScope]
+
   const { data: savedViews = [] } = useQuery({
-    queryKey: ["saved_views", "stats"],
-    queryFn: fetchSavedViews,
+    queryKey: viewsQueryKey,
+    queryFn: () => fetchSavedViews(viewsScope),
   })
 
   const createMutation = useMutation({
-    mutationFn: ({ name, filters }: { name: string; filters: FilterState }) =>
-      createSavedView(name, filters),
+    mutationFn: ({ name, payload }: { name: string; payload: unknown }) =>
+      createSavedView(name, payload, viewsScope),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["saved_views", "stats"] })
+      queryClient.invalidateQueries({ queryKey: viewsQueryKey })
       toast.success("Vista guardada")
       setSaveDialogOpen(false)
       setSaveName("")
@@ -258,15 +295,42 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
   const deleteMutation = useMutation({
     mutationFn: deleteSavedView,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["saved_views", "stats"] })
+      queryClient.invalidateQueries({ queryKey: viewsQueryKey })
       toast.success("Vista eliminada")
     },
     onError: () => toast.error("No se pudo eliminar"),
   })
 
   function loadView(view: SavedView) {
-    const f = view.filters as unknown as FilterState
-    onChange(f)
+    if (isCompare) {
+      const payload = view.filters as unknown as CompareSavedViewPayload
+      if (payload.period1 && onPeriod1Change) onPeriod1Change(payload.period1)
+      if (payload.period2 && onPeriod2Change) onPeriod2Change(payload.period2)
+      onRestoreSharedFilter?.({
+        type: payload.type ?? filter.type,
+        categoryIds: payload.categoryIds ?? filter.categoryIds,
+        accountIds: payload.accountIds ?? filter.accountIds,
+        currency: payload.currency ?? filter.currency,
+      })
+    } else {
+      const f = view.filters as unknown as FilterState
+      onChange(f)
+    }
+  }
+
+  function buildSavePayload(): unknown {
+    if (isCompare) {
+      const payload: CompareSavedViewPayload = {
+        period1: period1!,
+        period2: period2!,
+        type: filter.type,
+        categoryIds: filter.categoryIds,
+        accountIds: filter.accountIds,
+        currency: filter.currency,
+      }
+      return payload
+    }
+    return filter
   }
 
   const accountOptions = accounts.map((a) => ({
@@ -287,7 +351,7 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
     (filter.currency !== "all" ? 1 : 0) +
     (filter.type !== "all" ? 1 : 0)
 
-  const hasActiveFilters = activeFiltersCount > 0 || filter.date.preset !== "this_month"
+  const hasActiveFilters = activeFiltersCount > 0 || (!isCompare && filter.date.preset !== "this_month")
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
@@ -343,21 +407,41 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)} className="gap-2">
               <Plus className="h-3.5 w-3.5" />
-              Guardar filtros actuales
+              {isCompare ? "Guardar períodos actuales" : "Guardar filtros actuales"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Row 2: date, accounts, categories, currency, clear */}
+      {/* Row 2: date / periods, accounts, categories, currency, clear */}
       <div className="flex flex-wrap items-end gap-3">
-        {/* Date */}
-        <div className="min-w-[180px] flex-1">
-          <DateRangeFilter
-            value={filter.date}
-            onChange={(date) => onChange({ ...filter, date })}
-          />
-        </div>
+        {isCompare ? (
+          /* Two period pickers replace the single date filter in compare mode */
+          <>
+            <div className="space-y-1.5 min-w-[180px] flex-1">
+              <Label className="text-xs">Período 1</Label>
+              <DateRangeFilter
+                value={period1!}
+                onChange={(v) => onPeriod1Change?.(v)}
+              />
+            </div>
+            <div className="space-y-1.5 min-w-[180px] flex-1">
+              <Label className="text-xs">Período 2</Label>
+              <DateRangeFilter
+                value={period2!}
+                onChange={(v) => onPeriod2Change?.(v)}
+              />
+            </div>
+          </>
+        ) : (
+          /* Single date range filter for resumen mode */
+          <div className="min-w-[180px] flex-1">
+            <DateRangeFilter
+              value={filter.date}
+              onChange={(date) => onChange({ ...filter, date })}
+            />
+          </div>
+        )}
 
         {/* Accounts */}
         <div className="space-y-1.5 min-w-[160px] flex-1">
@@ -412,19 +496,19 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Guardar vista</DialogTitle>
+            <DialogTitle>{isCompare ? "Guardar vista de comparación" : "Guardar vista"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-1">
             <div className="space-y-1.5">
               <Label htmlFor="stats-view-name">Nombre de la vista</Label>
               <Input
                 id="stats-view-name"
-                placeholder="Gastos de enero..."
+                placeholder={isCompare ? "Enero vs Diciembre..." : "Gastos de enero..."}
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && saveName.trim()) {
-                    createMutation.mutate({ name: saveName.trim(), filters: filter })
+                    createMutation.mutate({ name: saveName.trim(), payload: buildSavePayload() })
                   }
                 }}
                 autoFocus
@@ -438,7 +522,7 @@ export function StatsFilterBar({ filter, categories, accounts, onChange }: Stats
             <Button
               size="sm"
               disabled={!saveName.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate({ name: saveName.trim(), filters: filter })}
+              onClick={() => createMutation.mutate({ name: saveName.trim(), payload: buildSavePayload() })}
             >
               Guardar
             </Button>
