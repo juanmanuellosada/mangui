@@ -59,7 +59,7 @@ export default function OfflinePage() {
       </div>
 
       <Link
-        href="/app/dashboard"
+        href="/app/inicio"
         className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all duration-150 hover:opacity-90 active:scale-[.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
       >
         Ir al inicio

@@ -61,7 +61,7 @@ export function RegisterForm() {
         data: {
           full_name: values.name,
         },
-        emailRedirectTo: `${window.location.origin}/app/dashboard`,
+        emailRedirectTo: `${window.location.origin}/app/inicio`,
       },
     });
 

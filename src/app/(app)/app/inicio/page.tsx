@@ -91,7 +91,7 @@ export default async function DashboardPage() {
             </p>
           </div>
           <Link
-            href="/app/accounts"
+            href="/app/cuentas"
             className={cn(
               buttonVariants({ size: "default" }),
               "gap-2 font-semibold shadow-sm shadow-primary/20 press-effect"

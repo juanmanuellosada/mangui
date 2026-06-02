@@ -10,7 +10,7 @@ try {
   await p.fill('input[type="password"]', "ManguiQA-2026!");
   await p.locator('button[type="submit"]').first().click().catch(()=>p.keyboard.press("Enter"));
   await p.waitForURL(/\/app\//, { timeout: 30000 }).catch(()=>{});
-  await p.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/app/cuentas`, { waitUntil: "networkidle" });
   await p.waitForTimeout(1200);
   await p.getByRole("button", { name: /nueva cuenta|agregar cuenta/i }).first().click().catch(()=>{});
   await p.waitForTimeout(900);

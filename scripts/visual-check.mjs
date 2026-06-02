@@ -29,7 +29,7 @@ const run = async () => {
   await shot(page, "01-dashboard-desktop");
 
   console.log("→ cuentas");
-  await page.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/app/cuentas`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
   await shot(page, "02-accounts-desktop");
 
