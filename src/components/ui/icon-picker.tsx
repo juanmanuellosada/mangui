@@ -14,6 +14,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { Search, Upload, X, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { AR_FINTECH_ICONS, AR_ICON_CATEGORIES } from "@/lib/ar-fintech-icons"
 import { CATEGORY_ICONS, CATEGORY_ICON_GROUPS } from "@/lib/category-icons"
+import { EXTRA_ACCOUNT_ICONS } from "@/lib/extra-account-icons"
 import { cn } from "@/lib/utils"
 import { EMOJI_CATALOG, searchEmojis } from "@/lib/emoji-catalog"
 import { createClient } from "@/lib/supabase/client"
@@ -207,6 +208,8 @@ function LogoCell({
   )
 }
 
+const ACCOUNT_ICONS = [...AR_FINTECH_ICONS, ...EXTRA_ACCOUNT_ICONS]
+
 function LogosTab({
   value,
   onSelect,
@@ -219,13 +222,13 @@ function LogosTab({
 
   const filtered = useMemo(() => {
     if (search.trim()) {
-      return AR_FINTECH_ICONS.filter(
+      return ACCOUNT_ICONS.filter(
         (icon) =>
           icon.title.toLowerCase().includes(search.toLowerCase()) ||
           icon.id.toLowerCase().includes(search.toLowerCase())
       )
     }
-    return AR_FINTECH_ICONS.filter((icon) => {
+    return ACCOUNT_ICONS.filter((icon) => {
       const cat = AR_ICON_CATEGORIES.find((c) => c.label === icon.category)
       return cat?.id === activeCategory
     })
