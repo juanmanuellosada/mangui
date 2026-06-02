@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -10,10 +10,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  Pause,
-  Play,
+  Search,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
 import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
@@ -34,13 +35,16 @@ import {
   computeBudgetProgress,
   periodLabel,
   scopeLabel,
-  windowLabel,
+  activeBudgetWindow,
   type Budget,
   type BudgetProgressStatus,
 } from "@/lib/budgets"
 import { MOVEMENTS_KEY, ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { renderCategoryIcon } from "@/lib/categories"
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
 import type { Tables } from "@/lib/database.types"
 
 type Movement = Tables<"movements">
@@ -84,6 +88,140 @@ async function fetchAccounts(): Promise<Account[]> {
   return data
 }
 
+// ── Normalize helper for accent-insensitive search ────────────────────────────
+
+function normalize(s: string) {
+  return s
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+}
+
+// ── Filter types ──────────────────────────────────────────────────────────────
+
+type EstadoFilter = "todos" | "activos" | "pausados"
+type MonedaFilter = "todas" | "ARS" | "USD"
+
+interface BudgetFilters {
+  search: string
+  estado: EstadoFilter
+  moneda: MonedaFilter
+}
+
+const DEFAULT_FILTERS: BudgetFilters = {
+  search: "",
+  estado: "todos",
+  moneda: "todas",
+}
+
+// ── Filter bar ────────────────────────────────────────────────────────────────
+
+function BudgetFilterBar({
+  filters,
+  onChange,
+}: {
+  filters: BudgetFilters
+  onChange: (f: BudgetFilters) => void
+}) {
+  const isActive =
+    filters.search.trim() !== "" ||
+    filters.estado !== "todos" ||
+    filters.moneda !== "todas"
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap lg:flex-nowrap gap-2 items-center">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[160px]">
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none"
+            aria-hidden
+          />
+          <Input
+            type="search"
+            placeholder="Buscar…"
+            value={filters.search}
+            onChange={(e) => onChange({ ...filters, search: e.target.value })}
+            className="pl-8 h-9 text-sm"
+            aria-label="Buscar presupuestos"
+          />
+        </div>
+
+        {/* Estado segmented */}
+        <div role="group" aria-label="Filtrar por estado" className="flex items-center gap-1 shrink-0">
+          {(["todos", "activos", "pausados"] as const).map((v) => {
+            const label = v === "todos" ? "Todos" : v === "activos" ? "Activos" : "Pausados"
+            const isSelected = filters.estado === v
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => onChange({ ...filters, estado: v })}
+                aria-pressed={isSelected}
+                className={cn(
+                  "inline-flex items-center h-9 px-3 rounded-lg text-sm font-medium",
+                  "border transition-all duration-150 cursor-pointer select-none",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                    : "bg-background border-input text-muted-foreground hover:border-ring/60 hover:text-foreground dark:bg-input/30"
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Moneda segmented */}
+        <div role="group" aria-label="Filtrar por moneda" className="flex items-center gap-1 shrink-0">
+          {(["todas", "ARS", "USD"] as const).map((v) => {
+            const label = v === "todas" ? "Todas" : v
+            const isSelected = filters.moneda === v
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => onChange({ ...filters, moneda: v })}
+                aria-pressed={isSelected}
+                className={cn(
+                  "inline-flex items-center h-9 px-3 rounded-lg text-sm font-medium",
+                  "border transition-all duration-150 cursor-pointer select-none",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
+                    : "bg-background border-input text-muted-foreground hover:border-ring/60 hover:text-foreground dark:bg-input/30"
+                )}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Clear */}
+      {isActive && (
+        <div className="flex items-center gap-3 px-0.5">
+          <button
+            type="button"
+            onClick={() => onChange(DEFAULT_FILTERS)}
+            className={cn(
+              "inline-flex items-center gap-1 text-xs text-muted-foreground",
+              "hover:text-foreground transition-colors duration-150 cursor-pointer",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            )}
+          >
+            <X className="h-3 w-3" aria-hidden />
+            Limpiar filtros
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Status helpers ────────────────────────────────────────────────────────────
 
 function StatusIcon({ status }: { status: BudgetProgressStatus }) {
@@ -105,6 +243,20 @@ function progressBarColor(status: BudgetProgressStatus): string {
   if (status === "exceeded") return "bg-destructive"
   if (status === "near") return "bg-amber-500"
   return "bg-success"
+}
+
+// ── Active window label using activeBudgetWindow ──────────────────────────────
+
+function windowLabelFromBudget(budget: Budget): string {
+  const w = activeBudgetWindow(budget)
+  const from = parseISO(w.from)
+  const to = parseISO(w.to)
+
+  if (from.getMonth() === to.getMonth() && from.getFullYear() === to.getFullYear()) {
+    const monthName = format(from, "MMM", { locale: es })
+    return `${from.getDate()}–${to.getDate()} ${monthName}.`
+  }
+  return `${format(from, "d MMM", { locale: es })}. – ${format(to, "d MMM", { locale: es })}.`
 }
 
 // ── Budget card ───────────────────────────────────────────────────────────────
@@ -141,6 +293,8 @@ function BudgetCard({
     .map((id) => accounts.find((a) => a.id === id)?.name)
     .filter(Boolean) as string[]
 
+  void scope
+
   const isPaused = budget.status === "paused"
 
   return (
@@ -158,6 +312,15 @@ function BudgetCard({
     >
       {/* Header row */}
       <div className="flex items-start gap-3 px-4 pt-4 pb-3">
+        {/* Budget icon */}
+        <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60 border border-border/40 overflow-hidden">
+          {budget.icon ? (
+            renderCategoryIcon(budget.icon, { size: "h-5 w-5", logoFill: true })
+          ) : (
+            <Wallet className="h-4.5 w-4.5 text-muted-foreground" style={{ width: "1.125rem", height: "1.125rem" }} />
+          )}
+        </div>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-sm truncate">{budget.name}</h3>
@@ -258,9 +421,9 @@ function BudgetCard({
             </div>
           </div>
 
-          {/* Window label */}
+          {/* Window label using activeBudgetWindow */}
           <p className="text-[10px] text-muted-foreground tabular-nums">
-            {windowLabel(budget.period, budget.start_date)}
+            {windowLabelFromBudget(budget)}
           </p>
         </div>
       )}
@@ -301,6 +464,7 @@ function CreateBudgetDialog({
         .insert({
           user_id: user.id,
           name: values.name,
+          icon: values.icon?.trim() || null,
           limit_amount: values.limit_amount,
           currency: values.currency,
           period: values.period,
@@ -308,6 +472,7 @@ function CreateBudgetDialog({
           account_ids: values.account_ids,
           is_recurring: values.is_recurring,
           start_date: values.start_date,
+          end_date: values.end_date || null,
           status: "active",
         })
         .select()
@@ -384,6 +549,7 @@ function EditBudgetDialog({
         .from("budgets")
         .update({
           name: values.name,
+          icon: values.icon?.trim() || null,
           limit_amount: values.limit_amount,
           currency: values.currency,
           period: values.period,
@@ -391,6 +557,7 @@ function EditBudgetDialog({
           account_ids: values.account_ids,
           is_recurring: values.is_recurring,
           start_date: values.start_date,
+          end_date: values.end_date || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", budget.id)
@@ -505,6 +672,7 @@ function FABCreate({
         .insert({
           user_id: user.id,
           name: values.name,
+          icon: values.icon?.trim() || null,
           limit_amount: values.limit_amount,
           currency: values.currency,
           period: values.period,
@@ -512,6 +680,7 @@ function FABCreate({
           account_ids: values.account_ids,
           is_recurring: values.is_recurring,
           start_date: values.start_date,
+          end_date: values.end_date || null,
           status: "active",
         })
         .select()
@@ -599,6 +768,7 @@ export function BudgetsList() {
   const ms = useMultiSelect()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkPending, setBulkPending] = useState(false)
+  const [filters, setFilters] = useState<BudgetFilters>(DEFAULT_FILTERS)
 
   const { data: budgets = [], isLoading: loadingBudgets } = useQuery({
     queryKey: BUDGETS_KEY,
@@ -655,7 +825,25 @@ export function BudgetsList() {
     },
   })
 
-  const budgetIds = budgets.map((b) => b.id)
+  // Client-side filtering
+  const filteredBudgets = useMemo(() => {
+    const q = normalize(filters.search)
+    return budgets.filter((b) => {
+      if (q && !normalize(b.name).includes(q)) return false
+      if (filters.estado === "activos" && b.status !== "active") return false
+      if (filters.estado === "pausados" && b.status !== "paused") return false
+      if (filters.moneda !== "todas" && b.currency !== filters.moneda) return false
+      return true
+    })
+  }, [budgets, filters])
+
+  const isFiltered =
+    filters.search.trim() !== "" ||
+    filters.estado !== "todos" ||
+    filters.moneda !== "todas"
+
+  const displayBudgets = isFiltered ? filteredBudgets : budgets
+  const budgetIds = displayBudgets.map((b) => b.id)
 
   async function handleBulkDelete() {
     setBulkPending(true)
@@ -697,12 +885,18 @@ export function BudgetsList() {
         </div>
       </div>
 
+      {/* Filter bar — only when there are budgets */}
+      {!loadingBudgets && budgets.length > 0 && (
+        <BudgetFilterBar filters={filters} onChange={setFilters} />
+      )}
+
       {/* Skeleton */}
       {loadingBudgets && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 rounded-xl" />
                 <Skeleton className="h-5 w-32" />
                 <Skeleton className="h-4 w-16 rounded-full" />
               </div>
@@ -737,10 +931,28 @@ export function BudgetsList() {
         </div>
       )}
 
+      {/* Filtered empty state */}
+      {!loadingBudgets && budgets.length > 0 && isFiltered && displayBudgets.length === 0 && (
+        <div className="rounded-2xl border border-border/60 bg-muted/30 p-10 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+            <Search className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">Sin resultados</p>
+            <p className="text-sm text-muted-foreground">
+              No se encontraron presupuestos con esos filtros.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setFilters(DEFAULT_FILTERS)}>
+            Limpiar filtros
+          </Button>
+        </div>
+      )}
+
       {/* Budget cards */}
-      {!loadingBudgets && budgets.length > 0 && (
+      {!loadingBudgets && displayBudgets.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-          {budgets.map((budget) => (
+          {displayBudgets.map((budget) => (
             <BudgetCard
               key={budget.id}
               budget={budget}

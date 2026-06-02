@@ -264,11 +264,13 @@ export type Database = {
           category_ids: string[]
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
+          end_date: string | null
+          icon: string | null
           id: string
           is_recurring: boolean
           limit_amount: number
           name: string
-          period: Database["public"]["Enums"]["budget_period"]
+          period: Database["public"]["Enums"]["budget_period"] | null
           start_date: string
           status: Database["public"]["Enums"]["budget_status"]
           updated_at: string
@@ -279,11 +281,13 @@ export type Database = {
           category_ids?: string[]
           created_at?: string
           currency: Database["public"]["Enums"]["currency"]
+          end_date?: string | null
+          icon?: string | null
           id?: string
           is_recurring?: boolean
           limit_amount: number
           name: string
-          period: Database["public"]["Enums"]["budget_period"]
+          period?: Database["public"]["Enums"]["budget_period"] | null
           start_date?: string
           status?: Database["public"]["Enums"]["budget_status"]
           updated_at?: string
@@ -294,11 +298,13 @@ export type Database = {
           category_ids?: string[]
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
+          end_date?: string | null
+          icon?: string | null
           id?: string
           is_recurring?: boolean
           limit_amount?: number
           name?: string
-          period?: Database["public"]["Enums"]["budget_period"]
+          period?: Database["public"]["Enums"]["budget_period"] | null
           start_date?: string
           status?: Database["public"]["Enums"]["budget_status"]
           updated_at?: string

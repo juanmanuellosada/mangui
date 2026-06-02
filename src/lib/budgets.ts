@@ -3,7 +3,12 @@ import {
   endOfMonth,
   startOfYear,
   endOfYear,
+  startOfWeek,
+  endOfWeek,
+  startOfQuarter,
+  endOfQuarter,
   addDays,
+  differenceInCalendarDays,
   parseISO,
   getDay,
   format,
@@ -86,6 +91,111 @@ export function currentWindow(
   }
 }
 
+/**
+ * Returns the active window {from, to} for a budget, as ISO date strings.
+ *
+ * Three cases:
+ *   1. is_recurring AND period set → rolling calendar occurrence via currentWindow().
+ *   2. is_recurring AND period NULL (custom) → advance [start_date, end_date] by its
+ *      own duration (end-start+1 days) until the window contains ref.
+ *   3. NOT is_recurring → fixed [start_date, end_date].
+ */
+export function activeBudgetWindow(
+  budget: Budget,
+  ref: Date = new Date()
+): { from: string; to: string } {
+  // Case 1: recurring with a preset period
+  if (budget.is_recurring && budget.period !== null) {
+    return currentWindow(budget.period, budget.start_date, ref)
+  }
+
+  // For cases 2 & 3 we need end_date. Fall back to start_date if somehow missing.
+  const endDate = budget.end_date ?? budget.start_date
+
+  // Case 3: non-recurring → fixed window
+  if (!budget.is_recurring) {
+    return { from: budget.start_date, to: endDate }
+  }
+
+  // Case 2: recurring with custom (NULL period) → roll [start_date, end_date] forward
+  // by (duration) days until the window contains ref.
+  const anchor = parseISO(budget.start_date)
+  const anchorEnd = parseISO(endDate)
+  // Duration in days is inclusive: end - start + 1 days per occurrence.
+  const duration = differenceInCalendarDays(anchorEnd, anchor) + 1
+
+  const refTime = new Date(ref)
+  refTime.setHours(0, 0, 0, 0)
+  const anchorTime = new Date(anchor)
+  anchorTime.setHours(0, 0, 0, 0)
+
+  const daysElapsed = differenceInCalendarDays(refTime, anchorTime)
+  // blockIndex can be negative if ref < anchor (edge case: show first window)
+  const blockIndex = Math.max(0, Math.floor(daysElapsed / duration))
+
+  const from = addDays(anchorTime, blockIndex * duration)
+  const to = addDays(from, duration - 1)
+  return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+}
+
+/**
+ * Returns the CURRENT calendar period window for a preset period.
+ * Used by the form to auto-fill desde-hasta when a preset is chosen.
+ *
+ * - weekly    → Mon–Sun of the week containing ref (ISO week, Monday anchor).
+ * - biweekly  → 14-day fortnight: 1–14 or 15–end of month based on ref day.
+ * - monthly   → 1st–last day of ref's month.
+ * - quarterly → first–last day of the calendar quarter containing ref.
+ * - annual    → Jan 1–Dec 31 of ref's year.
+ */
+export function calendarPeriodWindow(
+  period: BudgetPeriod,
+  ref: Date = new Date()
+): { from: string; to: string } {
+  switch (period) {
+    case "weekly": {
+      // ISO week: Monday → Sunday
+      const from = startOfWeek(ref, { weekStartsOn: 1 })
+      const to = endOfWeek(ref, { weekStartsOn: 1 })
+      return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+    }
+
+    case "biweekly": {
+      // Simple calendar fortnight: day 1–14 or day 15–end of month.
+      const day = ref.getDate()
+      const year = ref.getFullYear()
+      const month = ref.getMonth()
+      if (day <= 14) {
+        const from = new Date(year, month, 1)
+        const to = new Date(year, month, 14)
+        return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+      } else {
+        const from = new Date(year, month, 15)
+        const to = endOfMonth(ref)
+        return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+      }
+    }
+
+    case "monthly": {
+      const from = startOfMonth(ref)
+      const to = endOfMonth(ref)
+      return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+    }
+
+    case "quarterly": {
+      const from = startOfQuarter(ref)
+      const to = endOfQuarter(ref)
+      return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+    }
+
+    case "annual": {
+      const from = startOfYear(ref)
+      const to = endOfYear(ref)
+      return { from: format(from, "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") }
+    }
+  }
+}
+
 export type BudgetProgressStatus = "on_track" | "near" | "exceeded"
 
 export interface BudgetProgress {
@@ -122,7 +232,7 @@ export function computeBudgetProgress(
   movements: MovementRow[],
   ref: Date = new Date()
 ): BudgetProgress {
-  const window = currentWindow(budget.period, budget.start_date, ref)
+  const window = activeBudgetWindow(budget, ref)
 
   const spent = movements.reduce((acc, m) => {
     if (m.type !== "expense") return acc
@@ -153,7 +263,8 @@ const PERIOD_LABELS: Record<BudgetPeriod, string> = {
   annual: "Anual",
 }
 
-export function periodLabel(period: BudgetPeriod): string {
+export function periodLabel(period: BudgetPeriod | null): string {
+  if (period === null) return "Personalizado"
   return PERIOD_LABELS[period]
 }
 
@@ -186,7 +297,11 @@ export function scopeLabel(
 }
 
 /** Window label in short format (e.g. "1 may. – 31 may.") */
-export function windowLabel(period: BudgetPeriod, startDate: string, ref: Date = new Date()): string {
+export function windowLabel(period: BudgetPeriod | null, startDate: string, ref: Date = new Date()): string {
+  // For custom-range budgets without a period preset, show start date only
+  if (period === null) {
+    return format(parseISO(startDate), "d MMM yyyy", { locale: es })
+  }
   const w = currentWindow(period, startDate, ref)
   const from = parseISO(w.from)
   const to = parseISO(w.to)

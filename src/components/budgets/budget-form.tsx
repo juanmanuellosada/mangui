@@ -1,21 +1,27 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format } from "date-fns"
-import { X, TrendingDown } from "lucide-react"
+import { format, parseISO } from "date-fns"
+import { X, TrendingDown, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
 import { Switch } from "@/components/ui/switch"
-import { MangoSelect } from "@/components/ui/mango-select"
+import { CurrencyToggle } from "@/components/ui/currency-toggle"
+import { MangoDatePicker } from "@/components/ui/mango-date-picker"
+import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
+import { IconPicker } from "@/components/ui/icon-picker"
+import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip, renderCategoryIcon } from "@/lib/categories"
 import { cn, formatCurrency } from "@/lib/utils"
 import {
   periodLabel,
   computeBudgetProgress,
+  calendarPeriodWindow,
   type Budget,
   type BudgetPeriod,
 } from "@/lib/budgets"
@@ -29,25 +35,42 @@ type Movement = Tables<"movements">
 
 export type BudgetFormValues = {
   name: string
+  icon: string
   limit_amount: number
   currency: "ARS" | "USD"
-  period: BudgetPeriod
+  period: BudgetPeriod | null
+  start_date: string
+  end_date: string
   category_ids: string[]
   account_ids: string[]
   is_recurring: boolean
-  start_date: string
 }
 
-const budgetSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio"),
-  limit_amount: z.coerce.number().positive("El límite debe ser mayor a 0"),
-  currency: z.enum(["ARS", "USD"]),
-  period: z.enum(["weekly", "biweekly", "monthly", "quarterly", "annual"]),
-  category_ids: z.array(z.string()),
-  account_ids: z.array(z.string()),
-  is_recurring: z.boolean(),
-  start_date: z.string().min(1),
-})
+const budgetSchema = z
+  .object({
+    name: z.string().min(1, "El nombre es obligatorio"),
+    icon: z.string().optional(),
+    limit_amount: z.coerce.number().positive("El límite debe ser mayor a 0"),
+    currency: z.enum(["ARS", "USD"]),
+    period: z
+      .enum(["weekly", "biweekly", "monthly", "quarterly", "annual"])
+      .nullable(),
+    start_date: z.string().min(1, "La fecha de inicio es obligatoria"),
+    end_date: z.string().min(1, "La fecha de fin es obligatoria"),
+    category_ids: z.array(z.string()),
+    account_ids: z.array(z.string()),
+    is_recurring: z.boolean(),
+  })
+  .refine(
+    (data) => {
+      if (!data.start_date || !data.end_date) return true
+      return data.end_date >= data.start_date
+    },
+    {
+      message: "La fecha de fin debe ser igual o posterior a la de inicio",
+      path: ["end_date"],
+    }
+  )
 
 const PERIOD_OPTIONS: { value: BudgetPeriod; label: string }[] = [
   { value: "weekly", label: "Semanal" },
@@ -71,16 +94,39 @@ interface BudgetFormProps {
 }
 
 export function budgetToFormValues(budget: Budget): BudgetFormValues {
+  // Derive end_date from the budget — if null, fallback to start_date
+  const endDate = budget.end_date ?? budget.start_date
   return {
     name: budget.name,
+    icon: budget.icon ?? "",
     limit_amount: budget.limit_amount,
     currency: budget.currency,
     period: budget.period,
+    start_date: budget.start_date,
+    end_date: endDate,
     category_ids: budget.category_ids,
     account_ids: budget.account_ids,
     is_recurring: budget.is_recurring,
-    start_date: budget.start_date,
   }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Checks whether the given start/end dates match the calendarPeriodWindow of
+ * a preset exactly. Returns the matched preset or null if custom.
+ */
+function detectPreset(
+  startDate: string,
+  endDate: string,
+  ref: Date = new Date()
+): BudgetPeriod | null {
+  if (!startDate || !endDate) return null
+  for (const { value } of PERIOD_OPTIONS) {
+    const w = calendarPeriodWindow(value, ref)
+    if (w.from === startDate && w.to === endDate) return value
+  }
+  return null
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -96,6 +142,9 @@ export function BudgetForm({
   submitLabel = "Guardar presupuesto",
 }: BudgetFormProps) {
   const today = format(new Date(), "yyyy-MM-dd")
+  const initialPreset = calendarPeriodWindow("monthly")
+
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const {
     register,
@@ -108,20 +157,54 @@ export function BudgetForm({
     resolver: zodResolver(budgetSchema) as unknown as Resolver<BudgetFormValues, any>,
     defaultValues: {
       name: "",
+      icon: "",
       limit_amount: 0,
       currency: "ARS",
       period: "monthly",
+      start_date: initialPreset.from,
+      end_date: initialPreset.to,
       category_ids: [],
       account_ids: [],
       is_recurring: true,
-      start_date: today,
       ...defaultValues,
     },
   })
 
   const watchedValues = watch()
 
-  // Live preview: compute progress from watched form values
+  // Compute which preset (if any) matches current desde/hasta dates
+  const activePreset = detectPreset(
+    watchedValues.start_date,
+    watchedValues.end_date
+  )
+
+  // When a preset button is clicked: set period + auto-fill dates
+  function handlePresetClick(preset: BudgetPeriod) {
+    const w = calendarPeriodWindow(preset)
+    setValue("period", preset)
+    setValue("start_date", w.from)
+    setValue("end_date", w.to)
+  }
+
+  // When dates are edited manually: re-detect period (may become null = custom)
+  function handleStartDateChange(d: Date) {
+    const iso = format(d, "yyyy-MM-dd")
+    setValue("start_date", iso)
+    const detected = detectPreset(iso, watchedValues.end_date)
+    setValue("period", detected)
+  }
+
+  function handleEndDateChange(d: Date) {
+    const iso = format(d, "yyyy-MM-dd")
+    setValue("end_date", iso)
+    const detected = detectPreset(watchedValues.start_date, iso)
+    setValue("period", detected)
+  }
+
+  // Expense categories only for scope selection
+  const expenseCategories = categories.filter((c) => c.type === "expense")
+
+  // Live preview
   const liveProgress = useMemo(() => {
     if (!watchedValues.limit_amount || watchedValues.limit_amount <= 0) return null
 
@@ -129,10 +212,12 @@ export function BudgetForm({
       id: "__preview__",
       user_id: "",
       name: watchedValues.name,
+      icon: watchedValues.icon || null,
       limit_amount: watchedValues.limit_amount,
       currency: watchedValues.currency,
       period: watchedValues.period,
       start_date: watchedValues.start_date || today,
+      end_date: watchedValues.end_date || watchedValues.start_date || today,
       category_ids: watchedValues.category_ids,
       account_ids: watchedValues.account_ids,
       is_recurring: watchedValues.is_recurring,
@@ -147,258 +232,288 @@ export function BudgetForm({
     watchedValues.currency,
     watchedValues.period,
     watchedValues.start_date,
+    watchedValues.end_date,
     watchedValues.category_ids,
     watchedValues.account_ids,
     watchedValues.name,
+    watchedValues.icon,
     watchedValues.is_recurring,
     movements,
     today,
   ])
 
-  // Toggle helpers for multi-select chips
-  const toggleCategory = (id: string) => {
-    const current = watchedValues.category_ids
-    if (current.includes(id)) {
-      setValue("category_ids", current.filter((x) => x !== id))
-    } else {
-      setValue("category_ids", [...current, id])
-    }
-  }
-
-  const toggleAccount = (id: string) => {
-    const current = watchedValues.account_ids
-    if (current.includes(id)) {
-      setValue("account_ids", current.filter((x) => x !== id))
-    } else {
-      setValue("account_ids", [...current, id])
-    }
-  }
-
-  const clearAll = () => {
-    setValue("category_ids", [])
-    setValue("account_ids", [])
-  }
-
-  const hasScope =
-    watchedValues.category_ids.length > 0 || watchedValues.account_ids.length > 0
+  const icon = watchedValues.icon
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      {/* Name */}
-      <div className="space-y-1.5">
-        <Label htmlFor="budget-name">Nombre</Label>
-        <Input
-          id="budget-name"
-          placeholder="Supermercado"
-          {...register("name")}
-          aria-invalid={!!errors.name}
-          autoComplete="off"
-        />
-        {errors.name && (
-          <p className="text-xs text-destructive">{errors.name.message}</p>
-        )}
-      </div>
-
-      {/* Limit + Currency */}
-      <div className="space-y-1.5">
-        <Label htmlFor="budget-limit">Límite</Label>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <MoneyInput
-              id="budget-limit"
-              min={0}
-              step={0.01}
-              className="tabular-nums w-full"
-              placeholder="50.000"
-              currency={watchedValues.currency}
-              {...register("limit_amount")}
-              aria-invalid={!!errors.limit_amount}
-            />
-          </div>
-          <MangoSelect
-            value={watchedValues.currency}
-            onChange={(v) => setValue("currency", v as "ARS" | "USD")}
-            options={[
-              { value: "ARS", label: "ARS", leading: <span className="text-sm" aria-hidden>🇦🇷</span> },
-              { value: "USD", label: "US$", leading: <span className="text-sm" aria-hidden>🇺🇸</span> },
-            ]}
-            className="w-28"
-            aria-label="Moneda"
+    <>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        {/* 1. Nombre */}
+        <div className="space-y-1.5">
+          <Label htmlFor="budget-name" className="text-xs text-muted-foreground font-medium">
+            Nombre
+          </Label>
+          <Input
+            id="budget-name"
+            placeholder="Supermercado"
+            {...register("name")}
+            aria-invalid={!!errors.name}
+            autoComplete="off"
           />
-        </div>
-        {errors.limit_amount && (
-          <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
-        )}
-      </div>
-
-      {/* Period */}
-      <div className="space-y-1.5">
-        <Label>Período</Label>
-        <div className="flex flex-wrap gap-1.5">
-          {PERIOD_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setValue("period", value)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 press-effect cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                watchedValues.period === value
-                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Scope: categories + accounts */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Alcance</Label>
-          {hasScope && (
-            <button
-              type="button"
-              onClick={clearAll}
-              className="text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <X className="h-3 w-3" />
-              Global
-            </button>
+          {errors.name && (
+            <p className="text-xs text-destructive">{errors.name.message}</p>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground -mt-0.5">
-          Dejá vacío para incluir todas las categorías y cuentas.
-        </p>
 
-        {/* Category chips */}
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((cat) => {
-              const isActive = watchedValues.category_ids.includes(cat.id)
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => toggleCategory(cat.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer press-effect",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isActive
-                      ? "bg-primary/15 text-primary border border-primary/30"
-                      : "bg-muted text-muted-foreground hover:text-foreground border border-transparent"
-                  )}
-                >
-                  {cat.name}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Account chips */}
-        {accounts.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {accounts.map((acc) => {
-              const isActive = watchedValues.account_ids.includes(acc.id)
-              return (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => toggleAccount(acc.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer press-effect",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isActive
-                      ? "bg-accent/15 text-accent border border-accent/30"
-                      : "bg-muted text-muted-foreground hover:text-foreground border border-transparent"
-                  )}
-                >
-                  {acc.name}
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Recurring toggle */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <Label htmlFor="budget-recurring" className="cursor-pointer">
-            Renova automáticamente
-          </Label>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Se reinicia solo al inicio de cada período.
-          </p>
-        </div>
-        <Switch
-          id="budget-recurring"
-          checked={watchedValues.is_recurring}
-          onCheckedChange={(v) => setValue("is_recurring", v)}
-          aria-label="Renova automáticamente"
-        />
-      </div>
-
-      {/* Live preview */}
-      {liveProgress && (
-        <div className="rounded-xl border border-border/60 bg-muted/40 p-3.5 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <TrendingDown className="h-3.5 w-3.5" />
-            <span>Gasto en esta ventana</span>
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-lg font-bold tabular-nums">
-              {formatCurrency(liveProgress.spent, watchedValues.currency)}
-            </span>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              de {formatCurrency(liveProgress.limit, watchedValues.currency)} límite
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-border overflow-hidden">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-300",
-                liveProgress.status === "exceeded"
-                  ? "bg-destructive"
-                  : liveProgress.status === "near"
-                  ? "bg-amber-500"
-                  : "bg-success"
+        {/* 2. Ícono */}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Ícono</Label>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className={cn(
+              "flex items-center gap-3 w-full h-11 px-3 rounded-xl border border-input bg-background",
+              "text-sm transition-colors duration-150 cursor-pointer",
+              "hover:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/60 border border-border/40 overflow-hidden flex-shrink-0">
+              {icon ? (
+                renderCategoryIcon(icon, { size: "h-5 w-5" })
+              ) : (
+                <Tag className="h-4 w-4 text-muted-foreground" />
               )}
-              style={{ width: `${Math.min(liveProgress.percent, 100)}%` }}
+            </span>
+            <span className="text-muted-foreground flex-1 text-left">
+              {icon ? "Cambiar ícono" : "Elegir ícono…"}
+            </span>
+            {icon && (
+              <span
+                role="button"
+                aria-label="Quitar ícono"
+                onClick={(e) => { e.stopPropagation(); setValue("icon", "") }}
+                className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* 3. Límite + Moneda */}
+        <div className="space-y-1.5">
+          <Label htmlFor="budget-limit" className="text-xs text-muted-foreground font-medium">
+            Límite
+          </Label>
+          <MoneyInput
+            id="budget-limit"
+            min={0}
+            step={0.01}
+            className={cn(
+              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+              "focus:border-primary focus:ring-2 focus:ring-ring/30 w-full"
+            )}
+            placeholder="0"
+            currency={watchedValues.currency}
+            {...register("limit_amount")}
+            aria-invalid={!!errors.limit_amount}
+          />
+          {errors.limit_amount && (
+            <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
+          )}
+          <CurrencyToggle
+            value={watchedValues.currency}
+            onChange={(v) => setValue("currency", v)}
+            className="w-full"
+          />
+        </div>
+
+        {/* 4. Período — preset buttons + siempre-visible desde/hasta */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground font-medium">Período</Label>
+
+          {/* Preset pills */}
+          <div className="flex flex-wrap gap-1.5">
+            {PERIOD_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => handlePresetClick(value)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 press-effect cursor-pointer",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  activePreset === value
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+            {!activePreset && watchedValues.start_date && (
+              <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-muted/60 text-muted-foreground border border-border/60">
+                Personalizado
+              </span>
+            )}
+          </div>
+
+          {/* Desde / Hasta — always visible */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Desde</Label>
+              <MangoDatePicker
+                value={watchedValues.start_date ? parseISO(watchedValues.start_date) : null}
+                onChange={handleStartDateChange}
+                placeholder="Fecha inicio"
+                aria-invalid={!!errors.start_date}
+              />
+              {errors.start_date && (
+                <p className="text-xs text-destructive">{errors.start_date.message}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Hasta</Label>
+              <MangoDatePicker
+                value={watchedValues.end_date ? parseISO(watchedValues.end_date) : null}
+                onChange={handleEndDateChange}
+                placeholder="Fecha fin"
+                aria-invalid={!!errors.end_date}
+              />
+              {(errors as { end_date?: { message?: string } }).end_date && (
+                <p className="text-xs text-destructive">
+                  {(errors as { end_date?: { message?: string } }).end_date?.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Alcance — MangoMultiSelect para categorías y cuentas */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground font-medium">Alcance</Label>
+          <p className="text-[11px] text-muted-foreground -mt-0.5">
+            Dejá vacío para incluir todas las categorías y cuentas.
+          </p>
+
+          {/* Categorías */}
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Categorías</Label>
+            <MangoMultiSelect
+              values={watchedValues.category_ids}
+              onChange={(v) => setValue("category_ids", v)}
+              options={expenseCategories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                leading: <CategoryIconChip icon={c.icon} />,
+              }))}
+              placeholder="Todas las categorías"
+              showSearch
+              aria-label="Categorías del presupuesto"
             />
           </div>
-          <p className="text-[11px] text-muted-foreground tabular-nums">
-            {liveProgress.percent.toFixed(0)}% del límite ·{" "}
-            {periodLabel(watchedValues.period)} · ventana actual
-          </p>
-        </div>
-      )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 pt-1">
-        {onDelete && (
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={onDelete}
-            disabled={isLoading}
-            className="press-effect cursor-pointer"
-          >
-            Eliminar
-          </Button>
+          {/* Cuentas */}
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Cuentas</Label>
+            <MangoMultiSelect
+              values={watchedValues.account_ids}
+              onChange={(v) => setValue("account_ids", v)}
+              options={accounts.map((a) => ({
+                value: a.id,
+                label: a.name,
+                leading: <AccountIconChip icon={a.icon} />,
+              }))}
+              placeholder="Todas las cuentas"
+              showSearch
+              aria-label="Cuentas del presupuesto"
+            />
+          </div>
+        </div>
+
+        {/* 6. Renova automáticamente */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <Label htmlFor="budget-recurring" className="cursor-pointer">
+              Renova automáticamente
+            </Label>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Se reinicia solo al inicio de cada período.
+            </p>
+          </div>
+          <Switch
+            id="budget-recurring"
+            checked={watchedValues.is_recurring}
+            onCheckedChange={(v) => setValue("is_recurring", v)}
+            aria-label="Renova automáticamente"
+          />
+        </div>
+
+        {/* 7. Vista previa en vivo */}
+        {liveProgress && (
+          <div className="rounded-xl border border-border/60 bg-muted/40 p-3.5 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <TrendingDown className="h-3.5 w-3.5" />
+              <span>Gasto en esta ventana</span>
+            </div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-lg font-bold tabular-nums">
+                {formatCurrency(liveProgress.spent, watchedValues.currency)}
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                de {formatCurrency(liveProgress.limit, watchedValues.currency)} límite
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-border overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  liveProgress.status === "exceeded"
+                    ? "bg-destructive"
+                    : liveProgress.status === "near"
+                    ? "bg-amber-500"
+                    : "bg-success"
+                )}
+                style={{ width: `${Math.min(liveProgress.percent, 100)}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground tabular-nums">
+              {liveProgress.percent.toFixed(0)}% del límite ·{" "}
+              {periodLabel(watchedValues.period)} · ventana actual
+            </p>
+          </div>
         )}
-        <Button
-          type="submit"
-          disabled={isLoading}
-          className="flex-1 press-effect cursor-pointer font-semibold"
-        >
-          {isLoading ? "Guardando…" : submitLabel}
-        </Button>
-      </div>
-    </form>
+
+        {/* Acciones */}
+        <div className="flex items-center gap-2 pt-1">
+          {onDelete && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={onDelete}
+              disabled={isLoading}
+              className="press-effect cursor-pointer"
+            >
+              Eliminar
+            </Button>
+          )}
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="flex-1 press-effect cursor-pointer font-semibold"
+          >
+            {isLoading ? "Guardando…" : submitLabel}
+          </Button>
+        </div>
+      </form>
+
+      {/* IconPicker — rendered outside the form so it doesn't submit */}
+      <IconPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        value={icon ?? ""}
+        onChange={(v) => setValue("icon", v)}
+        logoCatalog="categories"
+      />
+    </>
   )
 }
