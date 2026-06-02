@@ -373,7 +373,14 @@ export function BudgetForm({
             <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
           )}
           {lockedCurrency !== null ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lockedCurrency === "ARS" ? "/icons/ar/monedas/ARS.svg" : "/icons/ar/monedas/USD.svg"}
+                alt=""
+                className="h-4 w-4 object-contain shrink-0"
+                aria-hidden="true"
+              />
               Moneda:{" "}
               <span className="font-semibold text-foreground">
                 {lockedCurrency === "ARS" ? "Pesos (ARS)" : "Dólares (USD)"}
