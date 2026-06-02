@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -46,31 +46,49 @@ export type BudgetFormValues = {
   is_recurring: boolean
 }
 
-const budgetSchema = z
-  .object({
-    name: z.string().min(1, "El nombre es obligatorio"),
-    icon: z.string().optional(),
-    limit_amount: z.coerce.number().positive("El límite debe ser mayor a 0"),
-    currency: z.enum(["ARS", "USD"]),
-    period: z
-      .enum(["weekly", "biweekly", "monthly", "quarterly", "annual"])
-      .nullable(),
-    start_date: z.string().min(1, "La fecha de inicio es obligatoria"),
-    end_date: z.string().min(1, "La fecha de fin es obligatoria"),
-    category_ids: z.array(z.string()),
-    account_ids: z.array(z.string()),
-    is_recurring: z.boolean(),
-  })
-  .refine(
-    (data) => {
-      if (!data.start_date || !data.end_date) return true
-      return data.end_date >= data.start_date
-    },
-    {
-      message: "La fecha de fin debe ser igual o posterior a la de inicio",
-      path: ["end_date"],
-    }
-  )
+const budgetBaseSchema = z.object({
+  name: z.string().min(1, "El nombre es obligatorio"),
+  icon: z.string().optional(),
+  limit_amount: z.coerce.number().positive("El límite debe ser mayor a 0"),
+  currency: z.enum(["ARS", "USD"]),
+  period: z
+    .enum(["weekly", "biweekly", "monthly", "quarterly", "annual"])
+    .nullable(),
+  start_date: z.string().min(1, "La fecha de inicio es obligatoria"),
+  end_date: z.string().min(1, "La fecha de fin es obligatoria"),
+  category_ids: z.array(z.string()),
+  account_ids: z.array(z.string()),
+  is_recurring: z.boolean(),
+})
+
+/** Build a schema that includes account-currency coherence validation.
+ *  Credit cards (tarjeta_credito) are wildcards — exempt from the restriction. */
+function makeBudgetSchema(accounts: Account[]) {
+  return budgetBaseSchema
+    .refine(
+      (data) => {
+        if (!data.start_date || !data.end_date) return true
+        return data.end_date >= data.start_date
+      },
+      {
+        message: "La fecha de fin debe ser igual o posterior a la de inicio",
+        path: ["end_date"],
+      }
+    )
+    .refine(
+      (data) => {
+        // Defense in depth: every selected non-card account must share the budget currency.
+        const selectedNonCards = accounts.filter(
+          (a) => data.account_ids.includes(a.id) && a.type !== "tarjeta_credito"
+        )
+        return selectedNonCards.every((a) => a.currency === data.currency)
+      },
+      {
+        message: "Todas las cuentas seleccionadas deben estar en la misma moneda que el presupuesto",
+        path: ["account_ids"],
+      }
+    )
+}
 
 const PERIOD_OPTIONS: { value: BudgetPeriod; label: string }[] = [
   { value: "weekly", label: "Semanal" },
@@ -154,7 +172,7 @@ export function BudgetForm({
     formState: { errors },
   } = useForm<BudgetFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(budgetSchema) as unknown as Resolver<BudgetFormValues, any>,
+    resolver: zodResolver(makeBudgetSchema(accounts)) as unknown as Resolver<BudgetFormValues, any>,
     defaultValues: {
       name: "",
       icon: "",
@@ -171,6 +189,40 @@ export function BudgetForm({
   })
 
   const watchedValues = watch()
+
+  // ── Single-currency restriction ───────────────────────────────────────────
+  // The currency of a budget is determined by the non-card accounts it covers.
+  // Credit cards (tarjeta_credito) are wildcards: they work with any currency.
+  const lockedCurrency = useMemo<"ARS" | "USD" | null>(() => {
+    const selectedNonCards = accounts.filter(
+      (a) => watchedValues.account_ids.includes(a.id) && a.type !== "tarjeta_credito"
+    )
+    if (selectedNonCards.length === 0) return null
+    return selectedNonCards[0].currency as "ARS" | "USD"
+  }, [accounts, watchedValues.account_ids])
+
+  // When the locked currency changes, force the form currency to match.
+  useEffect(() => {
+    if (lockedCurrency !== null) {
+      setValue("currency", lockedCurrency, { shouldValidate: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedCurrency])
+
+  // Filtered account options: when locked, hide accounts of the other currency
+  // (but keep all credit cards regardless of their nominal currency).
+  const accountOptions = useMemo(() => {
+    const visible = lockedCurrency === null
+      ? accounts
+      : accounts.filter(
+          (a) => a.type === "tarjeta_credito" || a.currency === lockedCurrency
+        )
+    return visible.map((a) => ({
+      value: a.id,
+      label: a.name,
+      leading: <AccountIconChip icon={a.icon} />,
+    }))
+  }, [accounts, lockedCurrency])
 
   // Compute which preset (if any) matches current desde/hasta dates
   const activePreset = detectPreset(
@@ -320,11 +372,21 @@ export function BudgetForm({
           {errors.limit_amount && (
             <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
           )}
-          <CurrencyToggle
-            value={watchedValues.currency}
-            onChange={(v) => setValue("currency", v)}
-            className="w-full"
-          />
+          {lockedCurrency !== null ? (
+            <p className="text-xs text-muted-foreground">
+              Moneda:{" "}
+              <span className="font-semibold text-foreground">
+                {lockedCurrency === "ARS" ? "Pesos (ARS)" : "Dólares (USD)"}
+              </span>
+              {" "}— determinada por las cuentas seleccionadas.
+            </p>
+          ) : (
+            <CurrencyToggle
+              value={watchedValues.currency}
+              onChange={(v) => setValue("currency", v)}
+              className="w-full"
+            />
+          )}
         </div>
 
         {/* 4. Período — preset buttons + siempre-visible desde/hasta */}
@@ -417,11 +479,7 @@ export function BudgetForm({
             <MangoMultiSelect
               values={watchedValues.account_ids}
               onChange={(v) => setValue("account_ids", v)}
-              options={accounts.map((a) => ({
-                value: a.id,
-                label: a.name,
-                leading: <AccountIconChip icon={a.icon} />,
-              }))}
+              options={accountOptions}
               placeholder="Todas las cuentas"
               showSearch
               aria-label="Cuentas del presupuesto"
