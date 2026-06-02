@@ -234,7 +234,7 @@ export function CompareTab({ movements, categories, currency = "ARS", period1, p
             {comparison.categories.map((cat, idx) => (
               <Link
                 key={`${cat.name}-${idx}`}
-                href={`/app/movements?type=expense`}
+                href={`/app/movimientos?type=expense`}
                 className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-muted/50 transition-colors group cursor-pointer"
               >
                 <div className="flex-1 min-w-0">

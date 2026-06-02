@@ -8,7 +8,7 @@ await p.locator('button[type="submit"]').first().click().catch(()=>p.keyboard.pr
 await p.waitForURL(/\/app\//,{timeout:30000}).catch(()=>{});
 // create 3 accounts via UI
 for (const [name,saldo] of [["Mercado Pago","48250"],["Brubank USD","1200"],["Efectivo","30000"]]) {
-  await p.goto(`${BASE}/app/accounts`,{waitUntil:"networkidle"}); await p.waitForTimeout(900);
+  await p.goto(`${BASE}/app/cuentas`,{waitUntil:"networkidle"}); await p.waitForTimeout(900);
   await p.getByRole("button",{name:/Nueva cuenta/i}).first().click().catch(()=>{});
   await p.waitForTimeout(700);
   await p.getByPlaceholder(/Cuenta Galicia/i).fill(name).catch(()=>{});
@@ -16,8 +16,8 @@ for (const [name,saldo] of [["Mercado Pago","48250"],["Brubank USD","1200"],["Ef
   await p.getByRole("button",{name:/^Crear cuenta$/i}).first().click().catch(()=>{});
   await p.waitForTimeout(1800);
 }
-await p.goto(`${BASE}/app/accounts`,{waitUntil:"networkidle"}); await p.waitForTimeout(1500);
+await p.goto(`${BASE}/app/cuentas`,{waitUntil:"networkidle"}); await p.waitForTimeout(1500);
 await p.screenshot({path:"design-mockups/qa/15-accounts-grid.png",fullPage:true});
-await p.goto(`${BASE}/app/dashboard`,{waitUntil:"networkidle"}); await p.waitForTimeout(2000);
+await p.goto(`${BASE}/app/inicio`,{waitUntil:"networkidle"}); await p.waitForTimeout(2000);
 await p.screenshot({path:"design-mockups/qa/16-dashboard-wide.png",fullPage:true});
 console.log("ok"); await b.close();

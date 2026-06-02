@@ -9,7 +9,7 @@ await p.fill('input[type="email"]', "qa@mangui.app");
 await p.fill('input[type="password"]', "ManguiQA-2026!");
 await p.getByRole("button", { name: /ingresar|entrar|iniciar/i }).first().click();
 await p.waitForURL(/\/app\//, { timeout: 30000 }).catch(() => {});
-await p.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+await p.goto(`${BASE}/app/cuentas`, { waitUntil: "networkidle" });
 await p.waitForTimeout(1200);
 // open new-account modal
 await p.getByRole("button", { name: /nueva cuenta|agregar cuenta|primera cuenta/i }).first().click().catch(() => {});

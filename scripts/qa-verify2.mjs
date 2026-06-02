@@ -13,7 +13,7 @@ const login = async () => {
   await p.waitForURL(/\/app\//, { timeout: 30000 }).catch(() => {});
 };
 const openModal = async () => {
-  await p.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/app/cuentas`, { waitUntil: "networkidle" });
   await p.waitForTimeout(1200);
   await p.getByRole("button", { name: /nueva cuenta|agregar cuenta|primera cuenta/i }).first().click().catch(()=>{});
   await p.waitForTimeout(1000);

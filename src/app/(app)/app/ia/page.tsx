@@ -415,7 +415,7 @@ export default function IASettingsPage() {
       {/* Link back to settings */}
       <div className="pb-4">
         <Link
-          href="/app/settings"
+          href="/app/ajustes"
           className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer"
         >
           ← Volver a Configuración

@@ -10,7 +10,7 @@ try {
   await p.fill('input[type="password"]', "ManguiQA-2026!");
   await p.locator('button[type="submit"]').first().click().catch(()=>p.keyboard.press("Enter"));
   await p.waitForURL(/\/app\//, { timeout: 30000 }).catch(()=>{});
-  await p.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/app/cuentas`, { waitUntil: "networkidle" });
   await p.waitForTimeout(1200);
   await p.getByRole("button", { name: /nueva cuenta|agregar cuenta|primera cuenta/i }).first().click().catch(()=>{});
   await p.waitForTimeout(900);
@@ -18,7 +18,7 @@ try {
   await p.locator('input[type="number"]').first().fill("150000").catch(()=>{});
   await p.getByRole("button", { name: /^Crear cuenta$/i }).first().click().catch(()=>{});
   await p.waitForTimeout(2500);
-  await p.goto(`${BASE}/app/accounts`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/app/cuentas`, { waitUntil: "networkidle" });
   await p.waitForTimeout(1500);
   await p.screenshot({ path: "design-mockups/qa/09-accounts-filterbar.png", fullPage: true });
   console.log("📸 09-accounts-filterbar.png");

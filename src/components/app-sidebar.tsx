@@ -26,12 +26,12 @@ import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
 
 const navItems = [
-  { icon: Home, label: "Inicio", href: "/app/dashboard" },
-  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movements" },
-  { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
+  { icon: Home, label: "Inicio", href: "/app/inicio" },
+  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movimientos" },
+  { icon: PiggyBank, label: "Cuentas", href: "/app/cuentas" },
   { icon: Tag, label: "Categorías", href: "/app/categorias" },
-  { icon: BarChart3, label: "Estadísticas", href: "/app/stats" },
-  { icon: CreditCard, label: "Tarjetas", href: "/app/cards" },
+  { icon: BarChart3, label: "Estadísticas", href: "/app/estadisticas" },
+  { icon: CreditCard, label: "Tarjetas", href: "/app/tarjetas" },
   { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
   { icon: Zap, label: "Reglas", href: "/app/reglas" },
   { icon: Wallet, label: "Presupuestos", href: "/app/presupuestos" },
@@ -65,7 +65,7 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar z-30 shadow-sm">
       {/* Brand */}
       <div className="flex items-center px-5 h-16 border-b border-sidebar-border">
-        <Link href="/app/dashboard" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+        <Link href="/app/inicio" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
           <BrandLockup size={28} />
         </Link>
       </div>
@@ -145,12 +145,12 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
           Integraciones
         </Link>
         <Link
-          href="/app/settings"
+          href="/app/ajustes"
           className={cn(
             "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
             "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            pathname === "/app/settings" &&
+            pathname === "/app/ajustes" &&
               "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
           )}
         >

@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
                 daysUntil === 0
                   ? `Hoy cierra tu tarjeta ${card.name}.`
                   : `Tu tarjeta ${card.name} cierra en ${daysUntil} día${daysUntil !== 1 ? "s" : ""}.`,
-              url: "/app/cards",
+              url: "/app/tarjetas",
             })
           })
           if (sent) totalSent++
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
                 daysUntil === 0
                   ? `Hoy vence el pago de ${card.name}.`
                   : `El pago de ${card.name} vence en ${daysUntil} día${daysUntil !== 1 ? "s" : ""}.`,
-              url: "/app/cards",
+              url: "/app/tarjetas",
             })
           })
           if (sent) totalSent++

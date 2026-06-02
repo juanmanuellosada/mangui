@@ -7,11 +7,11 @@ import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
 
 const navItems = [
-  { icon: Home, label: "Inicio", href: "/app/dashboard" },
-  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movements" },
+  { icon: Home, label: "Inicio", href: "/app/inicio" },
+  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movimientos" },
   null, // center slot — replaced by the "+" quick-add button
-  { icon: PiggyBank, label: "Cuentas", href: "/app/accounts" },
-  { icon: Settings, label: "Más", href: "/app/settings" },
+  { icon: PiggyBank, label: "Cuentas", href: "/app/cuentas" },
+  { icon: Settings, label: "Más", href: "/app/ajustes" },
 ];
 
 /**
