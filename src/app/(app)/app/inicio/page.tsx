@@ -74,7 +74,7 @@ export default async function DashboardPage() {
 
       {/* Onboarding CTA — shown only when user has no accounts */}
       {!hasAccounts && (
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-8 text-center space-y-5 animate-scale-in">
+        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 sm:p-8 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <Wallet className="h-8 w-8 text-primary" />
           </div>

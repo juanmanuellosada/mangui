@@ -133,7 +133,7 @@ export function CategoryPieChart() {
   }, [movements, categories])
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+    <div className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Gastos por categoría</h3>
@@ -171,7 +171,7 @@ export function CategoryPieChart() {
               data={chartData}
               dataKey="value"
               nameKey="name"
-              className="h-52"
+              className="h-44 sm:h-52 md:h-56"
             >
               <Pie
                 innerRadius="52%"

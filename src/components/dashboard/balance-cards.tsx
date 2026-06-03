@@ -76,7 +76,7 @@ export function BalanceCards({
   return (
     <div
       className={cn(
-        "rounded-2xl p-5 relative overflow-hidden",
+        "rounded-2xl p-4 sm:p-5 relative overflow-hidden",
         "bg-primary shadow-lg",
         "shadow-primary/30"
       )}
@@ -93,10 +93,10 @@ export function BalanceCards({
         style={{ filter: "blur(20px)" }}
       />
 
-      <div className="relative z-10 space-y-4">
+      <div className="relative z-10 space-y-4 min-w-0">
         {/* Label row */}
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-primary-foreground/60">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary-foreground/60">
             Balance total
           </p>
           {/* Currency toggle */}
@@ -106,12 +106,13 @@ export function BalanceCards({
             className={cn(
               "flex items-center gap-1.5 text-xs font-semibold",
               "bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground",
-              "px-2.5 py-1 rounded-lg transition-colors duration-200 press-effect cursor-pointer",
+              "min-h-[44px] px-3 py-1 rounded-lg transition-colors duration-200 press-effect cursor-pointer",
+              "sm:min-h-0 sm:px-2.5 sm:py-1",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50"
             )}
             title={`Ver en ${otherCurrency}`}
           >
-            <ArrowLeftRight className="h-3 w-3" />
+            <ArrowLeftRight className="h-3.5 w-3.5" />
             {otherCurrency}
           </button>
         </div>
@@ -121,7 +122,7 @@ export function BalanceCards({
           <Skeleton className="h-12 w-56 bg-primary-foreground/20" />
         ) : (
           <p
-            className="text-4xl md:text-5xl font-bold tabular-nums text-primary-foreground leading-none"
+            className="text-3xl sm:text-4xl md:text-5xl font-bold tabular-nums text-primary-foreground leading-none truncate min-w-0"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {formatCurrency(grandTotal, displayCurrency)}
@@ -135,7 +136,8 @@ export function BalanceCards({
             type="button"
             onClick={() => setDisplayCurrency("ARS")}
             className={cn(
-              "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-semibold tabular-nums transition-colors duration-150 press-effect cursor-pointer",
+              "flex items-center gap-1.5 text-xs px-3 rounded-lg font-semibold tabular-nums transition-colors duration-150 press-effect cursor-pointer",
+              "min-h-[44px] sm:min-h-0 sm:px-2.5 sm:py-1",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50",
               displayCurrency === "ARS"
                 ? "bg-primary-foreground/20 text-primary-foreground"
@@ -156,7 +158,8 @@ export function BalanceCards({
             type="button"
             onClick={() => setDisplayCurrency("USD")}
             className={cn(
-              "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-semibold tabular-nums transition-colors duration-150 press-effect cursor-pointer",
+              "flex items-center gap-1.5 text-xs px-3 rounded-lg font-semibold tabular-nums transition-colors duration-150 press-effect cursor-pointer",
+              "min-h-[44px] sm:min-h-0 sm:px-2.5 sm:py-1",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50",
               displayCurrency === "USD"
                 ? "bg-primary-foreground/20 text-primary-foreground"

@@ -4,39 +4,16 @@ import Link from "next/link";
 import { BrandLockup } from "@/components/brand-lockup";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
-  CreditCard,
-  Home,
-  PiggyBank,
-  Settings,
   PlusCircle,
   LogOut,
-  ArrowLeftRight,
-  Repeat,
-  Zap,
-  Wallet,
-  Target,
-  Plug,
-  Bot,
-  Tag,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
+import { PRIMARY_NAV, FOOTER_NAV } from "@/lib/nav-sections";
 
-const navItems = [
-  { icon: Home, label: "Inicio", href: "/app/inicio" },
-  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movimientos" },
-  { icon: PiggyBank, label: "Cuentas", href: "/app/cuentas" },
-  { icon: Tag, label: "Categorías", href: "/app/categorias" },
-  { icon: BarChart3, label: "Estadísticas", href: "/app/estadisticas" },
-  { icon: CreditCard, label: "Tarjetas", href: "/app/tarjetas" },
-  { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
-  { icon: Zap, label: "Reglas", href: "/app/reglas" },
-  { icon: Wallet, label: "Presupuestos", href: "/app/presupuestos" },
-  { icon: Target, label: "Metas", href: "/app/metas" },
-];
+const navItems = PRIMARY_NAV;
 
 interface AppSidebarProps {
   name: string;
@@ -118,45 +95,22 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
 
       {/* Footer: settings + user + logout */}
       <div className="p-3 space-y-0.5 pb-4">
-        <Link
-          href="/app/ia"
-          className={cn(
-            "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            pathname === "/app/ia" &&
-              "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-          )}
-        >
-          <Bot className="h-4 w-4 text-sidebar-foreground/70 flex-shrink-0" />
-          Inteligencia artificial
-        </Link>
-        <Link
-          href="/app/integraciones"
-          className={cn(
-            "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            pathname === "/app/integraciones" &&
-              "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-          )}
-        >
-          <Plug className="h-4 w-4 text-sidebar-foreground/70 flex-shrink-0" />
-          Integraciones
-        </Link>
-        <Link
-          href="/app/ajustes"
-          className={cn(
-            "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            pathname === "/app/ajustes" &&
-              "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-          )}
-        >
-          <Settings className="h-4 w-4 text-sidebar-foreground/70 flex-shrink-0" />
-          Configuración
-        </Link>
+        {FOOTER_NAV.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+              "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              pathname === item.href &&
+                "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+            )}
+          >
+            <item.icon className="h-4 w-4 text-sidebar-foreground/70 flex-shrink-0" />
+            {item.label}
+          </Link>
+        ))}
 
         {/* User card */}
         <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl">

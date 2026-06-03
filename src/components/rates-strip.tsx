@@ -31,33 +31,42 @@ export async function RatesStrip({ preferredRateType = "blue" }: RatesStripProps
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-xl bg-muted/50 border border-border/40 px-3 py-2 overflow-x-auto no-scrollbar">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1 shrink-0">
+    <div className="rounded-xl bg-muted/50 border border-border/40 px-3 py-2">
+      <span className="block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5 sm:hidden">
         USD/ARS
       </span>
-      {RATE_ORDER.map((rateType) => {
-        const data = rates[rateType]
-        if (!data) return null
-        const isPreferred = rateType === preferredRateType
+      {/* Mobile: 2×2 grid. sm+: single row */}
+      <div className="grid grid-cols-2 gap-1.5 sm:flex sm:items-center sm:gap-1.5">
+        <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1 shrink-0">
+          USD/ARS
+        </span>
+        {RATE_ORDER.map((rateType) => {
+          const data = rates[rateType]
+          if (!data) return null
+          const isPreferred = rateType === preferredRateType
 
-        return (
-          <div
-            key={rateType}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium shrink-0 transition-all",
-              isPreferred
-                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                : "bg-background/70 text-muted-foreground border border-border/60"
-            )}
-          >
-            <span className="font-semibold">{RATE_LABELS[rateType]}</span>
-            <span className={cn("text-[9px]", isPreferred ? "text-primary-foreground/60" : "opacity-40")}>C</span>
-            <span className="tabular-nums">{formatRate(data.buy)}</span>
-            <span className={cn("text-[9px]", isPreferred ? "text-primary-foreground/60" : "opacity-40")}>V</span>
-            <span className="tabular-nums">{formatRate(data.sell)}</span>
-          </div>
-        )
-      })}
+          return (
+            <div
+              key={rateType}
+              className={cn(
+                "flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-all",
+                "sm:inline-flex sm:justify-start sm:shrink-0 sm:px-2.5 sm:py-1",
+                isPreferred
+                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                  : "bg-background/70 text-muted-foreground border border-border/60"
+              )}
+            >
+              <span className="font-semibold">{RATE_LABELS[rateType]}</span>
+              <span className="flex items-center gap-0.5 tabular-nums">
+                <span className={cn("text-[9px]", isPreferred ? "text-primary-foreground/60" : "opacity-40")}>C</span>
+                <span>{formatRate(data.buy)}</span>
+                <span className={cn("text-[9px] ml-1", isPreferred ? "text-primary-foreground/60" : "opacity-40")}>V</span>
+                <span>{formatRate(data.sell)}</span>
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

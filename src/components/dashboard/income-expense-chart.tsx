@@ -95,7 +95,7 @@ export function IncomeExpenseChart() {
   const hasData = chartData.some((r) => r.ingresos > 0 || r.gastos > 0)
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+    <div className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Ingresos vs Gastos</h3>
@@ -138,7 +138,7 @@ export function IncomeExpenseChart() {
           barRadius={4}
           barCategoryGap={12}
           animationType="left-to-right"
-          className="h-52"
+          className="h-44 sm:h-52 md:h-56"
         >
           <Grid />
           <XAxis dataKey="mes" />
