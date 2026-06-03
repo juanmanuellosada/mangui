@@ -25,6 +25,7 @@ import {
   type Account,
 } from "@/lib/rules"
 import { ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
+import { AccountIconChip } from "@/lib/accounts"
 import { formatCurrency } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -407,14 +408,14 @@ export function RuleForm({
       {/* Match toggle */}
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground font-medium">Condiciones</Label>
-        <div className="flex rounded-xl bg-muted p-1 gap-1 w-fit">
+        <div className="flex rounded-xl bg-muted p-1 gap-1 w-full">
           {(["all", "any"] as RuleMatch[]).map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setMatch(m)}
               className={cn(
-                "px-4 h-8 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer",
+                "flex-1 px-4 h-8 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 match === m
                   ? "bg-background text-foreground shadow-sm"
@@ -463,7 +464,15 @@ export function RuleForm({
             onChange={(v) => setActionCategoryId(!v || v === "none" ? null : v)}
             options={[
               { value: "none", label: "– Sin cambio –" },
-              ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ...categories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                leading: c.icon ? (
+                  <span className="text-base leading-none select-none" aria-hidden>
+                    {c.icon}
+                  </span>
+                ) : undefined,
+              })),
             ]}
             placeholder="– Sin cambio –"
           />
@@ -476,7 +485,11 @@ export function RuleForm({
             onChange={(v) => setActionAccountId(!v || v === "none" ? null : v)}
             options={[
               { value: "none", label: "– Sin cambio –" },
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
+              ...accounts.map((a) => ({
+                value: a.id,
+                label: a.name,
+                leading: <AccountIconChip icon={a.icon} />,
+              })),
             ]}
             placeholder="– Sin cambio –"
           />
