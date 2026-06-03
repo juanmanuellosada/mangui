@@ -312,16 +312,80 @@ export type Database = {
         }
         Relationships: []
       }
+      goal_accounts: {
+        Row: {
+          account_id: string
+          goal_id: string
+        }
+        Insert: {
+          account_id: string
+          goal_id: string
+        }
+        Update: {
+          account_id?: string
+          goal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_accounts_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goal_categories: {
+        Row: {
+          category_id: string
+          goal_id: string
+        }
+        Insert: {
+          category_id: string
+          goal_id: string
+        }
+        Update: {
+          category_id?: string
+          goal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_categories_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goals: {
         Row: {
-          account_id: string | null
           baseline_amount: number | null
-          category_id: string | null
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
           deadline: string | null
+          end_date: string
+          icon: string | null
           id: string
+          is_global: boolean
           name: string
+          period: Database["public"]["Enums"]["goal_period"]
+          recurring: boolean
+          start_date: string
           status: Database["public"]["Enums"]["goal_status"]
           target_amount: number | null
           target_percent: number | null
@@ -330,14 +394,18 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          account_id?: string | null
           baseline_amount?: number | null
-          category_id?: string | null
           created_at?: string
           currency: Database["public"]["Enums"]["currency"]
           deadline?: string | null
+          end_date?: string
+          icon?: string | null
           id?: string
+          is_global?: boolean
           name: string
+          period?: Database["public"]["Enums"]["goal_period"]
+          recurring?: boolean
+          start_date?: string
           status?: Database["public"]["Enums"]["goal_status"]
           target_amount?: number | null
           target_percent?: number | null
@@ -346,14 +414,18 @@ export type Database = {
           user_id: string
         }
         Update: {
-          account_id?: string | null
           baseline_amount?: number | null
-          category_id?: string | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
           deadline?: string | null
+          end_date?: string
+          icon?: string | null
           id?: string
+          is_global?: boolean
           name?: string
+          period?: Database["public"]["Enums"]["goal_period"]
+          recurring?: boolean
+          start_date?: string
           status?: Database["public"]["Enums"]["goal_status"]
           target_amount?: number | null
           target_percent?: number | null
@@ -370,6 +442,11 @@ export type Database = {
           goal_id: string
           id: string
           month: string
+          percent: number | null
+          period_end: string | null
+          period_start: string | null
+          snap_status: string | null
+          target_amount: number | null
           user_id: string
         }
         Insert: {
@@ -378,6 +455,11 @@ export type Database = {
           goal_id: string
           id?: string
           month: string
+          percent?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          snap_status?: string | null
+          target_amount?: number | null
           user_id: string
         }
         Update: {
@@ -386,6 +468,11 @@ export type Database = {
           goal_id?: string
           id?: string
           month?: string
+          percent?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          snap_status?: string | null
+          target_amount?: number | null
           user_id?: string
         }
         Relationships: [
@@ -1219,8 +1306,15 @@ export type Database = {
       budget_status: "active" | "paused"
       category_type: "income" | "expense"
       currency: "ARS" | "USD"
+      goal_period:
+        | "weekly"
+        | "biweekly"
+        | "monthly"
+        | "quarterly"
+        | "annual"
+        | "custom"
       goal_status: "active" | "completed"
-      goal_type: "saving" | "reduction"
+      goal_type: "saving" | "reduction" | "income"
       movement_type: "income" | "expense"
       occurrence_status: "pending" | "confirmed" | "skipped"
       rate_type: "oficial" | "blue" | "mep" | "ccl" | "manual"
@@ -1386,8 +1480,16 @@ export const Constants = {
       budget_status: ["active", "paused"],
       category_type: ["income", "expense"],
       currency: ["ARS", "USD"],
+      goal_period: [
+        "weekly",
+        "biweekly",
+        "monthly",
+        "quarterly",
+        "annual",
+        "custom",
+      ],
       goal_status: ["active", "completed"],
-      goal_type: ["saving", "reduction"],
+      goal_type: ["saving", "reduction", "income"],
       movement_type: ["income", "expense"],
       occurrence_status: ["pending", "confirmed", "skipped"],
       rate_type: ["oficial", "blue", "mep", "ccl", "manual"],
