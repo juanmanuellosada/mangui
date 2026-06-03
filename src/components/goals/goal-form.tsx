@@ -13,7 +13,7 @@ import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
-import { CurrencySelect } from "@/components/ui/currency-select"
+import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { IconPicker } from "@/components/ui/icon-picker"
 import { GoalProgressBar } from "@/components/goals/goal-progress-bar"
 import { cn, formatCurrency } from "@/lib/utils"
@@ -27,6 +27,7 @@ import {
   type GoalScope,
   type GoalPeriod,
 } from "@/lib/goals"
+import { AccountIconChip } from "@/lib/accounts"
 import { createClient } from "@/lib/supabase/client"
 import type { Tables } from "@/lib/database.types"
 
@@ -428,7 +429,11 @@ export function GoalForm({
 
   // ── Option builders ─────────────────────────────────────────────────────────
 
-  const accountOptions = accounts.map((a) => ({ value: a.id, label: a.name }))
+  const accountOptions = accounts.map((a) => ({
+    value: a.id,
+    label: a.name,
+    leading: <AccountIconChip icon={a.icon} />,
+  }))
 
   const categoryOptions = categories.map((c) => ({
     value: c.id,
@@ -552,12 +557,12 @@ export function GoalForm({
             </button>
           </div>
 
-          {/* Currency select */}
+          {/* Currency toggle */}
           <div className="space-y-1.5 flex-1">
             <Label className="text-xs text-muted-foreground font-medium">Moneda</Label>
-            <CurrencySelect
+            <CurrencyToggle
               value={v.currency}
-              onChange={(val) => setValue("currency", val as "ARS" | "USD")}
+              onChange={(val) => setValue("currency", val)}
               className="w-full"
             />
           </div>
