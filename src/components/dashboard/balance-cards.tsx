@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeftRight } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -71,8 +70,6 @@ export function BalanceCards({
       ? totalARS + totalUSD * usdRate
       : totalUSD + totalARS / arsRate
 
-  const otherCurrency = displayCurrency === "ARS" ? "USD" : "ARS"
-
   return (
     <div
       className={cn(
@@ -95,27 +92,9 @@ export function BalanceCards({
 
       <div className="relative z-10 space-y-4 min-w-0">
         {/* Label row */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary-foreground/60">
-            Balance total
-          </p>
-          {/* Currency toggle */}
-          <button
-            type="button"
-            onClick={() => setDisplayCurrency(otherCurrency)}
-            className={cn(
-              "flex items-center gap-1.5 text-xs font-semibold",
-              "bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground",
-              "min-h-[44px] px-3 py-1 rounded-lg transition-colors duration-200 press-effect cursor-pointer",
-              "sm:min-h-0 sm:px-2.5 sm:py-1",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50"
-            )}
-            title={`Ver en ${otherCurrency}`}
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            {otherCurrency}
-          </button>
-        </div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-primary-foreground/60">
+          Balance total
+        </p>
 
         {/* Big hero number */}
         {isLoading ? (

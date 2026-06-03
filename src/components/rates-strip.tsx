@@ -63,7 +63,7 @@ export async function RatesStrip({ preferredRateType = "blue" }: RatesStripProps
               key={rateType}
               className={cn(
                 "flex flex-col gap-1 rounded-lg px-2.5 py-2 transition-all",
-                "sm:min-w-[88px]",
+                "sm:flex-1 sm:min-w-[88px]",
                 isPreferred
                   ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25 ring-1 ring-primary/40"
                   : "bg-background/70 border border-border/60"
