@@ -35,8 +35,7 @@ yarn-error.log*
 # but do track the example file
 !.env.example
 
-# PWA generated files
-/public/sw.js
+# PWA generated files (sw.js es estático y se commitea; workbox-*.js sería generado)
 /public/workbox-*.js
 
 # vercel
