@@ -103,28 +103,38 @@ export async function RatesStrip({ preferredRateType = "blue" }: RatesStripProps
                 <span className="flex items-baseline gap-0.5">
                   <span
                     className={cn(
-                      "text-[9px] font-bold uppercase",
+                      "text-[9px] font-bold",
                       isPreferred
                         ? "text-primary-foreground/55"
                         : "text-muted-foreground/60"
                     )}
                   >
-                    C
+                    $
                   </span>
                   <span className="text-xs font-semibold leading-none">
                     {formatRate(data.buy)}
                   </span>
                 </span>
+                <span
+                  className={cn(
+                    "text-[9px] font-normal leading-none",
+                    isPreferred
+                      ? "text-primary-foreground/40"
+                      : "text-muted-foreground/40"
+                  )}
+                >
+                  /
+                </span>
                 <span className="flex items-baseline gap-0.5">
                   <span
                     className={cn(
-                      "text-[9px] font-bold uppercase",
+                      "text-[9px] font-bold",
                       isPreferred
                         ? "text-primary-foreground/55"
                         : "text-muted-foreground/60"
                     )}
                   >
-                    V
+                    $
                   </span>
                   <span className="text-xs font-semibold leading-none">
                     {formatRate(data.sell)}
