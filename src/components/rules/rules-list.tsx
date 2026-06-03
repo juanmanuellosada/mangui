@@ -683,10 +683,11 @@ export function RulesList() {
           {!ms.selectionMode && (
             <Button
               onClick={() => openNewForm()}
-              className="hidden lg:inline-flex press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+              size="sm"
+              className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
             >
-              <PlusCircle className="h-4 w-4" />
-              Nueva regla
+              <PlusCircle className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Nueva regla</span>
             </Button>
           )}
         </div>
@@ -771,22 +772,6 @@ export function RulesList() {
         <p>Las reglas se aplican al crear un movimiento. La de mayor prioridad gana. No sobreescriben tu elecci&#243;n manual.</p>
       </div>
 
-      {/* FAB for mobile */}
-      <button
-        type="button"
-        onClick={() => openNewForm()}
-        className={cn(
-          "lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30",
-          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/35 press-effect",
-          "flex items-center justify-center",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        )}
-        aria-label="Nueva regla"
-      >
-        <PlusCircle className="h-6 w-6" />
-      </button>
-
       {/* Form dialog */}
       <Dialog
         open={showForm}
@@ -815,7 +800,7 @@ export function RulesList() {
 
       {/* Delete confirm */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent compact className="max-w-sm">
           <DialogHeader>
             <DialogTitle>&#191;Eliminar regla?</DialogTitle>
             <DialogDescription>
@@ -851,6 +836,7 @@ export function RulesList() {
 
       {/* Bulk delete confirm */}
       <ConfirmSheet
+        compact
         open={confirmOpen}
         onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
         title="Eliminar reglas"

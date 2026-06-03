@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import {
@@ -512,7 +512,7 @@ export function StatsFilterBar({
 
       {/* Save view dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent compact className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{isCompare ? "Guardar vista de comparación" : "Guardar vista"}</DialogTitle>
           </DialogHeader>

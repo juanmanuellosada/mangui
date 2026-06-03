@@ -842,17 +842,16 @@ export function RecurringList() {
           {!loadingRec && recurring.length > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          <div className="hidden lg:block">
-            {!ms.selectionMode && (
-              <Button
-                onClick={openCreate}
-                className="gap-2 press-effect font-semibold shadow-sm shadow-primary/20"
-              >
-                <PlusCircle className="h-4 w-4" />
-                Nueva recurrente
-              </Button>
-            )}
-          </div>
+          {!ms.selectionMode && (
+            <Button
+              onClick={openCreate}
+              size="sm"
+              className="gap-1.5 press-effect font-semibold shadow-sm shadow-primary/20"
+            >
+              <PlusCircle className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Nueva recurrente</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -928,22 +927,6 @@ export function RecurringList() {
         </div>
       )}
 
-      {/* Mobile FAB */}
-      <button
-        type="button"
-        onClick={openCreate}
-        className={cn(
-          "lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30",
-          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/35 press-effect",
-          "flex items-center justify-center",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        )}
-        aria-label="Nueva recurrente"
-      >
-        <PlusCircle className="h-6 w-6" />
-      </button>
-
       {/* Dialog */}
       <RecurringDialog
         rec={editingRec}
@@ -970,6 +953,7 @@ export function RecurringList() {
 
       {/* Bulk delete confirm */}
       <ConfirmSheet
+        compact
         open={confirmOpen}
         onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
         title="Eliminar recurrentes"

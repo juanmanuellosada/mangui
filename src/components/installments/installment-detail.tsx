@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -157,7 +157,7 @@ function DeletePurchaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Eliminar compra completa</DialogTitle>
           <DialogDescription>
@@ -226,7 +226,7 @@ function DeleteCuotaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
             Eliminar cuota {movement.installment_number}/{movement.installment_total}
@@ -573,6 +573,7 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
 
       {/* Bulk delete confirm */}
       <ConfirmSheet
+        compact
         open={confirmOpen}
         onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
         title="Eliminar cuotas"

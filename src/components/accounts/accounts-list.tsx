@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
@@ -288,7 +288,7 @@ function DeleteAccountDialog({ account }: { account: Account }) {
           <Trash2 className="h-3.5 w-3.5 text-destructive" />
         </Button>
       } />
-      <DialogContent className="max-w-sm">
+      <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Eliminar cuenta</DialogTitle>
           <DialogDescription>
@@ -585,7 +585,7 @@ function SortControl({
     <div
       role="group"
       aria-label="Ordenar por"
-      className="flex items-center gap-1 shrink-0"
+      className="flex items-center gap-1 w-full"
     >
       {SORT_PILLS.map(({ key, label }) => {
         const isActive = sortKey === key
@@ -598,7 +598,7 @@ function SortControl({
             onClick={() => handleClick(key)}
             aria-pressed={isActive}
             className={cn(
-              "inline-flex items-center gap-1 h-9 px-3 rounded-lg text-sm font-medium",
+              "flex-1 inline-flex items-center justify-center gap-1 h-9 px-2 md:px-3 rounded-lg text-xs md:text-sm font-medium min-w-0",
               "border transition-all duration-150 cursor-pointer select-none motion-reduce:transition-none",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
@@ -606,7 +606,7 @@ function SortControl({
                 : "bg-background border-input text-muted-foreground hover:border-ring/60 hover:text-foreground dark:bg-input/30"
             )}
           >
-            <span>{label}</span>
+            <span className="truncate">{label}</span>
             {showDir && <DirIcon className="h-3 w-3 shrink-0" aria-hidden />}
           </button>
         )

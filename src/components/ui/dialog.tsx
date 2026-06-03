@@ -43,9 +43,11 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  compact = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  compact?: boolean
 }) {
   return (
     <DialogPortal>
@@ -53,8 +55,27 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
+          // Shared base
+          "z-50 bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none",
+          compact
+            ? // Compact: always centered (old behavior), never full-screen
+              [
+                "fixed top-1/2 left-1/2 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 grid gap-4 rounded-xl p-4 sm:max-w-sm duration-100",
+                "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+                className,
+              ]
+            : // Full-screen on mobile, centered on desktop — base classes first, then caller className, then mobile overrides last so they win
+              [
+                // Animations and shared positioning
+                "fixed flex flex-col p-4 gap-4",
+                "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-top-4 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-top-4 duration-200",
+                // Desktop: centered dialog
+                "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:h-auto sm:max-h-[88dvh] sm:w-full sm:max-w-sm sm:rounded-xl sm:overflow-y-auto",
+                // Caller className applied here
+                className,
+                // Mobile full-screen overrides — last so they win over caller's max-h/overflow on mobile
+                "inset-0 w-full h-[100dvh] max-h-[100dvh] rounded-none overflow-y-auto sm:inset-auto",
+              ]
         )}
         {...props}
       >
@@ -102,7 +123,10 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        // Mobile full-screen: sticky to bottom of scroll container, no rounded corners, no negative bottom margin
+        "-mx-4 -mb-0 mt-auto flex flex-col-reverse gap-2 rounded-none border-t bg-muted/50 p-4 sticky bottom-0",
+        // Desktop: restore original style (rounded bottom, flex row, negative bottom margin)
+        "sm:-mb-4 sm:rounded-b-xl sm:flex-row sm:justify-end sm:static",
         className
       )}
       {...props}

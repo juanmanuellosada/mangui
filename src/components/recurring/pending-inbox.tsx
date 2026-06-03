@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -164,7 +164,7 @@ function EditOccurrenceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Editar y confirmar</DialogTitle>
           <DialogDescription>

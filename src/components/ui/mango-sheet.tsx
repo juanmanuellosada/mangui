@@ -62,6 +62,8 @@ export interface MangoSheetProps {
   description?: string
   children: React.ReactNode
   footer?: React.ReactNode
+  /** When true, stays compact and centered on all screen sizes (use for confirmation dialogs). */
+  compact?: boolean
 }
 
 export function MangoSheet({
@@ -71,6 +73,7 @@ export function MangoSheet({
   description,
   children,
   footer,
+  compact = false,
 }: MangoSheetProps) {
   const isMobile = useMobile()
   const reducedMotion = useReducedMotion()
@@ -204,25 +207,27 @@ export function MangoSheet({
 
   const shouldClose = dragY > 100
 
+  // On mobile non-compact: full-screen, no backdrop click-to-close (X button closes), no drag handle
+  // On mobile compact: centered dialog like desktop
+  const mobileFullScreen = isMobile && !compact
+
   const content = (
     <div
       className="fixed inset-0 z-50 flex"
-      // Desktop: centered; mobile: bottom-aligned
       style={{
-        alignItems: isMobile ? "flex-end" : "center",
+        alignItems: isMobile && !compact ? "flex-start" : isMobile ? "center" : "center",
         justifyContent: "center",
       }}
     >
-      {/* Backdrop */}
-      <div
-        className={cn(
-          "absolute inset-0 backdrop-blur-sm",
-          !isMobile && "data-open:animate-in data-open:fade-in-0"
-        )}
-        style={{ backgroundColor: `rgba(0,0,0,${backdropOpacity})`, transition: isDragging ? "none" : "background-color 0.2s ease-out" }}
-        aria-hidden="true"
-        onClick={() => onOpenChange(false)}
-      />
+      {/* Backdrop — hidden on mobile full-screen (panel covers entire screen) */}
+      {!mobileFullScreen && (
+        <div
+          className="absolute inset-0 backdrop-blur-sm"
+          style={{ backgroundColor: `rgba(0,0,0,${backdropOpacity})`, transition: isDragging ? "none" : "background-color 0.2s ease-out" }}
+          aria-hidden="true"
+          onClick={() => onOpenChange(false)}
+        />
+      )}
 
       {/* Panel */}
       <div
@@ -234,16 +239,24 @@ export function MangoSheet({
         tabIndex={-1}
         className={cn(
           "relative z-10 w-full flex flex-col bg-popover ring-1 ring-foreground/10 shadow-2xl focus:outline-none",
-          // Mobile: bottom sheet, slides up from bottom
-          isMobile
-            ? "rounded-t-2xl max-h-[92dvh]"
+          mobileFullScreen
+            ? // Mobile full-screen: occupy entire viewport, anchored to top
+              "h-[100dvh] max-h-[100dvh] rounded-none"
+            : isMobile
+            ? // Mobile compact: centered dialog
+              "rounded-xl max-w-[calc(100%-2rem)] max-h-[88dvh]"
             : // Desktop: centered dialog, max width, rounded all sides, bounded height
               "rounded-xl max-w-[calc(100%-2rem)] sm:max-w-md mx-4 max-h-[88dvh]",
-          // Desktop enter animation
-          !isMobile && !reducedMotion && "animate-in fade-in-0 zoom-in-95 duration-200"
+          // Enter animation
+          !mobileFullScreen && !reducedMotion && (
+            isMobile
+              ? "animate-in fade-in-0 zoom-in-95 duration-200"
+              : "animate-in fade-in-0 zoom-in-95 duration-200"
+          ),
+          mobileFullScreen && !reducedMotion && "animate-in fade-in-0 slide-in-from-top-4 duration-200"
         )}
         style={
-          isMobile
+          isMobile && !mobileFullScreen
             ? {
                 transform: reducedMotion ? undefined : `translateY(${dragY}px)`,
                 transition: isDragging || reducedMotion ? "none" : "transform 0.3s cubic-bezier(.32,.72,0,1)",
@@ -251,12 +264,12 @@ export function MangoSheet({
               }
             : undefined
         }
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={!mobileFullScreen ? handleTouchStart : undefined}
+        onTouchMove={!mobileFullScreen ? handleTouchMove : undefined}
+        onTouchEnd={!mobileFullScreen ? handleTouchEnd : undefined}
       >
-        {/* Drag handle — mobile only, acts as drag target */}
-        {isMobile && (
+        {/* Drag handle — mobile compact only (bottom sheet style), hidden in full-screen */}
+        {isMobile && !mobileFullScreen && (
           <div
             data-drag-handle
             className="flex justify-center pt-2.5 pb-1 cursor-grab active:cursor-grabbing shrink-0"
@@ -276,7 +289,7 @@ export function MangoSheet({
           data-drag-handle
           className={cn(
             "flex items-center justify-between px-4 py-3 shrink-0 border-b border-border/60",
-            isMobile && "cursor-grab active:cursor-grabbing"
+            isMobile && !mobileFullScreen && "cursor-grab active:cursor-grabbing"
           )}
         >
           <div className="flex flex-col gap-0.5 min-w-0">

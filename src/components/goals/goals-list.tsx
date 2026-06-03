@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -767,10 +767,11 @@ function CreateGoalDialog({
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="hidden lg:inline-flex press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+        size="sm"
+        className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
       >
-        <PlusCircle className="h-4 w-4" />
-        Nueva meta
+        <PlusCircle className="h-4 w-4 shrink-0" />
+        <span className="hidden sm:inline">Nueva meta</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -900,7 +901,7 @@ function EditGoalDialog({
   if (confirmDelete) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm">
+        <DialogContent compact className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Eliminar meta</DialogTitle>
             <DialogDescription>
@@ -962,78 +963,6 @@ function EditGoalDialog({
         )}
       </DialogContent>
     </Dialog>
-  )
-}
-
-// ── Mobile FAB ────────────────────────────────────────────────────────────────
-
-function FABCreate({
-  categories,
-  accounts,
-  movements,
-}: {
-  categories: Category[]
-  accounts: Account[]
-  movements: Movement[]
-}) {
-  const [open, setOpen] = useState(false)
-  const queryClient = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: async (values: GoalFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-      return saveGoal(values, undefined, user.id)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: GOALS_KEY })
-      queryClient.invalidateQueries({ queryKey: GOAL_ACCOUNTS_KEY })
-      queryClient.invalidateQueries({ queryKey: GOAL_CATEGORIES_KEY })
-      toast.success("Meta creada")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear la meta", { description: err.message })
-    },
-  })
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(
-          "lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30",
-          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/35 press-effect",
-          "flex items-center justify-center",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        )}
-        aria-label="Nueva meta"
-      >
-        <PlusCircle className="h-6 w-6" />
-      </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nueva meta</DialogTitle>
-            <DialogDescription>
-              Definí un objetivo de ahorro, ingreso o reducción de gastos.
-            </DialogDescription>
-          </DialogHeader>
-          <GoalForm
-            categories={categories}
-            accounts={accounts}
-            movements={movements}
-            onSubmit={async (v) => { await mutation.mutateAsync(v) }}
-            isLoading={mutation.isPending}
-            submitLabel="Crear meta"
-          />
-        </DialogContent>
-      </Dialog>
-    </>
   )
 }
 
@@ -1337,9 +1266,6 @@ export function GoalsList() {
         </div>
       )}
 
-      {/* Mobile FAB */}
-      <FABCreate categories={categories} accounts={accounts} movements={movements} />
-
       {/* Edit dialog */}
       {editingGoal && (
         <EditGoalDialog
@@ -1366,6 +1292,7 @@ export function GoalsList() {
 
       {/* Bulk delete confirm */}
       <ConfirmSheet
+        compact
         open={confirmOpen}
         onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
         title="Eliminar metas"

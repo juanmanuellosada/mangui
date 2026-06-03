@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -763,13 +763,13 @@ function CreateBudgetDialog({
 
   return (
     <>
-      {/* Desktop button */}
       <Button
         onClick={() => setOpen(true)}
-        className="hidden lg:inline-flex press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+        size="sm"
+        className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
       >
-        <PlusCircle className="h-4 w-4" />
-        Nuevo presupuesto
+        <PlusCircle className="h-4 w-4 shrink-0" />
+        <span className="hidden sm:inline">Nuevo presupuesto</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -868,7 +868,7 @@ function EditBudgetDialog({
   if (confirmDelete) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm">
+        <DialogContent compact className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Eliminar presupuesto</DialogTitle>
             <DialogDescription>
@@ -916,95 +916,6 @@ function EditBudgetDialog({
         />
       </DialogContent>
     </Dialog>
-  )
-}
-
-// ── Mobile FAB ────────────────────────────────────────────────────────────────
-
-function FABCreate({
-  categories,
-  accounts,
-  movements,
-}: {
-  categories: Category[]
-  accounts: Account[]
-  movements: Movement[]
-}) {
-  const [open, setOpen] = useState(false)
-  const queryClient = useQueryClient()
-
-  const mutation = useMutation({
-    mutationFn: async (values: BudgetFormValues) => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No autenticado")
-      const { data, error } = await supabase
-        .from("budgets")
-        .insert({
-          user_id: user.id,
-          name: values.name,
-          icon: values.icon?.trim() || null,
-          limit_amount: values.limit_amount,
-          currency: values.currency,
-          period: values.period,
-          category_ids: values.category_ids,
-          account_ids: values.account_ids,
-          is_recurring: values.is_recurring,
-          start_date: values.start_date,
-          end_date: values.end_date || null,
-          status: "active",
-        })
-        .select()
-        .single()
-      if (error) throw error
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: BUDGETS_KEY })
-      toast.success("Presupuesto creado")
-      setOpen(false)
-    },
-    onError: (err: Error) => {
-      toast.error("Error al crear el presupuesto", { description: err.message })
-    },
-  })
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(
-          "lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30",
-          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/35 press-effect",
-          "flex items-center justify-center",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        )}
-        aria-label="Nuevo presupuesto"
-      >
-        <PlusCircle className="h-6 w-6" />
-      </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nuevo presupuesto</DialogTitle>
-            <DialogDescription>
-              Configurá un límite de gasto por período.
-            </DialogDescription>
-          </DialogHeader>
-          <BudgetForm
-            categories={categories}
-            accounts={accounts}
-            movements={movements}
-            onSubmit={async (v) => { await mutation.mutateAsync(v) }}
-            isLoading={mutation.isPending}
-            submitLabel="Guardar presupuesto"
-          />
-        </DialogContent>
-      </Dialog>
-    </>
   )
 }
 
@@ -1292,9 +1203,6 @@ export function BudgetsList() {
         </div>
       )}
 
-      {/* Mobile FAB */}
-      <FABCreate categories={categories} accounts={accounts} movements={movements} />
-
       {/* Edit dialog */}
       {editingBudget && (
         <EditBudgetDialog
@@ -1321,6 +1229,7 @@ export function BudgetsList() {
 
       {/* Bulk delete confirm */}
       <ConfirmSheet
+        compact
         open={confirmOpen}
         onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
         title="Eliminar presupuestos"

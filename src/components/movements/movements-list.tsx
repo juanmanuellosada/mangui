@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useMemo, useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -710,7 +710,7 @@ function DeleteTransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Eliminar transferencia</DialogTitle>
           <DialogDescription>
@@ -923,7 +923,7 @@ function DeleteMovementDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Eliminar movimiento</DialogTitle>
           <DialogDescription>
@@ -1270,7 +1270,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories }: Movement
 
       {/* Save view dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent compact className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Guardar vista</DialogTitle>
           </DialogHeader>
