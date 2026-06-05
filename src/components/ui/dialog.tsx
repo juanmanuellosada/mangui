@@ -74,7 +74,7 @@ function DialogContent({
                 // Caller className applied here
                 className,
                 // Mobile full-screen overrides — last so they win over caller's max-h/overflow on mobile
-                "inset-0 w-full h-[100dvh] max-h-[100dvh] rounded-none overflow-y-auto sm:inset-auto",
+                "inset-0 w-full h-[100dvh] max-h-[100dvh] rounded-none overflow-y-auto",
               ]
         )}
         {...props}
