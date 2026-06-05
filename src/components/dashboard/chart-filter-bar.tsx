@@ -56,7 +56,7 @@ export function ChartFilterBar({
   categoryOptions,
 }: ChartFilterBarProps) {
   return (
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+    <div className="flex flex-nowrap items-center gap-2">
       <div className="flex-1 min-w-0">
         <DateRangeFilter
           value={filters.date}

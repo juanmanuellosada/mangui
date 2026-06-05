@@ -9,7 +9,8 @@
  */
 
 import * as React from "react"
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -56,12 +57,19 @@ export function MangoMultiSelect({
   "aria-label": ariaLabel,
 }: MangoMultiSelectProps) {
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, placeAbove: false })
+  const [posReady, setPosReady] = useState(false)
+  const [revealed, setRevealed] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const [searchQuery, setSearchQuery] = useState("")
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setMounted(true) }, [])
 
   // When showSearch is active, filter by normalized label; otherwise use all options.
   const filteredOptions =
@@ -70,6 +78,45 @@ export function MangoMultiSelect({
           normalizeLabel(o.label).includes(normalizeLabel(searchQuery))
         )
       : options
+
+  // ── Portal positioning (mirrors DateRangeFilter) ──────────────────────────
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const popoverHeight = 300 // conservative estimate for the dropdown
+    const spaceBelow = window.innerHeight - rect.bottom
+    const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight
+    setPos({
+      top: placeAbove ? rect.top - 8 : rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+      placeAbove,
+    })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosReady(false)
+      setRevealed(false)
+      return
+    }
+    updatePos()
+    setPosReady(true)
+    window.addEventListener("scroll", updatePos, true)
+    window.addEventListener("resize", updatePos)
+    return () => {
+      window.removeEventListener("scroll", updatePos, true)
+      window.removeEventListener("resize", updatePos)
+    }
+  }, [open, updatePos])
+
+  useEffect(() => {
+    if (!posReady) return
+    setRevealed(true)
+  }, [posReady])
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   const openDropdown = useCallback(() => {
     if (disabled) return
@@ -101,13 +148,14 @@ export function MangoMultiSelect({
     onChange([])
   }, [onChange])
 
-  // Close on outside click
+  // Close on outside click (check trigger + portal popover separately)
   useEffect(() => {
     if (!open) return
     function handleClick(e: MouseEvent) {
+      const t = e.target as Node
       if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        !triggerRef.current?.contains(t) &&
+        !popoverRef.current?.contains(t)
       ) {
         closeDropdown()
       }
@@ -213,15 +261,6 @@ export function MangoMultiSelect({
     }
   }
 
-  // Popover auto-flip: place below trigger, flip to above if near bottom.
-  const [dropUp, setDropUp] = useState(false)
-  useEffect(() => {
-    if (!open || !triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    const spaceBelow = window.innerHeight - rect.bottom
-    setDropUp(spaceBelow < 260)
-  }, [open])
-
   // Trigger label: show count when selections exist, placeholder when empty.
   const selectedCount = values.length
   const selectedOptions = options.filter((o) => values.includes(o.value))
@@ -319,120 +358,122 @@ export function MangoMultiSelect({
         </span>
       </button>
 
-      {/* Popover */}
-      {open && (
+      {/* Portal popover */}
+      {mounted && open && createPortal(
         <div
+          ref={popoverRef}
+          role="listbox"
+          aria-multiselectable="true"
+          aria-label={ariaLabel ?? "Opciones"}
           className={cn(
-            "absolute z-50 w-full",
-            dropUp ? "bottom-full mb-1" : "top-full mt-1"
+            "fixed z-[200] rounded-lg border border-border/80",
+            "bg-popover text-popover-foreground shadow-lg",
+            "transition-[opacity,scale] duration-[150ms] ease-out motion-reduce:transition-none",
+            revealed ? "opacity-100 scale-100" : "opacity-0 scale-[0.97] pointer-events-none",
+            pos.placeAbove ? "origin-bottom" : "origin-top",
           )}
+          style={{
+            top: pos.top,
+            left: pos.left,
+            minWidth: pos.width,
+            transform: pos.placeAbove ? "translateY(-100%)" : undefined,
+          }}
         >
-          <div
-            className={cn(
-              "rounded-lg border border-border/80",
-              "bg-popover text-popover-foreground shadow-lg",
-              "animate-in fade-in-0 zoom-in-95 duration-150",
-              dropUp ? "origin-bottom" : "origin-top"
-            )}
+          {/* Search input */}
+          {showSearch && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60">
+              <SearchIcon
+                className="h-3.5 w-3.5 text-muted-foreground shrink-0"
+                aria-hidden
+              />
+              <input
+                ref={searchRef}
+                type="text"
+                role="searchbox"
+                aria-label="Buscar opción"
+                autoComplete="off"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar…"
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
+              />
+            </div>
+          )}
+
+          {/* Options list */}
+          <ul
+            ref={listRef}
+            className="max-h-60 overflow-y-auto"
           >
-            {/* Search input */}
-            {showSearch && (
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60">
-                <SearchIcon
-                  className="h-3.5 w-3.5 text-muted-foreground shrink-0"
-                  aria-hidden
-                />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  role="searchbox"
-                  aria-label="Buscar opción"
-                  autoComplete="off"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Buscar…"
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
-                />
-              </div>
-            )}
-
-            {/* Options list */}
-            <ul
-              ref={listRef}
-              role="listbox"
-              aria-multiselectable="true"
-              aria-label={ariaLabel ?? "Opciones"}
-              className="max-h-60 overflow-y-auto"
-            >
-              {filteredOptions.length === 0 ? (
-                <li
-                  role="presentation"
-                  className="px-3 py-3 text-sm text-muted-foreground text-center select-none"
-                >
-                  Sin resultados
-                </li>
-              ) : (
-                filteredOptions.map((option, idx) => {
-                  const isSelected = values.includes(option.value)
-                  return (
-                    <li
-                      key={option.value}
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-disabled={option.disabled}
-                      tabIndex={option.disabled ? -1 : 0}
-                      onClick={() => !option.disabled && toggleOption(option.value)}
-                      onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+            {filteredOptions.length === 0 ? (
+              <li
+                role="presentation"
+                className="px-3 py-3 text-sm text-muted-foreground text-center select-none"
+              >
+                Sin resultados
+              </li>
+            ) : (
+              filteredOptions.map((option, idx) => {
+                const isSelected = values.includes(option.value)
+                return (
+                  <li
+                    key={option.value}
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={option.disabled}
+                    tabIndex={option.disabled ? -1 : 0}
+                    onClick={() => !option.disabled && toggleOption(option.value)}
+                    onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none",
+                      "transition-colors duration-100 outline-none",
+                      !option.disabled &&
+                        "hover:bg-accent/10 focus:bg-accent/10",
+                      isSelected && "font-medium text-primary",
+                      option.disabled && "opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    {/* Checkbox indicator */}
+                    <span
                       className={cn(
-                        "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer select-none",
-                        "transition-colors duration-100 outline-none",
-                        !option.disabled &&
-                          "hover:bg-accent/10 focus:bg-accent/10",
-                        isSelected && "font-medium text-primary",
-                        option.disabled && "opacity-40 cursor-not-allowed"
+                        "flex items-center justify-center h-4 w-4 rounded border shrink-0 transition-colors",
+                        isSelected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border/60 bg-background"
                       )}
+                      aria-hidden
                     >
-                      {/* Checkbox indicator */}
-                      <span
-                        className={cn(
-                          "flex items-center justify-center h-4 w-4 rounded border shrink-0 transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border/60 bg-background"
-                        )}
-                        aria-hidden
-                      >
-                        {isSelected && (
-                          <CheckIcon className="h-2.5 w-2.5" aria-hidden />
-                        )}
-                      </span>
-                      {option.leading && (
-                        <span className="flex items-center shrink-0">
-                          {option.leading}
-                        </span>
+                      {isSelected && (
+                        <CheckIcon className="h-2.5 w-2.5" aria-hidden />
                       )}
-                      <span className="flex-1 truncate">{option.label}</span>
-                    </li>
-                  )
-                })
-              )}
-            </ul>
-
-            {/* Footer: Limpiar action */}
-            {values.length > 0 && (
-              <div className="border-t border-border/60 px-3 py-1.5">
-                <button
-                  type="button"
-                  onClick={clearAll}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Limpiar
-                </button>
-              </div>
+                    </span>
+                    {option.leading && (
+                      <span className="flex items-center shrink-0">
+                        {option.leading}
+                      </span>
+                    )}
+                    <span className="flex-1 truncate">{option.label}</span>
+                  </li>
+                )
+              })
             )}
-          </div>
-        </div>
+          </ul>
+
+          {/* Footer: Limpiar action */}
+          {values.length > 0 && (
+            <div className="border-t border-border/60 px-3 py-1.5">
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Limpiar
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body,
       )}
     </div>
   )
