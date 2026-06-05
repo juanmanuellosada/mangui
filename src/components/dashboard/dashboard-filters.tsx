@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
-import { SlidersHorizontal } from "lucide-react"
 import type { Tables } from "@/lib/database.types"
 
 type Account = Tables<"accounts">
@@ -100,8 +99,7 @@ export function DashboardGlobalFilters() {
 
   return (
     <div className="flex flex-nowrap items-center gap-2">
-      <SlidersHorizontal className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-      <div className="flex-1 min-w-0">
+<div className="flex-1 min-w-0">
         <MangoMultiSelect
           values={accountIds}
           onChange={setAccountIds}
