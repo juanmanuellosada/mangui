@@ -200,11 +200,12 @@ function makeCustomLink(dark: boolean) {
     const expenseIdx = sourcePayload?.expenseIdx ?? 0
     const fillColor = nodeColor(kind, expenseIdx, dark)
 
+  const halfW = linkWidth / 2
   const d = `
-    M${sourceX},${sourceY}
-    C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}
-    L${targetX},${targetY + linkWidth}
-    C${targetControlX},${targetY + linkWidth} ${sourceControlX},${sourceY + linkWidth} ${sourceX},${sourceY + linkWidth}
+    M${sourceX},${sourceY - halfW}
+    C${sourceControlX},${sourceY - halfW} ${targetControlX},${targetY - halfW} ${targetX},${targetY - halfW}
+    L${targetX},${targetY + halfW}
+    C${targetControlX},${targetY + halfW} ${sourceControlX},${sourceY + halfW} ${sourceX},${sourceY + halfW}
     Z
   `
 
