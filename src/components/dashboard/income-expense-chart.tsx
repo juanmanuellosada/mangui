@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency } from "@/lib/utils"
@@ -15,26 +15,40 @@ import {
   Legend,
 } from "@/components/evilcharts/charts/bar-chart"
 import type { Tables } from "@/lib/database.types"
-import { subMonths, startOfMonth, endOfMonth, format } from "date-fns"
+import {
+  startOfMonth,
+  endOfMonth,
+  format,
+  eachMonthOfInterval,
+  parseISO,
+} from "date-fns"
 import { es } from "date-fns/locale"
+import { filterMovements } from "@/lib/stats"
+import { fetchAllMovements } from "@/lib/movements"
+import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
+import {
+  ChartFilterBar,
+  chartFiltersToStatsFilter,
+  dateFromLastN,
+  type ChartFilters,
+} from "./chart-filter-bar"
 
-type Movement = Tables<"movements">
-type MovementSlim = Pick<Movement, "id" | "type" | "amount" | "converted_amount" | "date">
+type Category = Tables<"categories">
+type Account = Tables<"accounts">
 
-const MONTHS = 6
-
-async function fetchMonthsMovements(): Promise<MovementSlim[]> {
+async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient()
-  const now = new Date()
-  const from = format(startOfMonth(subMonths(now, MONTHS - 1)), "yyyy-MM-dd")
-  const to = format(endOfMonth(now), "yyyy-MM-dd")
-  const { data, error } = await supabase
-    .from("movements")
-    .select("id, type, amount, converted_amount, date")
-    .gte("date", from)
-    .lte("date", to)
+  const { data, error } = await supabase.from("categories").select("*")
   if (error) throw error
-  return data as MovementSlim[]
+  return data
+}
+
+async function fetchAccounts(): Promise<Account[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("accounts").select("*").order("name")
+  if (error) throw error
+  return data
 }
 
 type BarRow = { mes: string; ingresos: number; gastos: number }
@@ -57,40 +71,99 @@ const barChartConfig = {
 } satisfies Record<keyof Omit<BarRow, "mes">, { label: string; colors: { light: string[]; dark: string[] } }>
 
 export function IncomeExpenseChart() {
-  const { data: movements, isLoading } = useQuery<MovementSlim[]>({
-    queryKey: ["movements", "last-6-months"],
-    queryFn: fetchMonthsMovements,
+  const [filters, setFilters] = useState<ChartFilters>(() => ({
+    date: dateFromLastN(6, "months"),
+    accountIds: [],
+    categoryIds: [],
+  }))
+
+  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+    queryKey: ["movements", "stats-all"],
+    queryFn: fetchAllMovements,
   })
 
+  const { data: categories, isLoading: loadingCategories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+  })
+
+  const { data: accounts, isLoading: loadingAccounts } = useQuery({
+    queryKey: ["accounts", "stats"],
+    queryFn: fetchAccounts,
+  })
+
+  const isLoading = loadingMovements || loadingCategories || loadingAccounts
+
+  const statsFilter = useMemo(
+    () => chartFiltersToStatsFilter(filters, "all"),
+    [filters],
+  )
+
+  const filtered = useMemo(
+    () => (allMovements ? filterMovements(allMovements, statsFilter) : []),
+    [allMovements, statsFilter],
+  )
+
+  const accountOptions = useMemo(
+    () =>
+      (accounts ?? []).map((a) => ({
+        value: a.id,
+        label: a.name,
+        leading: <AccountIconChip icon={a.icon} />,
+      })),
+    [accounts],
+  )
+
+  const categoryOptions = useMemo(
+    () =>
+      (categories ?? []).map((c) => ({
+        value: c.id,
+        label: c.name,
+        leading: <CategoryIconChip icon={c.icon} />,
+      })),
+    [categories],
+  )
+
   const chartData: BarRow[] = useMemo(() => {
-    if (!movements) return []
+    if (!filtered.length) return []
 
-    const now = new Date()
-    const rows: BarRow[] = []
+    // Determine the month range to display
+    let rangeStart: Date
+    let rangeEnd: Date
 
-    for (let i = MONTHS - 1; i >= 0; i--) {
-      const d = subMonths(now, i)
-      const from = format(startOfMonth(d), "yyyy-MM-dd")
-      const to = format(endOfMonth(d), "yyyy-MM-dd")
+    if (filters.date.from && filters.date.to) {
+      rangeStart = startOfMonth(parseISO(filters.date.from))
+      rangeEnd = endOfMonth(parseISO(filters.date.to))
+    } else {
+      // Fallback: derive range from the filtered movements themselves
+      const dates = filtered.map((m) => m.date).sort()
+      if (dates.length === 0) return []
+      rangeStart = startOfMonth(parseISO(dates[0]))
+      rangeEnd = endOfMonth(parseISO(dates[dates.length - 1]))
+    }
+
+    const months = eachMonthOfInterval({ start: rangeStart, end: rangeEnd })
+
+    return months.map((monthDate) => {
+      const from = format(startOfMonth(monthDate), "yyyy-MM-dd")
+      const to = format(endOfMonth(monthDate), "yyyy-MM-dd")
 
       let ingresos = 0
       let gastos = 0
-      for (const m of movements) {
+      for (const m of filtered) {
         if (m.date < from || m.date > to) continue
         const amount = m.converted_amount ?? m.amount
         if (m.type === "income") ingresos += amount
         else gastos += amount
       }
 
-      rows.push({
-        mes: format(d, "MMM", { locale: es }),
+      return {
+        mes: format(monthDate, "MMM", { locale: es }),
         ingresos: Math.round(ingresos),
         gastos: Math.round(gastos),
-      })
-    }
-
-    return rows
-  }, [movements])
+      }
+    })
+  }, [filtered, filters.date])
 
   const hasData = chartData.some((r) => r.ingresos > 0 || r.gastos > 0)
 
@@ -99,10 +172,15 @@ export function IncomeExpenseChart() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Ingresos vs Gastos</h3>
-        <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-          Últimos 6 meses
-        </span>
       </div>
+
+      {/* Filters */}
+      <ChartFilterBar
+        filters={filters}
+        onChange={setFilters}
+        accountOptions={accountOptions}
+        categoryOptions={categoryOptions}
+      />
 
       {isLoading && (
         <div className="space-y-2 py-2">
@@ -126,7 +204,7 @@ export function IncomeExpenseChart() {
         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
           <BarChart3 className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">
-            Sin movimientos en los últimos 6 meses.
+            Sin movimientos para el período y filtros seleccionados.
           </p>
         </div>
       )}
@@ -151,23 +229,23 @@ export function IncomeExpenseChart() {
         </EvilBarChart>
       )}
 
-      {/* Summary row — current month */}
+      {/* Summary row — last month in range */}
       {!isLoading && hasData && (() => {
-        const currentMonth = chartData[chartData.length - 1]
-        if (!currentMonth) return null
-        const diff = currentMonth.ingresos - currentMonth.gastos
+        const lastMonth = chartData[chartData.length - 1]
+        if (!lastMonth) return null
+        const diff = lastMonth.ingresos - lastMonth.gastos
         return (
           <div className="flex gap-4 pt-2 text-xs border-t border-border/40">
             <div className="flex-1 text-center">
               <p className="text-muted-foreground mb-0.5">Ingresos</p>
               <p className="font-semibold tabular-nums text-success">
-                {formatCurrency(currentMonth.ingresos, "ARS")}
+                {formatCurrency(lastMonth.ingresos, "ARS")}
               </p>
             </div>
             <div className="flex-1 text-center">
               <p className="text-muted-foreground mb-0.5">Gastos</p>
               <p className="font-semibold tabular-nums text-destructive">
-                {formatCurrency(currentMonth.gastos, "ARS")}
+                {formatCurrency(lastMonth.gastos, "ARS")}
               </p>
             </div>
             <div className="flex-1 text-center">

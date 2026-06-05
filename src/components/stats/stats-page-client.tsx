@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { fetchAllMovements } from "@/lib/movements"
 import {
   filterMovements,
   summaryTotals,
@@ -41,17 +42,6 @@ type Budget = Tables<"budgets">
 type RecurringTransaction = Tables<"recurring_transactions">
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
-
-async function fetchMovements(): Promise<Movement[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("movements")
-    .select("*")
-    .order("date", { ascending: false })
-    .limit(2000)
-  if (error) throw error
-  return data
-}
 
 async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient()
@@ -222,7 +212,7 @@ export function StatsPageClient() {
 
   const { data: movements = [], isLoading: loadingMovements } = useQuery({
     queryKey: ["movements", "stats-all"],
-    queryFn: fetchMovements,
+    queryFn: fetchAllMovements,
   })
 
   const { data: categories = [], isLoading: loadingCategories } = useQuery({

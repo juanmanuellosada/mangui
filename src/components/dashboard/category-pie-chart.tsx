@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency } from "@/lib/utils"
@@ -14,31 +14,30 @@ import {
 } from "@/components/evilcharts/charts/pie-chart"
 import type { ChartConfig } from "@/components/evilcharts/ui/chart"
 import type { Tables } from "@/lib/database.types"
-import { startOfMonth, endOfMonth, format } from "date-fns"
+import { filterMovements } from "@/lib/stats"
+import { fetchAllMovements } from "@/lib/movements"
+import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
+import {
+  ChartFilterBar,
+  chartFiltersToStatsFilter,
+  dateFromPreset,
+  type ChartFilters,
+} from "./chart-filter-bar"
 
-type Movement = Tables<"movements">
 type Category = Tables<"categories">
+type Account = Tables<"accounts">
 
-async function fetchCurrentMonthMovements(): Promise<Movement[]> {
+async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient()
-  const now = new Date()
-  const from = format(startOfMonth(now), "yyyy-MM-dd")
-  const to = format(endOfMonth(now), "yyyy-MM-dd")
-  const { data, error } = await supabase
-    .from("movements")
-    .select("*")
-    .eq("type", "expense")
-    .gte("date", from)
-    .lte("date", to)
+  const { data, error } = await supabase.from("categories").select("*")
   if (error) throw error
   return data
 }
 
-async function fetchCategories(): Promise<Category[]> {
+async function fetchAccounts(): Promise<Account[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
+  const { data, error } = await supabase.from("accounts").select("*").order("name")
   if (error) throw error
   return data
 }
@@ -67,9 +66,15 @@ const CATEGORY_COLORS_DARK = [
 const TOP_N = 5
 
 export function CategoryPieChart() {
-  const { data: movements, isLoading: loadingMovements } = useQuery({
-    queryKey: ["movements", "current-month-expenses"],
-    queryFn: fetchCurrentMonthMovements,
+  const [filters, setFilters] = useState<ChartFilters>(() => ({
+    date: dateFromPreset("this_month"),
+    accountIds: [],
+    categoryIds: [],
+  }))
+
+  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+    queryKey: ["movements", "stats-all"],
+    queryFn: fetchAllMovements,
   })
 
   const { data: categories, isLoading: loadingCategories } = useQuery({
@@ -77,17 +82,54 @@ export function CategoryPieChart() {
     queryFn: fetchCategories,
   })
 
-  const isLoading = loadingMovements || loadingCategories
+  const { data: accounts, isLoading: loadingAccounts } = useQuery({
+    queryKey: ["accounts", "stats"],
+    queryFn: fetchAccounts,
+  })
+
+  const isLoading = loadingMovements || loadingCategories || loadingAccounts
+
+  const statsFilter = useMemo(
+    () => chartFiltersToStatsFilter(filters, "expense"),
+    [filters],
+  )
+
+  const filtered = useMemo(
+    () => (allMovements ? filterMovements(allMovements, statsFilter) : []),
+    [allMovements, statsFilter],
+  )
+
+  const accountOptions = useMemo(
+    () =>
+      (accounts ?? []).map((a) => ({
+        value: a.id,
+        label: a.name,
+        leading: <AccountIconChip icon={a.icon} />,
+      })),
+    [accounts],
+  )
+
+  const categoryOptions = useMemo(
+    () =>
+      (categories ?? [])
+        .filter((c) => c.type === "expense")
+        .map((c) => ({
+          value: c.id,
+          label: c.name,
+          leading: <CategoryIconChip icon={c.icon} />,
+        })),
+    [categories],
+  )
 
   const { chartData, config, totalExpenses } = useMemo(() => {
-    if (!movements || !categories) return { chartData: [], config: {} as ChartConfig, totalExpenses: 0 }
+    if (!filtered.length || !categories) return { chartData: [], config: {} as ChartConfig, totalExpenses: 0 }
 
     const catMap = new Map(categories.map((c) => [c.id, c]))
 
     // Sum by category
     const totals = new Map<string, number>()
     let total = 0
-    for (const m of movements) {
+    for (const m of filtered) {
       const amount = m.converted_amount ?? m.amount
       total += amount
       const key = m.category_id ?? "__none__"
@@ -133,17 +175,22 @@ export function CategoryPieChart() {
     }
 
     return { chartData: rows, config: cfg, totalExpenses: total }
-  }, [movements, categories])
+  }, [filtered, categories])
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Gastos por categoría</h3>
-        <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-          Este mes
-        </span>
       </div>
+
+      {/* Filters */}
+      <ChartFilterBar
+        filters={filters}
+        onChange={setFilters}
+        accountOptions={accountOptions}
+        categoryOptions={categoryOptions}
+      />
 
       {isLoading && (
         <div className="flex flex-col items-center gap-3 py-4">
@@ -160,7 +207,7 @@ export function CategoryPieChart() {
         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
           <PieChart className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">
-            Sin gastos este mes todavía.
+            Sin gastos para el período y filtros seleccionados.
           </p>
         </div>
       )}

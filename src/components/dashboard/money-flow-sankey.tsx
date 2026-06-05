@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useTheme } from "next-themes"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
@@ -11,31 +11,33 @@ import { ArrowRightLeft } from "lucide-react"
 import { Sankey, Tooltip, ResponsiveContainer, Layer, Rectangle } from "recharts"
 import type { NodeProps, LinkProps, SankeyData } from "recharts/types/chart/Sankey"
 import type { Tables } from "@/lib/database.types"
-import { startOfMonth, endOfMonth, format } from "date-fns"
-import { es } from "date-fns/locale"
+import { filterMovements } from "@/lib/stats"
+import { fetchAllMovements } from "@/lib/movements"
+import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
+import {
+  ChartFilterBar,
+  chartFiltersToStatsFilter,
+  dateFromPreset,
+  type ChartFilters,
+} from "./chart-filter-bar"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
+type Account = Tables<"accounts">
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
-
-async function fetchCurrentMonthMovements(): Promise<Movement[]> {
-  const supabase = createClient()
-  const now = new Date()
-  const from = format(startOfMonth(now), "yyyy-MM-dd")
-  const to = format(endOfMonth(now), "yyyy-MM-dd")
-  const { data, error } = await supabase
-    .from("movements")
-    .select("*")
-    .gte("date", from)
-    .lte("date", to)
-  if (error) throw error
-  return data
-}
 
 async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("categories").select("*")
+  if (error) throw error
+  return data
+}
+
+async function fetchAccounts(): Promise<Account[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("accounts").select("*").order("name")
   if (error) throw error
   return data
 }
@@ -482,9 +484,15 @@ export function MoneyFlowSankey() {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
-  const { data: movements, isLoading: loadingMovements } = useQuery({
-    queryKey: ["movements", "current-month-all"],
-    queryFn: fetchCurrentMonthMovements,
+  const [filters, setFilters] = useState<ChartFilters>(() => ({
+    date: dateFromPreset("this_month"),
+    accountIds: [],
+    categoryIds: [],
+  }))
+
+  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+    queryKey: ["movements", "stats-all"],
+    queryFn: fetchAllMovements,
   })
 
   const { data: categories, isLoading: loadingCategories } = useQuery({
@@ -492,19 +500,50 @@ export function MoneyFlowSankey() {
     queryFn: fetchCategories,
   })
 
-  const isLoading = loadingMovements || loadingCategories
+  const { data: accounts, isLoading: loadingAccounts } = useQuery({
+    queryKey: ["accounts", "stats"],
+    queryFn: fetchAccounts,
+  })
 
-  const monthLabel = format(new Date(), "MMMM yyyy", { locale: es })
-    .replace(/^\w/, (c) => c.toUpperCase())
+  const isLoading = loadingMovements || loadingCategories || loadingAccounts
+
+  const statsFilter = useMemo(
+    () => chartFiltersToStatsFilter(filters, "all"),
+    [filters],
+  )
+
+  const filtered = useMemo(
+    () => (allMovements ? filterMovements(allMovements, statsFilter) : []),
+    [allMovements, statsFilter],
+  )
+
+  const accountOptions = useMemo(
+    () =>
+      (accounts ?? []).map((a) => ({
+        value: a.id,
+        label: a.name,
+        leading: <AccountIconChip icon={a.icon} />,
+      })),
+    [accounts],
+  )
+
+  const categoryOptions = useMemo(
+    () =>
+      (categories ?? []).map((c) => ({
+        value: c.id,
+        label: c.name,
+        leading: <CategoryIconChip icon={c.icon} />,
+      })),
+    [categories],
+  )
 
   const result = useMemo<SankeyResult | null>(() => {
-    if (!movements || !categories) return null
-    if (movements.length === 0) return null
-    const r = buildSankeyData(movements, categories)
+    if (!filtered.length || !categories) return null
+    const r = buildSankeyData(filtered, categories)
     // Must have at least one link to render the chart
     if (r.data.links.length === 0) return null
     return r
-  }, [movements, categories])
+  }, [filtered, categories])
 
   const CustomNode = useMemo(() => makeCustomNode(isDark), [isDark])
   const CustomLink = useMemo(() => makeCustomLink(isDark), [isDark])
@@ -515,9 +554,17 @@ export function MoneyFlowSankey() {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Flujo del mes</h3>
         <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-          {monthLabel}
+          {filters.date.label}
         </span>
       </div>
+
+      {/* Filters */}
+      <ChartFilterBar
+        filters={filters}
+        onChange={setFilters}
+        accountOptions={accountOptions}
+        categoryOptions={categoryOptions}
+      />
 
       {/* Loading skeleton */}
       {isLoading && (
@@ -542,7 +589,7 @@ export function MoneyFlowSankey() {
       {!isLoading && !result && (
         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
           <ArrowRightLeft className="h-10 w-10 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">Sin datos este mes todavía.</p>
+          <p className="text-sm text-muted-foreground">Sin datos para el período y filtros seleccionados.</p>
         </div>
       )}
 

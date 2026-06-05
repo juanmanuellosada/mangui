@@ -182,6 +182,21 @@ export async function fetchTransfers(
 }
 
 /**
+ * fetchAllMovements — fetches all movements without filtering (for client-side stats).
+ * Use queryKey ["movements", "stats-all"] so the cache is shared across components.
+ */
+export async function fetchAllMovements(): Promise<Movement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .order("date", { ascending: false })
+    .limit(2000)
+  if (error) throw error
+  return data
+}
+
+/**
  * Serialize a MovementsFilter to a stable string for use in react-query keys.
  */
 export function filterKey(filter: MovementsFilter): string {
