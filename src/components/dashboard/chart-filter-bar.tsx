@@ -56,25 +56,32 @@ export function ChartFilterBar({
   categoryOptions,
 }: ChartFilterBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <DateRangeFilter
-        value={filters.date}
-        onChange={(date) => onChange({ ...filters, date })}
-      />
-      <MangoMultiSelect
-        values={filters.accountIds}
-        onChange={(accountIds) => onChange({ ...filters, accountIds })}
-        options={accountOptions}
-        placeholder="Todas las cuentas"
-        showSearch
-      />
-      <MangoMultiSelect
-        values={filters.categoryIds}
-        onChange={(categoryIds) => onChange({ ...filters, categoryIds })}
-        options={categoryOptions}
-        placeholder="Todas las categorías"
-        showSearch
-      />
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+      <div className="flex-1 min-w-0">
+        <DateRangeFilter
+          value={filters.date}
+          onChange={(date) => onChange({ ...filters, date })}
+          triggerClassName="w-full min-w-0"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <MangoMultiSelect
+          values={filters.accountIds}
+          onChange={(accountIds) => onChange({ ...filters, accountIds })}
+          options={accountOptions}
+          placeholder="Todas las cuentas"
+          showSearch
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <MangoMultiSelect
+          values={filters.categoryIds}
+          onChange={(categoryIds) => onChange({ ...filters, categoryIds })}
+          options={categoryOptions}
+          placeholder="Todas las categorías"
+          showSearch
+        />
+      </div>
     </div>
   )
 }

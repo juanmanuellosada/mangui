@@ -49,6 +49,8 @@ interface Props {
   value: DateRangeValue
   onChange: (v: DateRangeValue) => void
   id?: string
+  /** Additional classes applied to the trigger button */
+  triggerClassName?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -225,7 +227,7 @@ const DAY_PICKER_CLASSNAMES = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function DateRangeFilter({ value, onChange, id }: Props) {
+export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props) {
   const [open, setOpen] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const [pos, setPos] = React.useState({ top: 0, left: 0, placeAbove: false })
@@ -389,10 +391,11 @@ export function DateRangeFilter({ value, onChange, id }: Props) {
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
           "hover:border-primary/40",
           open && "border-primary/40",
+          triggerClassName,
         )}
       >
         <CalendarDays className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-        <span className="flex-1 text-foreground">{value.label}</span>
+        <span className="flex-1 min-w-0 truncate text-foreground">{value.label}</span>
         <ChevronDown
           className={cn(
             "h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform duration-150",
