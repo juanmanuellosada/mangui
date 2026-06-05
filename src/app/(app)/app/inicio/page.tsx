@@ -12,6 +12,7 @@ import { BalanceCards } from "@/components/dashboard/balance-cards"
 import { CategoryPieChart } from "@/components/dashboard/category-pie-chart"
 import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart"
 import { RecentMovements } from "@/components/dashboard/recent-movements"
+import { AccountsPreview } from "@/components/dashboard/accounts-preview"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -102,6 +103,9 @@ export default async function DashboardPage() {
           </Link>
         </div>
       )}
+
+      {/* Accounts preview — visible only when there are accounts */}
+      {hasAccounts && <AccountsPreview />}
 
       {/* Charts — stacked, full width on mobile; side by side on md+ */}
       {hasAccounts && (
