@@ -103,7 +103,13 @@ export default async function DashboardPage() {
       )}
 
       {/* Accounts preview — visible only when there are accounts */}
-      {hasAccounts && <AccountsPreview />}
+      {hasAccounts && (
+        <AccountsPreview
+          rateType={rateType}
+          manualRate={manualRate}
+          rates={rates}
+        />
+      )}
 
       {/* Charts region — global filters + per-chart date filter */}
       {hasAccounts && (

@@ -13,6 +13,21 @@ import {
   type AccountBalance,
 } from "@/lib/accounts"
 import { formatCurrency, cn } from "@/lib/utils"
+import type { RateType, RatesMap } from "@/lib/rates/dolar"
+import type { Tables } from "@/lib/database.types"
+import { fetchAllMovements } from "@/lib/movements"
+import { currentCycleRange, isInCycle } from "@/lib/cards"
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+
+type CardStatement = Tables<"card_statements">
+type Movement = Tables<"movements">
+
+interface AccountsPreviewProps {
+  rateType: RateType
+  manualRate: number | null
+  rates: RatesMap
+}
 
 async function fetchAccounts(): Promise<Account[]> {
   const supabase = createClient()
@@ -33,6 +48,17 @@ async function fetchBalances(): Promise<AccountBalance[]> {
   return data
 }
 
+async function fetchAllStatements(): Promise<CardStatement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("card_statements")
+    .select("*")
+    .eq("status", "pendiente")
+    .order("due_date", { ascending: true })
+  if (error) throw error
+  return data
+}
+
 function AccountCardSkeleton() {
   return (
     <div className="rounded-2xl border border-border/60 bg-card px-3.5 py-3 flex items-center gap-3">
@@ -49,7 +75,19 @@ function AccountCardSkeleton() {
   )
 }
 
-export function AccountsPreview() {
+function getConversionRate(
+  rateType: RateType,
+  rates: RatesMap,
+  manualRate: number | null,
+  fromCurrency: "ARS" | "USD"
+): number {
+  if (rateType === "manual") return manualRate ?? 1
+  const data = rates[rateType as keyof RatesMap]
+  if (!data) return 0
+  return fromCurrency === "ARS" ? (data.sell || 0) : (data.buy || 0)
+}
+
+export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreviewProps) {
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
     queryKey: ["accounts"],
     queryFn: fetchAccounts,
@@ -60,7 +98,17 @@ export function AccountsPreview() {
     queryFn: fetchBalances,
   })
 
-  const isLoading = loadingAccounts || loadingBalances
+  const { data: statements, isLoading: loadingStatements } = useQuery({
+    queryKey: ["card_statements"],
+    queryFn: fetchAllStatements,
+  })
+
+  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+    queryKey: ["movements", "stats-all"],
+    queryFn: fetchAllMovements,
+  })
+
+  const isLoading = loadingAccounts || loadingBalances || loadingStatements || loadingMovements
 
   const balanceMap = new Map(
     (balances ?? []).map((b) => [b.account_id, b])
@@ -96,6 +144,52 @@ export function AccountsPreview() {
             const balance = bal?.current_balance ?? account.initial_balance
             const currency = account.currency ?? "ARS"
             const type = account.type
+            const isCreditCard = type === "tarjeta_credito"
+
+            // ── Credit card: compute next-due amount ──────────────────────────
+            let cardAmountARS = 0
+            let cardAmountUSD: number | null = null
+            let cardDueDate: string | null = null
+
+            if (isCreditCard) {
+              // Try to find the nearest pending statement
+              const pendingStatement = (statements ?? [])
+                .filter((s) => s.account_id === account.id)
+                .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null
+
+              if (pendingStatement) {
+                cardAmountARS = pendingStatement.total_amount
+                cardDueDate = pendingStatement.due_date
+              } else {
+                // Fallback: sum current cycle movements from fetchAllMovements
+                const closingDay = account.closing_day
+                if (closingDay != null) {
+                  const { cycleStart, cycleEnd } = currentCycleRange(closingDay)
+                  const cycleMovements = (allMovements ?? []).filter(
+                    (m: Movement) =>
+                      m.account_id === account.id &&
+                      m.type === "expense" &&
+                      isInCycle(m.date, cycleStart, cycleEnd)
+                  )
+                  cardAmountARS = cycleMovements.reduce(
+                    (sum: number, m: Movement) => sum + (m.converted_amount ?? m.amount),
+                    0
+                  )
+                  // due_date from cards.ts is not trivially available here without importing; omit
+                }
+              }
+
+              // Convert ARS → USD
+              if (currency === "ARS") {
+                const rate = getConversionRate(rateType, rates, manualRate, "ARS")
+                cardAmountUSD = rate > 0 ? cardAmountARS / rate : null
+              } else {
+                // Card is in USD — flip display: show USD as primary, ARS as secondary
+                cardAmountUSD = cardAmountARS
+                const rate = getConversionRate(rateType, rates, manualRate, "USD")
+                cardAmountARS = rate > 0 ? cardAmountUSD * rate : 0
+              }
+            }
 
             return (
               <div
@@ -145,19 +239,43 @@ export function AccountsPreview() {
                   </div>
                 </div>
 
-                {/* Balance */}
+                {/* Balance / Amount due */}
                 <div className="text-right flex-shrink-0">
-                  <p
-                    className={cn(
-                      "text-sm font-bold tabular-nums",
-                      balance < 0 ? "text-destructive" : "text-foreground"
-                    )}
-                  >
-                    {formatCurrency(balance, currency)}
-                  </p>
-                  <div className="flex justify-end mt-0.5">
-                    <CurrencyChip currency={currency} size="sm" />
-                  </div>
+                  {isCreditCard ? (
+                    <>
+                      <p className="text-[10px] text-muted-foreground leading-none mb-0.5">
+                        {cardDueDate
+                          ? `Vence ${format(parseISO(cardDueDate), "d/M", { locale: es })}`
+                          : "A pagar"}
+                      </p>
+                      <p className="text-sm font-bold tabular-nums text-foreground">
+                        {currency === "ARS"
+                          ? formatCurrency(cardAmountARS, "ARS")
+                          : formatCurrency(cardAmountUSD ?? 0, "USD")}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
+                        {currency === "ARS"
+                          ? cardAmountUSD != null
+                            ? formatCurrency(cardAmountUSD, "USD")
+                            : "—"
+                          : formatCurrency(cardAmountARS, "ARS")}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p
+                        className={cn(
+                          "text-sm font-bold tabular-nums",
+                          balance < 0 ? "text-destructive" : "text-foreground"
+                        )}
+                      >
+                        {formatCurrency(balance, currency)}
+                      </p>
+                      <div className="flex justify-end mt-0.5">
+                        <CurrencyChip currency={currency} size="sm" />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )

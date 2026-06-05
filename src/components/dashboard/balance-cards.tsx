@@ -55,11 +55,11 @@ export function BalanceCards({
   const visible = balances?.filter((b) => !b.is_hidden) ?? []
 
   const totalARS = visible
-    .filter((b) => b.currency === "ARS")
+    .filter((b) => b.currency === "ARS" && b.account_type !== "tarjeta_credito")
     .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
 
   const totalUSD = visible
-    .filter((b) => b.currency === "USD")
+    .filter((b) => b.currency === "USD" && b.account_type !== "tarjeta_credito")
     .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
 
   const arsRate = getConversionRate(rateType, rates, manualRate, "ARS")
