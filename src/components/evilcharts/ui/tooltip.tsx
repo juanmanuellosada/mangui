@@ -122,22 +122,19 @@ function ChartTooltipContent({
                   formatter(item.value, item.name, item, index, item.payload)
                 ) : (
                   <>
-                    {itemConfig?.icon ? (
-                      <itemConfig.icon />
-                    ) : (
-                      !hideIndicator && (
-                        <div
-                          className={cn("shrink-0 rounded-[2px]", {
-                            "h-2.5 w-2.5": indicator === "dot",
-                            "w-1": indicator === "line",
-                            "w-0 border-[1.5px] border-dashed bg-transparent!":
-                              indicator === "dashed",
-                            "my-0.5": nestLabel && indicator === "dashed",
-                          })}
-                          style={getIndicatorColorStyle(key, colorsCount)}
-                        />
-                      )
+                    {!hideIndicator && (
+                      <div
+                        className={cn("shrink-0 rounded-[2px]", {
+                          "h-2.5 w-2.5": indicator === "dot",
+                          "w-1": indicator === "line",
+                          "w-0 border-[1.5px] border-dashed bg-transparent!":
+                            indicator === "dashed",
+                          "my-0.5": nestLabel && indicator === "dashed",
+                        })}
+                        style={getIndicatorColorStyle(key, colorsCount)}
+                      />
                     )}
+                    {itemConfig?.icon && <itemConfig.icon />}
                     <div
                       className={cn(
                         "flex flex-1 justify-between gap-4 leading-none",

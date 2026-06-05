@@ -103,13 +103,16 @@ export function CategoryPieChart() {
     const cfg: ChartConfig = {}
 
     top.forEach(([key, value], idx) => {
+      const cat = catMap.get(key)
       const name =
         key === "__none__"
           ? "Sin categoría"
-          : (catMap.get(key)?.name ?? "Sin categoría")
+          : (cat?.name ?? "Sin categoría")
+      const emoji = key !== "__none__" ? (cat?.icon ?? null) : null
       rows.push({ name, value: Math.round(value * 100) / 100 })
       cfg[name] = {
         label: name,
+        ...(emoji ? { icon: () => <span className="text-sm leading-none select-none">{emoji}</span> } : {}),
         colors: {
           light: [CATEGORY_COLORS_LIGHT[idx % CATEGORY_COLORS_LIGHT.length]],
           dark: [CATEGORY_COLORS_DARK[idx % CATEGORY_COLORS_DARK.length]],

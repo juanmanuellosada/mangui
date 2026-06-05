@@ -79,15 +79,12 @@ function ChartLegendContent({
                 onSelectChange?.(selected === key ? null : key);
               }}
             >
-              {itemConfig?.icon && !hideIcon ? (
-                <itemConfig.icon />
-              ) : (
-                <LegendIndicator
-                  variant={variant}
-                  dataKey={key}
-                  colorsCount={colorsCount}
-                />
-              )}
+              <LegendIndicator
+                variant={variant}
+                dataKey={key}
+                colorsCount={colorsCount}
+              />
+              {itemConfig?.icon && !hideIcon && <itemConfig.icon />}
               {itemConfig?.label}
             </div>
           );
