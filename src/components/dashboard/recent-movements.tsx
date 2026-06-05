@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronRight, ArrowUpCircle, ArrowDownCircle, PlusCircle } from "lucide-react"
@@ -8,23 +9,35 @@ import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import type { Tables } from "@/lib/database.types"
-import { MOVEMENTS_KEY, ACCOUNTS_KEY } from "@/lib/movements"
+import { ACCOUNTS_KEY } from "@/lib/movements"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Account } from "@/lib/accounts"
 import { useQuickAdd } from "@/components/quick-add-provider"
+import { MangoSelect } from "@/components/ui/mango-select"
+import { lastN } from "@/lib/date-ranges"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
 
-async function fetchRecentMovements(): Promise<Movement[]> {
+const DAYS_OPTIONS = [
+  { value: "7", label: "Últimos 7 días" },
+  { value: "15", label: "Últimos 15 días" },
+  { value: "30", label: "Últimos 30 días" },
+  { value: "90", label: "Últimos 90 días" },
+]
+
+async function fetchRecentMovements(days: string): Promise<Movement[]> {
   const supabase = createClient()
+  const { from } = lastN(Number(days), "days")
   const { data, error } = await supabase
     .from("movements")
     .select("*")
+    .gte("date", from!)
+    .eq("is_future", false)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(5)
+    .limit(100)
   if (error) throw error
   return data
 }
@@ -58,10 +71,11 @@ function formatDateShort(dateStr: string): string {
 
 export function RecentMovements() {
   const quickAdd = useQuickAdd()
+  const [days, setDays] = useState("30")
 
   const { data: movements, isLoading: loadingMovements } = useQuery({
-    queryKey: MOVEMENTS_KEY,
-    queryFn: fetchRecentMovements,
+    queryKey: ["movements", "recent", days],
+    queryFn: () => fetchRecentMovements(days),
     staleTime: 60 * 1000,
   })
 
@@ -81,18 +95,27 @@ export function RecentMovements() {
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold">Actividad reciente</h3>
-        {accounts.length > 0 && (
-          <button
-            type="button"
-            onClick={() => quickAdd.open()}
-            className={cn(buttonVariants({ size: "sm" }), "gap-1.5 cursor-pointer")}
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            Nuevo
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <MangoSelect
+            value={days}
+            onChange={setDays}
+            options={DAYS_OPTIONS}
+            triggerClassName="w-auto text-xs h-8 px-2"
+            aria-label="Período de actividad"
+          />
+          {accounts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => quickAdd.open()}
+              className={cn(buttonVariants({ size: "sm" }), "gap-1.5 cursor-pointer")}
+            >
+              <PlusCircle className="h-3.5 w-3.5" />
+              Nuevo
+            </button>
+          )}
+        </div>
       </div>
 
       {loadingMovements && (
@@ -115,13 +138,13 @@ export function RecentMovements() {
       {!loadingMovements && (!movements || movements.length === 0) && (
         <div className="flex flex-col items-center justify-center h-32 gap-2 text-center">
           <p className="text-sm text-muted-foreground">
-            Sin movimientos todavía.
+            Sin actividad en los últimos {days} días.
           </p>
         </div>
       )}
 
       {!loadingMovements && movements && movements.length > 0 && (
-        <div className="divide-y divide-border/40">
+        <div className="max-h-[22rem] overflow-y-auto divide-y divide-border/40">
           {movements.map((m) => {
             const isIncome = m.type === "income"
             const account = accountMap.get(m.account_id)
