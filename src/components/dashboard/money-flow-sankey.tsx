@@ -74,6 +74,7 @@ const DEFICIT_COLOR_LIGHT = "oklch(0.714 0.213 47.6)"   // amber-orange
 const DEFICIT_COLOR_DARK  = "oklch(0.78 0.21 47.6)"
 
 const TOP_N_EXPENSE = 5  // matches pie chart
+const BALANCE_MIN_SHARE = 0.02  // balance node only shown when diff >= 2% of the larger side
 
 // ─── Node kind type ───────────────────────────────────────────────────────────
 
@@ -131,21 +132,27 @@ function makeCustomNode(dark: boolean) {
   const LABEL_OFFSET = width + 6
 
   let textX: number
+  let textY: number
   let textAnchor: "start" | "middle" | "end"
+  let dominantBaseline: "middle" | "auto"
 
   if (depth === 0) {
     textX = x + LABEL_OFFSET
+    textY = y + height / 2
     textAnchor = "start"
+    dominantBaseline = "middle"
   } else if (depth === 2) {
     textX = x - 6
+    textY = y + height / 2
     textAnchor = "end"
+    dominantBaseline = "middle"
   } else {
-    // center — label above node
+    // center column — label above the node, horizontally centered
     textX = x + width / 2
+    textY = y - 6
     textAnchor = "middle"
+    dominantBaseline = "auto"
   }
-
-  const textY = depth === 1 ? y - 6 : y + height / 2
 
   return (
     <Layer key={`node-${index}`}>
@@ -162,7 +169,7 @@ function makeCustomNode(dark: boolean) {
         x={textX}
         y={textY}
         textAnchor={textAnchor}
-        dominantBaseline={depth === 1 ? "auto" : "central"}
+        dominantBaseline={dominantBaseline}
         fontSize={11}
         fill="currentColor"
         style={{ fontSize: 11 }}
@@ -312,9 +319,10 @@ function buildSankeyData(
   // Determine if we need a deficit source node
   const needsDeficit = expenseTotal > incomeTotal
   const diff = Math.abs(incomeTotal - expenseTotal)
+  const balanceSignificant = diff > 0 && diff >= BALANCE_MIN_SHARE * Math.max(incomeTotal, expenseTotal)
 
   // Add deficit node first (it's a source, leftmost column)
-  if (needsDeficit && diff > 0.005) {
+  if (needsDeficit && balanceSignificant) {
     nodes.push({ name: "Uso de ahorros", kind: "deficit" })
   }
 
@@ -339,7 +347,7 @@ function buildSankeyData(
     const { key } = expenseRows[i]
     const cat = catMap.get(key)
     const name = key === "__others__"
-      ? "Otros gastos"
+      ? "Otras categorías"
       : key === "__none__"
         ? "Sin categoría (egr.)"
         : (cat?.name ?? "Sin categoría")
@@ -347,7 +355,7 @@ function buildSankeyData(
   }
 
   // Savings or deficit node
-  const hasSavings = incomeTotal > expenseTotal && diff > 0.005
+  const hasSavings = incomeTotal > expenseTotal && balanceSignificant
   if (hasSavings) {
     nodes.push({ name: "Ahorro", kind: "savings" })
   }
@@ -356,7 +364,7 @@ function buildSankeyData(
   const links: { source: number; target: number; value: number }[] = []
 
   // Deficit → total central
-  if (needsDeficit && diff > 0.005) {
+  if (needsDeficit && balanceSignificant) {
     links.push({ source: 0, target: totalIdx, value: Math.round(diff * 100) / 100 })
   }
 
