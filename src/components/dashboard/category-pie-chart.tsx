@@ -16,28 +16,19 @@ import type { ChartConfig } from "@/components/evilcharts/ui/chart"
 import type { Tables } from "@/lib/database.types"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
-import { AccountIconChip } from "@/lib/accounts"
-import { CategoryIconChip } from "@/lib/categories"
+import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
 import {
-  ChartFilterBar,
   chartFiltersToStatsFilter,
   dateFromPreset,
   type ChartFilters,
 } from "./chart-filter-bar"
+import { useDashboardFilters } from "./dashboard-filters"
 
 type Category = Tables<"categories">
-type Account = Tables<"accounts">
 
 async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("categories").select("*")
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("name")
   if (error) throw error
   return data
 }
@@ -66,11 +57,10 @@ const CATEGORY_COLORS_DARK = [
 const TOP_N = 5
 
 export function CategoryPieChart() {
-  const [filters, setFilters] = useState<ChartFilters>(() => ({
-    date: dateFromPreset("this_month"),
-    accountIds: [],
-    categoryIds: [],
-  }))
+  const [date, setDate] = useState<DateRangeValue>(() => dateFromPreset("this_month"))
+  const { accountIds, categoryIds } = useDashboardFilters()
+
+  const filters: ChartFilters = { date, accountIds, categoryIds }
 
   const { data: allMovements, isLoading: loadingMovements } = useQuery({
     queryKey: ["movements", "stats-all"],
@@ -82,43 +72,17 @@ export function CategoryPieChart() {
     queryFn: fetchCategories,
   })
 
-  const { data: accounts, isLoading: loadingAccounts } = useQuery({
-    queryKey: ["accounts", "stats"],
-    queryFn: fetchAccounts,
-  })
-
-  const isLoading = loadingMovements || loadingCategories || loadingAccounts
+  const isLoading = loadingMovements || loadingCategories
 
   const statsFilter = useMemo(
     () => chartFiltersToStatsFilter(filters, "expense"),
-    [filters],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date, accountIds, categoryIds],
   )
 
   const filtered = useMemo(
     () => (allMovements ? filterMovements(allMovements, statsFilter) : []),
     [allMovements, statsFilter],
-  )
-
-  const accountOptions = useMemo(
-    () =>
-      (accounts ?? []).map((a) => ({
-        value: a.id,
-        label: a.name,
-        leading: <AccountIconChip icon={a.icon} />,
-      })),
-    [accounts],
-  )
-
-  const categoryOptions = useMemo(
-    () =>
-      (categories ?? [])
-        .filter((c) => c.type === "expense")
-        .map((c) => ({
-          value: c.id,
-          label: c.name,
-          leading: <CategoryIconChip icon={c.icon} />,
-        })),
-    [categories],
   )
 
   const { chartData, config, totalExpenses } = useMemo(() => {
@@ -184,12 +148,11 @@ export function CategoryPieChart() {
         <h3 className="text-sm font-semibold">Gastos por categoría</h3>
       </div>
 
-      {/* Filters */}
-      <ChartFilterBar
-        filters={filters}
-        onChange={setFilters}
-        accountOptions={accountOptions}
-        categoryOptions={categoryOptions}
+      {/* Date filter */}
+      <DateRangeFilter
+        value={date}
+        onChange={setDate}
+        triggerClassName="w-full min-w-0"
       />
 
       {isLoading && (

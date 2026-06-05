@@ -14,6 +14,7 @@ import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart"
 import { RecentMovements } from "@/components/dashboard/recent-movements"
 import { AccountsPreview } from "@/components/dashboard/accounts-preview"
 import { MoneyFlowSankey } from "@/components/dashboard/money-flow-sankey"
+import { DashboardFiltersProvider, DashboardGlobalFilters } from "@/components/dashboard/dashboard-filters"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -103,15 +104,16 @@ export default async function DashboardPage() {
       {/* Accounts preview — visible only when there are accounts */}
       {hasAccounts && <AccountsPreview />}
 
-      {/* Money flow sankey — full width */}
-      {hasAccounts && <MoneyFlowSankey />}
-
-      {/* Charts — stacked, full width on mobile; side by side on md+ */}
+      {/* Charts region — global filters + per-chart date filter */}
       {hasAccounts && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <CategoryPieChart />
-          <IncomeExpenseChart />
-        </div>
+        <DashboardFiltersProvider>
+          <DashboardGlobalFilters />
+          <MoneyFlowSankey />
+          <div className="grid md:grid-cols-2 gap-4">
+            <CategoryPieChart />
+            <IncomeExpenseChart />
+          </div>
+        </DashboardFiltersProvider>
       )}
 
       {/* Exchange rates strip */}

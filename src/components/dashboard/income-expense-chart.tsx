@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
 import { formatCurrency } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BarChart3 } from "lucide-react"
@@ -14,7 +13,6 @@ import {
   Tooltip,
   Legend,
 } from "@/components/evilcharts/charts/bar-chart"
-import type { Tables } from "@/lib/database.types"
 import {
   startOfMonth,
   endOfMonth,
@@ -25,31 +23,14 @@ import {
 import { es } from "date-fns/locale"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
-import { AccountIconChip } from "@/lib/accounts"
-import { CategoryIconChip } from "@/lib/categories"
+import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
 import {
-  ChartFilterBar,
   chartFiltersToStatsFilter,
   dateFromLastN,
   type ChartFilters,
 } from "./chart-filter-bar"
+import { useDashboardFilters } from "./dashboard-filters"
 
-type Category = Tables<"categories">
-type Account = Tables<"accounts">
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*")
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("name")
-  if (error) throw error
-  return data
-}
 
 type BarRow = { mes: string; ingresos: number; gastos: number }
 
@@ -71,57 +52,25 @@ const barChartConfig = {
 } satisfies Record<keyof Omit<BarRow, "mes">, { label: string; colors: { light: string[]; dark: string[] } }>
 
 export function IncomeExpenseChart() {
-  const [filters, setFilters] = useState<ChartFilters>(() => ({
-    date: dateFromLastN(6, "months"),
-    accountIds: [],
-    categoryIds: [],
-  }))
+  const [date, setDate] = useState<DateRangeValue>(() => dateFromLastN(6, "months"))
+  const { accountIds, categoryIds } = useDashboardFilters()
 
-  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+  const filters: ChartFilters = { date, accountIds, categoryIds }
+
+  const { data: allMovements, isLoading } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchAllMovements,
   })
 
-  const { data: categories, isLoading: loadingCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
-
-  const { data: accounts, isLoading: loadingAccounts } = useQuery({
-    queryKey: ["accounts", "stats"],
-    queryFn: fetchAccounts,
-  })
-
-  const isLoading = loadingMovements || loadingCategories || loadingAccounts
-
   const statsFilter = useMemo(
     () => chartFiltersToStatsFilter(filters, "all"),
-    [filters],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date, accountIds, categoryIds],
   )
 
   const filtered = useMemo(
     () => (allMovements ? filterMovements(allMovements, statsFilter) : []),
     [allMovements, statsFilter],
-  )
-
-  const accountOptions = useMemo(
-    () =>
-      (accounts ?? []).map((a) => ({
-        value: a.id,
-        label: a.name,
-        leading: <AccountIconChip icon={a.icon} />,
-      })),
-    [accounts],
-  )
-
-  const categoryOptions = useMemo(
-    () =>
-      (categories ?? []).map((c) => ({
-        value: c.id,
-        label: c.name,
-        leading: <CategoryIconChip icon={c.icon} />,
-      })),
-    [categories],
   )
 
   const chartData: BarRow[] = useMemo(() => {
@@ -131,9 +80,9 @@ export function IncomeExpenseChart() {
     let rangeStart: Date
     let rangeEnd: Date
 
-    if (filters.date.from && filters.date.to) {
-      rangeStart = startOfMonth(parseISO(filters.date.from))
-      rangeEnd = endOfMonth(parseISO(filters.date.to))
+    if (date.from && date.to) {
+      rangeStart = startOfMonth(parseISO(date.from))
+      rangeEnd = endOfMonth(parseISO(date.to))
     } else {
       // Fallback: derive range from the filtered movements themselves
       const dates = filtered.map((m) => m.date).sort()
@@ -163,7 +112,7 @@ export function IncomeExpenseChart() {
         gastos: Math.round(gastos),
       }
     })
-  }, [filtered, filters.date])
+  }, [filtered, date])
 
   const hasData = chartData.some((r) => r.ingresos > 0 || r.gastos > 0)
 
@@ -172,15 +121,12 @@ export function IncomeExpenseChart() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Ingresos vs Gastos</h3>
+        <DateRangeFilter
+          value={date}
+          onChange={setDate}
+          triggerClassName="min-w-0"
+        />
       </div>
-
-      {/* Filters */}
-      <ChartFilterBar
-        filters={filters}
-        onChange={setFilters}
-        accountOptions={accountOptions}
-        categoryOptions={categoryOptions}
-      />
 
       {isLoading && (
         <div className="space-y-2 py-2">

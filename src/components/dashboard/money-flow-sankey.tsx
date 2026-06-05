@@ -13,31 +13,22 @@ import type { NodeProps, LinkProps, SankeyData } from "recharts/types/chart/Sank
 import type { Tables } from "@/lib/database.types"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
-import { AccountIconChip } from "@/lib/accounts"
-import { CategoryIconChip } from "@/lib/categories"
+import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
 import {
-  ChartFilterBar,
   chartFiltersToStatsFilter,
   dateFromPreset,
   type ChartFilters,
 } from "./chart-filter-bar"
+import { useDashboardFilters } from "./dashboard-filters"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
-type Account = Tables<"accounts">
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
 async function fetchCategories(): Promise<Category[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("categories").select("*")
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("name")
   if (error) throw error
   return data
 }
@@ -484,11 +475,10 @@ export function MoneyFlowSankey() {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
-  const [filters, setFilters] = useState<ChartFilters>(() => ({
-    date: dateFromPreset("this_month"),
-    accountIds: [],
-    categoryIds: [],
-  }))
+  const [date, setDate] = useState<DateRangeValue>(() => dateFromPreset("this_month"))
+  const { accountIds, categoryIds } = useDashboardFilters()
+
+  const filters: ChartFilters = { date, accountIds, categoryIds }
 
   const { data: allMovements, isLoading: loadingMovements } = useQuery({
     queryKey: ["movements", "stats-all"],
@@ -500,41 +490,17 @@ export function MoneyFlowSankey() {
     queryFn: fetchCategories,
   })
 
-  const { data: accounts, isLoading: loadingAccounts } = useQuery({
-    queryKey: ["accounts", "stats"],
-    queryFn: fetchAccounts,
-  })
-
-  const isLoading = loadingMovements || loadingCategories || loadingAccounts
+  const isLoading = loadingMovements || loadingCategories
 
   const statsFilter = useMemo(
     () => chartFiltersToStatsFilter(filters, "all"),
-    [filters],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [date, accountIds, categoryIds],
   )
 
   const filtered = useMemo(
     () => (allMovements ? filterMovements(allMovements, statsFilter) : []),
     [allMovements, statsFilter],
-  )
-
-  const accountOptions = useMemo(
-    () =>
-      (accounts ?? []).map((a) => ({
-        value: a.id,
-        label: a.name,
-        leading: <AccountIconChip icon={a.icon} />,
-      })),
-    [accounts],
-  )
-
-  const categoryOptions = useMemo(
-    () =>
-      (categories ?? []).map((c) => ({
-        value: c.id,
-        label: c.name,
-        leading: <CategoryIconChip icon={c.icon} />,
-      })),
-    [categories],
   )
 
   const result = useMemo<SankeyResult | null>(() => {
@@ -553,18 +519,12 @@ export function MoneyFlowSankey() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Flujo del mes</h3>
-        <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-          {filters.date.label}
-        </span>
+        <DateRangeFilter
+          value={date}
+          onChange={setDate}
+          triggerClassName="min-w-0"
+        />
       </div>
-
-      {/* Filters */}
-      <ChartFilterBar
-        filters={filters}
-        onChange={setFilters}
-        accountOptions={accountOptions}
-        categoryOptions={categoryOptions}
-      />
 
       {/* Loading skeleton */}
       {isLoading && (
