@@ -68,11 +68,6 @@ export default async function DashboardPage() {
         />
       )}
 
-      {/* Exchange rates strip */}
-      <Suspense fallback={<Skeleton className="h-9 w-full rounded-xl" />}>
-        <RatesStrip preferredRateType={rateType} />
-      </Suspense>
-
       {/* Onboarding CTA — shown only when user has no accounts */}
       {!hasAccounts && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 sm:p-8 text-center space-y-5 animate-scale-in">
@@ -114,6 +109,11 @@ export default async function DashboardPage() {
           <IncomeExpenseChart />
         </div>
       )}
+
+      {/* Exchange rates strip */}
+      <Suspense fallback={<Skeleton className="h-9 w-full rounded-xl" />}>
+        <RatesStrip preferredRateType={rateType} />
+      </Suspense>
 
       {/* Recent movements — full width */}
       <RecentMovements />
