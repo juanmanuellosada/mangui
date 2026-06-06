@@ -9,20 +9,27 @@ export async function signOut() {
   redirect("/login");
 }
 
-export async function signInAsDemo() {
+export async function signInAsDemo(): Promise<
+  | { ok: true; access_token: string; refresh_token: string }
+  | { ok: false }
+> {
   const email = process.env.DEMO_EMAIL;
   const password = process.env.DEMO_PASSWORD;
 
   if (!email || !password) {
-    redirect("/login?demo=error");
+    return { ok: false };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    redirect("/login?demo=error");
+  if (error || !data.session) {
+    return { ok: false };
   }
 
-  redirect("/inicio");
+  return {
+    ok: true,
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+  };
 }

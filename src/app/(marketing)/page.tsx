@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand-lockup";
-import { signInAsDemo } from "@/app/actions/auth";
+import { DemoButton } from "@/components/demo-button";
 import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar";
 import {
   ArrowRight,
@@ -29,7 +29,7 @@ function formatRate(value: number): string {
   }).format(value)
 }
 
-/* ─── Demo CTA form ─────────────────────────────────────────── */
+/* ─── Demo CTA ──────────────────────────────────────────────── */
 function DemoCTA({
   className,
   variant = "outline-dark",
@@ -38,20 +38,15 @@ function DemoCTA({
   variant?: "outline-dark" | "outline-light";
 }) {
   return (
-    <form action={signInAsDemo}>
-      <button
-        type="submit"
-        className={cn(
-          "inline-flex items-center justify-center gap-2 h-11 px-6 text-sm font-semibold rounded-lg transition-colors duration-150 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
-          variant === "outline-dark"
-            ? "border border-white/20 text-white/80 hover:bg-white/8 hover:text-white"
-            : "border border-border/70 text-foreground hover:bg-muted",
-          className
-        )}
-      >
-        Ver demo
-      </button>
-    </form>
+    <DemoButton
+      className={cn(
+        "inline-flex items-center justify-center gap-2 h-11 px-6 text-sm font-semibold rounded-lg transition-colors duration-150 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        variant === "outline-dark"
+          ? "border border-white/20 text-white/80 hover:bg-white/8 hover:text-white"
+          : "border border-border/70 text-foreground hover:bg-muted",
+        className
+      )}
+    />
   );
 }
 
@@ -154,17 +149,12 @@ export default async function LandingPage() {
                     Crear cuenta
                     <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
-                  <form action={signInAsDemo}>
-                    <button
-                      type="submit"
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "lg" }),
-                        "gap-2 font-medium h-11 px-6 text-sm press-effect w-full sm:w-auto cursor-pointer"
-                      )}
-                    >
-                      Ver demo
-                    </button>
-                  </form>
+                  <DemoButton
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "lg" }),
+                      "gap-2 font-medium h-11 px-6 text-sm press-effect w-full sm:w-auto"
+                    )}
+                  />
                 </div>
 
                 <p className="text-xs text-muted-foreground leading-relaxed">
@@ -976,14 +966,9 @@ export default async function LandingPage() {
               >
                 Crear cuenta
               </Link>
-              <form action={signInAsDemo}>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center gap-2 h-11 px-8 text-sm font-semibold rounded-lg border border-white/20 text-white/75 hover:bg-white/8 hover:text-white transition-colors duration-150 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer w-full sm:w-auto"
-                >
-                  Ver demo
-                </button>
-              </form>
+              <DemoButton
+                className="inline-flex items-center justify-center gap-2 h-11 px-8 text-sm font-semibold rounded-lg border border-white/20 text-white/75 hover:bg-white/8 hover:text-white transition-colors duration-150 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-full sm:w-auto"
+              />
             </div>
             <p className="text-xs text-white/30">
               "Ver demo" abre una cuenta de ejemplo, solo lectura.
