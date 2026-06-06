@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   X,
   ChevronDown,
+  LayoutList,
 } from "lucide-react"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
@@ -40,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MangoSheet } from "@/components/ui/mango-sheet"
+import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -74,6 +76,8 @@ import {
   startOfDay,
 } from "date-fns"
 import { es } from "date-fns/locale"
+import { SummaryCards } from "@/components/stats/summary-cards"
+import { summaryTotals } from "@/lib/stats"
 import { useQuickAdd } from "@/components/quick-add-provider"
 import { listAttachments, uploadAttachment } from "@/lib/attachments"
 import { isFutureDate } from "@/lib/date-utils"
@@ -82,6 +86,16 @@ type Movement = Tables<"movements">
 type Transfer = Tables<"transfers">
 type Category = Tables<"categories">
 type SavedView = Tables<"saved_views">
+
+type GroupBy = "none" | "day" | "month" | "category" | "account"
+
+const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: "none", label: "Sin agrupar" },
+  { value: "day", label: "Por día" },
+  { value: "month", label: "Por mes" },
+  { value: "category", label: "Por categoría" },
+  { value: "account", label: "Por cuenta" },
+]
 
 const FETCH_LIMIT = 200
 
@@ -966,9 +980,11 @@ interface MovementsFilterBarProps {
   onChange: (f: MovementsFilter) => void
   accounts: Account[]
   categories: Category[]
+  groupBy: GroupBy
+  onGroupByChange: (g: GroupBy) => void
 }
 
-function MovementsFilterBar({ filter, onChange, accounts, categories }: MovementsFilterBarProps) {
+function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, onGroupByChange }: MovementsFilterBarProps) {
   const queryClient = useQueryClient()
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState("")
@@ -1105,6 +1121,20 @@ function MovementsFilterBar({ filter, onChange, accounts, categories }: Movement
           showSearch
           disabled={filter.type === "transfer"}
           aria-label="Filtrar por categoría"
+        />
+      </div>
+
+      {/* Grouping */}
+      <div className="space-y-1.5">
+        <Label className="text-xs flex items-center gap-1">
+          <LayoutList className="h-3 w-3" aria-hidden />
+          Agrupar
+        </Label>
+        <MangoSelect
+          value={groupBy}
+          onChange={(v) => onGroupByChange(v as GroupBy)}
+          options={GROUP_BY_OPTIONS}
+          aria-label="Agrupar movimientos"
         />
       </div>
     </div>
@@ -1313,6 +1343,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories }: Movement
 
 export function MovementsList() {
   const [filter, setFilter] = useState<MovementsFilter>(defaultFilter)
+  const [groupBy, setGroupBy] = useState<GroupBy>("none")
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
   const [deletingMovement, setDeletingMovement] = useState<Movement | null>(null)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
@@ -1365,19 +1396,104 @@ export function MovementsList() {
     return [...movementItems, ...transferItems]
   }, [movements, transfers])
 
-  // ── Group by date ─────────────────────────────────────────────────────────
-  const grouped = useMemo(() => {
-    const map = new Map<string, FeedItem[]>()
-    for (const fi of feed) {
-      const date = fi.item.date
-      const day = startOfDay(parseISO(date)).toISOString()
-      if (!map.has(day)) map.set(day, [])
-      map.get(day)!.push(fi)
+  // ── Totals for SummaryCards (movements only, no transfers) ────────────────
+  const totals = useMemo(
+    () => summaryTotals(movements ?? [], "ARS"),
+    [movements]
+  )
+
+  // ── Build grouped feed parametrized by groupBy ───────────────────────────
+  const groupedFeed = useMemo<{ key: string; label: string; items: FeedItem[] }[]>(() => {
+    if (groupBy === "none") {
+      // Flat list — still sorted desc; return a single pseudo-group with no label
+      const sorted = [...feed].sort((a, b) => {
+        const dateDiff = b.item.date.localeCompare(a.item.date)
+        if (dateDiff !== 0) return dateDiff
+        return b.item.created_at.localeCompare(a.item.created_at)
+      })
+      return sorted.length > 0 ? [{ key: "__flat__", label: "", items: sorted }] : []
     }
-    return [...map.entries()]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([key, items]) => [key, items] as [string, FeedItem[]])
-  }, [feed])
+
+    if (groupBy === "day") {
+      const map = new Map<string, FeedItem[]>()
+      for (const fi of feed) {
+        const day = startOfDay(parseISO(fi.item.date)).toISOString()
+        if (!map.has(day)) map.set(day, [])
+        map.get(day)!.push(fi)
+      }
+      return [...map.entries()]
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .map(([key, items]) => ({
+          key,
+          label: formatDayLabel(items[0].item.date),
+          items,
+        }))
+    }
+
+    if (groupBy === "month") {
+      const map = new Map<string, FeedItem[]>()
+      for (const fi of feed) {
+        const d = parseISO(fi.item.date)
+        const monthKey = format(d, "yyyy-MM")
+        if (!map.has(monthKey)) map.set(monthKey, [])
+        map.get(monthKey)!.push(fi)
+      }
+      return [...map.entries()]
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .map(([key, items]) => {
+          const d = parseISO(key + "-01")
+          const label = format(d, "MMMM yyyy", { locale: es })
+          return { key, label: label.charAt(0).toUpperCase() + label.slice(1), items }
+        })
+    }
+
+    if (groupBy === "category") {
+      const map = new Map<string, FeedItem[]>()
+      for (const fi of feed) {
+        let key: string
+        if (fi.kind === "transfer") {
+          key = "__transfer__"
+        } else {
+          key = fi.item.category_id ?? "__none__"
+        }
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(fi)
+      }
+      return [...map.entries()]
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([key, items]) => {
+          let label: string
+          if (key === "__transfer__") label = "Transferencias"
+          else if (key === "__none__") label = "Sin categoría"
+          else label = categoryMap.get(key)?.name ?? "Sin categoría"
+          return { key, label, items }
+        })
+    }
+
+    if (groupBy === "account") {
+      const map = new Map<string, FeedItem[]>()
+      for (const fi of feed) {
+        let key: string
+        if (fi.kind === "transfer") {
+          key = "__transfer__"
+        } else {
+          key = fi.item.account_id
+        }
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(fi)
+      }
+      return [...map.entries()]
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([key, items]) => {
+          let label: string
+          if (key === "__transfer__") label = "Transferencias"
+          else label = accountMap.get(key)?.name ?? "—"
+          return { key, label, items }
+        })
+    }
+
+    return []
+  }, [feed, groupBy, accountMap, categoryMap])
 
   const totalItems = feed.length
 
@@ -1461,7 +1577,29 @@ export function MovementsList() {
         onChange={setFilter}
         accounts={accounts}
         categories={categories}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
       />
+
+      {/* Summary cards */}
+      {!isLoading && totalItems > 0 && (
+        <div className="space-y-2">
+          <SummaryCards totals={totals} currency="ARS" period={filter.date.label} />
+          <p className="text-xs text-muted-foreground px-1">
+            {totalItems} {totalItems === 1 ? "movimiento" : "movimientos"}
+          </p>
+        </div>
+      )}
+      {isLoading && (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-[76px] rounded-2xl" />
+            ))}
+          </div>
+          <Skeleton className="h-3 w-24" />
+        </div>
+      )}
 
       {/* Loading skeleton */}
       {isLoading && (
@@ -1510,53 +1648,52 @@ export function MovementsList() {
         </div>
       )}
 
-      {/* Grouped feed */}
-      {!isLoading && grouped.length > 0 && (
+      {/* Feed (flat or grouped) */}
+      {!isLoading && groupedFeed.length > 0 && (
         <div className="space-y-5">
-          {grouped.map(([dayKey, dayItems]) => {
-            const firstDate = dayItems[0].item.date
-            return (
-              <div key={dayKey}>
-                {/* Date header */}
+          {groupedFeed.map(({ key, label, items }) => (
+            <div key={key}>
+              {/* Group header — hidden in flat mode */}
+              {groupBy !== "none" && (
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">
-                  {formatDayLabel(firstDate)}
+                  {label}
                 </p>
-                {/* Items card */}
-                <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-                  {dayItems.map((fi) => {
-                    const feedId = fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`
-                    return (
-                      <div key={feedId} className="px-4">
-                        {fi.kind === "movement" ? (
-                          <MovementRow
-                            movement={fi.item}
-                            account={accountMap.get(fi.item.account_id)}
-                            category={fi.item.category_id ? categoryMap.get(fi.item.category_id) : undefined}
-                            onEdit={setEditingMovement}
-                            onDelete={setDeletingMovement}
-                            selectionMode={ms.selectionMode}
-                            isSelected={ms.isSelected(fi.item.id)}
-                            onToggle={ms.toggle}
-                          />
-                        ) : (
-                          <TransferRow
-                            transfer={fi.item}
-                            fromAccount={accountMap.get(fi.item.from_account_id)}
-                            toAccount={accountMap.get(fi.item.to_account_id)}
-                            onEdit={setEditingTransfer}
-                            onDelete={setDeletingTransfer}
-                            selectionMode={ms.selectionMode}
-                            isSelected={ms.isSelected(`t-${fi.item.id}`)}
-                            onToggle={ms.toggle}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+              )}
+              {/* Items card */}
+              <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+                {items.map((fi) => {
+                  const feedId = fi.kind === "movement" ? fi.item.id : `t-${fi.item.id}`
+                  return (
+                    <div key={feedId} className="px-4">
+                      {fi.kind === "movement" ? (
+                        <MovementRow
+                          movement={fi.item}
+                          account={accountMap.get(fi.item.account_id)}
+                          category={fi.item.category_id ? categoryMap.get(fi.item.category_id) : undefined}
+                          onEdit={setEditingMovement}
+                          onDelete={setDeletingMovement}
+                          selectionMode={ms.selectionMode}
+                          isSelected={ms.isSelected(fi.item.id)}
+                          onToggle={ms.toggle}
+                        />
+                      ) : (
+                        <TransferRow
+                          transfer={fi.item}
+                          fromAccount={accountMap.get(fi.item.from_account_id)}
+                          toAccount={accountMap.get(fi.item.to_account_id)}
+                          onEdit={setEditingTransfer}
+                          onDelete={setDeletingTransfer}
+                          selectionMode={ms.selectionMode}
+                          isSelected={ms.isSelected(`t-${fi.item.id}`)}
+                          onToggle={ms.toggle}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       )}
 
