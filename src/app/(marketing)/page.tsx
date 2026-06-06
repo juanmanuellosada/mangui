@@ -827,12 +827,12 @@ export default async function LandingPage() {
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-[34ch]">
                   Balances por cuenta, movimientos con categoría, gráficos de gastos en el tiempo. Todo en un vistazo.
                 </p>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     href="/register"
                     className={cn(
-                      buttonVariants({ size: "sm" }),
-                      "gap-1.5 font-semibold press-effect"
+                      buttonVariants(),
+                      "inline-flex items-center justify-center gap-2 h-11 px-6 text-sm font-semibold press-effect"
                     )}
                   >
                     Crear cuenta
