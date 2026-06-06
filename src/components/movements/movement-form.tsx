@@ -32,6 +32,7 @@ import {
 import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
+import { useIsDemo } from "@/lib/use-is-demo"
 import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
 
 type Category = Tables<"categories">
@@ -140,6 +141,7 @@ export function MovementForm({
   initialMode,
 }: MovementFormProps) {
   const today = new Date().toISOString().split("T")[0]
+  const isDemo = useIsDemo()
 
   // 3-way mode state (only relevant when initialMode is provided)
   const [mode, setMode] = useState<MovementMode>(initialMode ?? (defaultValues?.type ?? "expense"))
@@ -798,7 +800,7 @@ export function MovementForm({
                 onSelect={setPendingFactura}
                 onClearPending={() => setPendingFactura(null)}
                 onDeleted={onAttachmentDeleted}
-                disabled={isLoading}
+                disabled={isLoading || isDemo}
               />
               <AttachmentSlot
                 label="Recibo / comprobante de pago"
@@ -807,7 +809,7 @@ export function MovementForm({
                 onSelect={setPendingRecibo}
                 onClearPending={() => setPendingRecibo(null)}
                 onDeleted={onAttachmentDeleted}
-                disabled={isLoading}
+                disabled={isLoading || isDemo}
               />
             </div>
           )}
@@ -819,7 +821,7 @@ export function MovementForm({
               onSelect={setPendingComprobante}
               onClearPending={() => setPendingComprobante(null)}
               onDeleted={onAttachmentDeleted}
-              disabled={isLoading}
+              disabled={isLoading || isDemo}
             />
           )}
 
@@ -832,7 +834,8 @@ export function MovementForm({
                 ? "bg-success hover:bg-success/90 text-white shadow-sm shadow-success/20"
                 : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/20"
             )}
-            disabled={isLoading}
+            disabled={isLoading || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
           >
             {isLoading ? "Guardando…" : submitLabel_resolved}
           </Button>

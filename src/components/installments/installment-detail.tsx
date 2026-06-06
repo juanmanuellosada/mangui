@@ -49,6 +49,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 type InstallmentPurchase = Tables<"installment_purchases">
 type Movement = Tables<"movements">
@@ -201,11 +202,13 @@ function DeletePurchaseDialog({
   open,
   onOpenChange,
   onDeleted,
+  isDemo,
 }: {
   purchase: InstallmentPurchase
   open: boolean
   onOpenChange: (v: boolean) => void
   onDeleted: () => void
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
 
@@ -253,7 +256,8 @@ function DeletePurchaseDialog({
           <Button
             variant="destructive"
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className="press-effect"
           >
             {mutation.isPending ? "Eliminando…" : "Eliminar todo"}
@@ -270,10 +274,12 @@ function DeleteCuotaDialog({
   movement,
   open,
   onOpenChange,
+  isDemo,
 }: {
   movement: Movement
   open: boolean
   onOpenChange: (v: boolean) => void
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
 
@@ -323,7 +329,8 @@ function DeleteCuotaDialog({
           <Button
             variant="destructive"
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className="press-effect"
           >
             {mutation.isPending ? "Eliminando…" : "Eliminar cuota"}
@@ -344,6 +351,7 @@ function CuotaRow({
   isSelected,
   onToggle,
   postponeControls,
+  isDemo,
 }: {
   movement: Movement
   currency: "ARS" | "USD"
@@ -352,6 +360,7 @@ function CuotaRow({
   isSelected?: boolean
   onToggle?: (id: string) => void
   postponeControls?: React.ReactNode
+  isDemo?: boolean
 }) {
   const status = getCuotaStatus(movement)
   const StatusIcon = STATUS_ICONS[status]
@@ -409,13 +418,15 @@ function CuotaRow({
       {!selectionMode && !postponeControls && (
         <button
           type="button"
-          title="Eliminar cuota"
-          onClick={() => onDelete(movement)}
+          title={isDemo ? "No disponible en el modo demo" : "Eliminar cuota"}
+          onClick={isDemo ? undefined : () => onDelete(movement)}
+          disabled={isDemo}
           className={cn(
             "h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0",
             "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
             "hover:bg-destructive/10 text-muted-foreground hover:text-destructive",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
+            "disabled:opacity-30 disabled:cursor-not-allowed"
           )}
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -433,12 +444,14 @@ function PostponeControls({
   cycles,
   purchaseId,
   startDate,
+  isDemo,
 }: {
   movement: Movement
   allMovements: Movement[]
   cycles: CardCycle[]
   purchaseId: string
   startDate: string
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
   const [pendingDelta, setPendingDelta] = useState<-1 | 1 | null>(null)
@@ -519,9 +532,9 @@ function PostponeControls({
       <div className="flex items-center gap-1 flex-shrink-0">
         <button
           type="button"
-          disabled={!canMinus || isPending}
+          disabled={!canMinus || isPending || isDemo}
           onClick={() => setPendingDelta(-1)}
-          title="−1 mes"
+          title={isDemo ? "No disponible en el modo demo" : "−1 mes"}
           aria-label="Mover cuota un mes atrás"
           className={cn(
             "h-7 w-7 rounded-lg flex items-center justify-center",
@@ -535,9 +548,9 @@ function PostponeControls({
         </button>
         <button
           type="button"
-          disabled={!canPlus || isPending}
+          disabled={!canPlus || isPending || isDemo}
           onClick={() => setPendingDelta(1)}
-          title="+1 mes"
+          title={isDemo ? "No disponible en el modo demo" : "+1 mes"}
           aria-label="Mover cuota un mes adelante"
           className={cn(
             "h-7 w-7 rounded-lg flex items-center justify-center",
@@ -594,6 +607,7 @@ interface EditPurchaseSheetProps {
   availableCategories?: Category[]
   open: boolean
   onOpenChange: (v: boolean) => void
+  isDemo?: boolean
 }
 
 function EditPurchaseSheet({
@@ -604,6 +618,7 @@ function EditPurchaseSheet({
   availableCategories,
   open,
   onOpenChange,
+  isDemo,
 }: EditPurchaseSheetProps) {
   const queryClient = useQueryClient()
 
@@ -768,7 +783,8 @@ function EditPurchaseSheet({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className="press-effect"
           >
             {saveMutation.isPending ? "Guardando…" : "Guardar cambios"}
@@ -948,6 +964,7 @@ export function InstallmentDetailBody({
   accounts,
   categories,
 }: InstallmentDetailBodyProps) {
+  const isDemo = useIsDemo()
   const [deletePurchaseOpen, setDeletePurchaseOpen] = useState(false)
   const [deletingCuota, setDeletingCuota] = useState<Movement | null>(null)
   const [editPurchaseOpen, setEditPurchaseOpen] = useState(false)
@@ -1103,6 +1120,7 @@ export function InstallmentDetailBody({
                   selectionMode={ms.selectionMode}
                   isSelected={ms.isSelected(m.id)}
                   onToggle={ms.toggle}
+                  isDemo={isDemo}
                   postponeControls={
                     showPostpone ? (
                       <PostponeControls
@@ -1111,6 +1129,7 @@ export function InstallmentDetailBody({
                         cycles={cycles}
                         purchaseId={purchaseId}
                         startDate={purchase.start_date}
+                        isDemo={isDemo}
                       />
                     ) : undefined
                   }
@@ -1125,6 +1144,8 @@ export function InstallmentDetailBody({
       <Button
         variant="outline"
         onClick={() => setEditPurchaseOpen(true)}
+        disabled={isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
         className="w-full press-effect flex items-center gap-2"
       >
         <Pencil className="h-4 w-4" />
@@ -1140,6 +1161,8 @@ export function InstallmentDetailBody({
         <Button
           variant="destructive"
           onClick={() => setDeletePurchaseOpen(true)}
+          disabled={isDemo}
+          title={isDemo ? "No disponible en el modo demo" : undefined}
           className="w-full press-effect"
         >
           Eliminar compra completa
@@ -1155,6 +1178,7 @@ export function InstallmentDetailBody({
         open={deletePurchaseOpen}
         onOpenChange={setDeletePurchaseOpen}
         onDeleted={() => setDeletePurchaseOpen(false)}
+        isDemo={isDemo}
       />
 
       {deletingCuota && (
@@ -1162,6 +1186,7 @@ export function InstallmentDetailBody({
           movement={deletingCuota}
           open={!!deletingCuota}
           onOpenChange={(v) => { if (!v) setDeletingCuota(null) }}
+          isDemo={isDemo}
         />
       )}
 
@@ -1175,6 +1200,7 @@ export function InstallmentDetailBody({
           availableCategories={categories}
           open={editPurchaseOpen}
           onOpenChange={setEditPurchaseOpen}
+          isDemo={isDemo}
         />
       )}
 
@@ -1199,7 +1225,7 @@ export function InstallmentDetailBody({
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending || isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect">
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
             </Button>
           </div>
@@ -1217,6 +1243,7 @@ export function InstallmentDetailBody({
 
 export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
   const router = useRouter()
+  const isDemo = useIsDemo()
   const [deletePurchaseOpen, setDeletePurchaseOpen] = useState(false)
 
   const { data: purchase, isLoading } = useQuery({
@@ -1279,15 +1306,17 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
         </h1>
         <button
           type="button"
-          onClick={() => setDeletePurchaseOpen(true)}
+          onClick={isDemo ? undefined : () => setDeletePurchaseOpen(true)}
+          disabled={isDemo}
           className={cn(
             "h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0",
             "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
             "transition-all duration-150 press-effect cursor-pointer",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "disabled:opacity-30 disabled:cursor-not-allowed"
           )}
           aria-label="Eliminar compra completa"
-          title="Eliminar compra completa"
+          title={isDemo ? "No disponible en el modo demo" : "Eliminar compra completa"}
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -1301,6 +1330,7 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
         open={deletePurchaseOpen}
         onOpenChange={setDeletePurchaseOpen}
         onDeleted={() => router.push("/movimientos")}
+        isDemo={isDemo}
       />
     </div>
   )

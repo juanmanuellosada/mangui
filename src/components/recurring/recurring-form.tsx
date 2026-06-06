@@ -16,6 +16,7 @@ import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
+import { useIsDemo } from "@/lib/use-is-demo"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { AccountIconChip, type Account } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -157,6 +158,7 @@ export function RecurringForm({
   submitLabel = "Guardar recurrente",
 }: RecurringFormProps) {
   const today = new Date().toISOString().split("T")[0]
+  const isDemo = useIsDemo()
 
   const {
     register,
@@ -719,7 +721,8 @@ export function RecurringForm({
         <Button
           type="submit"
           className="w-full press-effect font-semibold h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/20"
-          disabled={isLoading}
+          disabled={isLoading || isDemo}
+          title={isDemo ? "No disponible en el modo demo" : undefined}
         >
           {isLoading ? "Guardando…" : submitLabel}
         </Button>
@@ -729,7 +732,8 @@ export function RecurringForm({
             variant="outline"
             className="w-full press-effect text-destructive border-destructive/30 hover:bg-destructive/10"
             onClick={onDelete}
-            disabled={isDeleting}
+            disabled={isDeleting || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
           >
             {isDeleting ? "Eliminando…" : "Eliminar recurrente"}
           </Button>

@@ -38,7 +38,6 @@ import { INSTALLMENTS_KEY, computeInstallmentAmounts, computeInstallmentDate, is
 import { isFutureDate } from "@/lib/date-utils"
 import { uploadAttachment } from "@/lib/attachments"
 import { fetchDolarRates } from "@/lib/rates/dolar"
-import { useIsDemo } from "@/lib/use-is-demo"
 
 type Category = Tables<"categories">
 export type QuickAddMode = "movement" | "transfer"
@@ -175,7 +174,6 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [defaultType, setDefaultType] = React.useState<"income" | "expense">("expense")
   const [preset, setPreset] = React.useState<QuickAddPreset | undefined>(undefined)
   const queryClient = useQueryClient()
-  const isDemo = useIsDemo()
 
   const { data: accounts = [] } = useQuery({
     queryKey: ACCOUNTS_KEY,
@@ -188,9 +186,6 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   })
 
   const open = React.useCallback((m: QuickAddMode = "movement", type: "income" | "expense" = "expense", p?: QuickAddPreset) => {
-    // Demo users cannot create movements — block silently (UI entry points are
-    // already hidden, but this is a safety net for any missed call site).
-    if (isDemo) return
     // Both "movement" and "transfer" are served by the same MovementForm sheet.
     // Map "transfer" to "movement" mode so the sheet opens with the 3-way toggle,
     // but store the intended initial mode so MovementForm starts on the transfer tab.
@@ -198,7 +193,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     setDefaultType(type)
     setPreset(p)
     setIsOpen(true)
-  }, [isDemo])
+  }, [])
 
 
   // Re-derive on every open call using a ref to capture the original QuickAddMode.

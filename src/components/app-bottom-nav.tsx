@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
 import { MangoSheet } from "@/components/ui/mango-sheet";
 import { MORE_SHEET_NAV } from "@/lib/nav-sections";
-import { useIsDemo } from "@/lib/use-is-demo";
 import React from "react";
 
 const BOTTOM_NAV = [
@@ -25,7 +24,6 @@ const BOTTOM_NAV = [
 export function AppBottomNav() {
   const pathname = usePathname();
   const quickAdd = useQuickAdd();
-  const isDemo = useIsDemo();
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   // "Más" is considered active when the current path matches any item in the sheet.
@@ -44,7 +42,6 @@ export function AppBottomNav() {
           {BOTTOM_NAV.map((item, index) => {
             // Center slot: quick-add button
             if (item === null) {
-              if (isDemo) return <div key="quick-add" className="w-12" />;
               return (
                 <button
                   key="quick-add"

@@ -86,6 +86,7 @@ import { summaryTotals } from "@/lib/stats"
 import { useQuickAdd } from "@/components/quick-add-provider"
 import { listAttachments, uploadAttachment } from "@/lib/attachments"
 import { isFutureDate } from "@/lib/date-utils"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 type Movement = Tables<"movements">
 type Transfer = Tables<"transfers">
@@ -195,6 +196,7 @@ function MovementRow({
   selectionMode,
   isSelected,
   onToggle,
+  isDemo,
 }: {
   movement: Movement
   account: Account | undefined
@@ -204,6 +206,7 @@ function MovementRow({
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  isDemo?: boolean
 }) {
   const isIncome = movement.type === "income"
   const displayAmount = movement.converted_amount ?? movement.amount
@@ -296,18 +299,20 @@ function MovementRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            title="Editar"
+            title={isDemo ? "No disponible en el modo demo" : "Editar"}
             className="press-effect cursor-pointer"
             onClick={() => onEdit(movement)}
+            disabled={isDemo}
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon-sm"
-            title="Eliminar"
+            title={isDemo ? "No disponible en el modo demo" : "Eliminar"}
             className="press-effect cursor-pointer"
             onClick={() => onDelete(movement)}
+            disabled={isDemo}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
@@ -328,6 +333,7 @@ function TransferRow({
   selectionMode,
   isSelected,
   onToggle,
+  isDemo,
 }: {
   transfer: Transfer
   fromAccount: Account | undefined
@@ -337,6 +343,7 @@ function TransferRow({
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  isDemo?: boolean
 }) {
   const isCross =
     fromAccount && toAccount && fromAccount.currency !== toAccount.currency
@@ -401,18 +408,20 @@ function TransferRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            title="Editar"
+            title={isDemo ? "No disponible en el modo demo" : "Editar"}
             className="press-effect cursor-pointer"
             onClick={() => onEdit(transfer)}
+            disabled={isDemo}
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon-sm"
-            title="Eliminar"
+            title={isDemo ? "No disponible en el modo demo" : "Eliminar"}
             className="press-effect cursor-pointer"
             onClick={() => onDelete(transfer)}
+            disabled={isDemo}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
@@ -1353,6 +1362,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function MovementsList() {
+  const isDemo = useIsDemo()
   const [filter, setFilter] = useState<MovementsFilter>(defaultFilter)
   const [groupBy, setGroupBy] = useState<GroupBy>("none")
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
@@ -1833,6 +1843,7 @@ export function MovementsList() {
                           selectionMode={ms.selectionMode}
                           isSelected={ms.isSelected(fi.item.id)}
                           onToggle={ms.toggle}
+                          isDemo={isDemo}
                         />
                       ) : (
                         <TransferRow
@@ -1844,6 +1855,7 @@ export function MovementsList() {
                           selectionMode={ms.selectionMode}
                           isSelected={ms.isSelected(`t-${fi.item.id}`)}
                           onToggle={ms.toggle}
+                          isDemo={isDemo}
                         />
                       )}
                     </div>
@@ -1931,7 +1943,8 @@ export function MovementsList() {
             <Button
               variant="destructive"
               onClick={handleBulkDelete}
-              disabled={bulkPending}
+              disabled={bulkPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect"
             >
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}

@@ -239,16 +239,6 @@ function CrearMovimientoCard({
     onResolve(toolCallId, false)
   }, [toolCallId, onResolve])
 
-  // Demo mode: show a read-only notice instead of the confirmation form.
-  if (isDemo) {
-    return (
-      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs bg-muted/60 text-muted-foreground border border-border/40">
-        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-        <span>En modo demo no se pueden crear movimientos.</span>
-      </div>
-    )
-  }
-
   if (resolved) {
     // Show a compact result badge once resolved
     const isConfirmed = state === "output-available"

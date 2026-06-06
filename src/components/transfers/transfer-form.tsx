@@ -20,6 +20,7 @@ import { AccountIconChip, type Account } from "@/lib/accounts"
 import { isFutureDate } from "@/lib/date-utils"
 import { listTransferAttachments, type MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import type { Tables } from "@/lib/database.types"
 import type { RateType } from "@/lib/rates/dolar"
 
@@ -102,6 +103,7 @@ export function TransferForm({
   onAttachmentDeleted,
 }: TransferFormProps) {
   const today = new Date().toISOString().split("T")[0]
+  const isDemo = useIsDemo()
 
   // Transfers exclude credit cards from both origin and destination
   const transferAccounts = accounts.filter((a) => a.type !== "tarjeta_credito")
@@ -535,10 +537,15 @@ export function TransferForm({
           onAttachmentDeleted?.()
           refetchAttachments()
         }}
-        disabled={isLoading}
+        disabled={isLoading || isDemo}
       />
 
-      <Button type="submit" className="w-full press-effect font-semibold h-11" disabled={isLoading}>
+      <Button
+        type="submit"
+        className="w-full press-effect font-semibold h-11"
+        disabled={isLoading || isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
+      >
         {isLoading ? "Guardando…" : submitLabel}
       </Button>
     </form>

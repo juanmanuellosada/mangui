@@ -44,6 +44,17 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Demo session: sign out when returning to the public landing/legal pages so the
+  // visitor is not still logged in as demo. Uses user_metadata from the JWT — no DB query.
+  const DEMO_PUBLIC_PATHS = ["/", "/privacidad", "/terminos"];
+  if (
+    user?.user_metadata?.is_demo === true &&
+    DEMO_PUBLIC_PATHS.some((p) => pathname === p)
+  ) {
+    await supabase.auth.signOut();
+    return supabaseResponse; // respond as anonymous visitor
+  }
+
   // Public paths — accessible without authentication
   const PUBLIC_EXACT = ["/"];
   const PUBLIC_PREFIX = ["/api", "/login", "/register", "/forgot-password", "/reset-password", "/offline", "/privacidad", "/terminos"];

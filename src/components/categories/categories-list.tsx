@@ -20,6 +20,7 @@ import { renderCategoryIcon } from "@/lib/categories"
 import { createClient } from "@/lib/supabase/client"
 import { CATEGORIES_KEY, MOVEMENTS_KEY } from "@/lib/movements"
 import { cn } from "@/lib/utils"
+import { useIsDemo } from "@/lib/use-is-demo"
 import type { Tables } from "@/lib/database.types"
 
 type Category = Tables<"categories">
@@ -91,6 +92,7 @@ function CategoryForm({
   submitLabel,
   userId,
   onDelete,
+  isDemo,
 }: {
   defaultValues?: Partial<CategoryFormValues>
   onSubmit: (v: CategoryFormValues) => Promise<void>
@@ -98,6 +100,7 @@ function CategoryForm({
   submitLabel?: string
   userId?: string
   onDelete?: () => void
+  isDemo?: boolean
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -205,12 +208,19 @@ function CategoryForm({
               variant="outline"
               className="shrink-0 press-effect text-destructive border-destructive/30 hover:bg-destructive/10"
               onClick={onDelete}
+              disabled={isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
             >
               <Trash2 className="h-4 w-4" />
               Eliminar
             </Button>
           )}
-          <Button type="submit" className={cn("press-effect", onDelete ? "flex-1" : "w-full")} disabled={isLoading}>
+          <Button
+            type="submit"
+            className={cn("press-effect", onDelete ? "flex-1" : "w-full")}
+            disabled={isLoading || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
+          >
             {isLoading ? "Guardando…" : (submitLabel ?? "Guardar")}
           </Button>
         </div>
@@ -252,6 +262,7 @@ function CategoryCard({
   selectionMode,
   isSelected,
   onToggle,
+  isDemo,
 }: {
   category: Category
   onEdit: (c: Category) => void
@@ -259,6 +270,7 @@ function CategoryCard({
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  isDemo?: boolean
 }) {
   function handleCardClick() {
     if (selectionMode && onToggle) onToggle(category.id)
@@ -312,18 +324,20 @@ function CategoryCard({
           <Button
             variant="ghost"
             size="icon-sm"
-            title="Editar categoría"
+            title={isDemo ? "No disponible en el modo demo" : "Editar categoría"}
             className="press-effect cursor-pointer"
             onClick={() => onEdit(category)}
+            disabled={isDemo}
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon-sm"
-            title="Eliminar categoría"
+            title={isDemo ? "No disponible en el modo demo" : "Eliminar categoría"}
             className="press-effect cursor-pointer"
             onClick={(e) => { e.stopPropagation(); onDeleteRequest(category) }}
+            disabled={isDemo}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
@@ -491,7 +505,7 @@ function CategoriesFilterBar({
 
 // ── Create sheet ──────────────────────────────────────────────────────────────
 
-function CreateCategorySheet({ userId }: { userId?: string }) {
+function CreateCategorySheet({ userId, isDemo }: { userId?: string; isDemo?: boolean }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -543,6 +557,7 @@ function CreateCategorySheet({ userId }: { userId?: string }) {
           isLoading={mutation.isPending}
           submitLabel="Crear categoría"
           userId={userId}
+          isDemo={isDemo}
         />
       </MangoSheet>
     </>
@@ -556,11 +571,13 @@ function EditCategorySheet({
   userId,
   onClose,
   onDelete,
+  isDemo,
 }: {
   category: Category
   userId?: string
   onClose: () => void
   onDelete: () => void
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
 
@@ -620,6 +637,7 @@ function EditCategorySheet({
       submitLabel="Guardar cambios"
       userId={userId}
       onDelete={onDelete}
+      isDemo={isDemo}
     />
   )
 }
@@ -628,6 +646,7 @@ function EditCategorySheet({
 
 export function CategoriesList() {
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
 
   const { data: categories, isLoading } = useQuery({
     queryKey: CATEGORIES_KEY,
@@ -742,7 +761,7 @@ export function CategoriesList() {
           {!isLoading && categories && categories.length > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          {!ms.selectionMode && <CreateCategorySheet userId={userId} />}
+          {!ms.selectionMode && <CreateCategorySheet userId={userId} isDemo={isDemo} />}
         </div>
       </div>
 
@@ -779,7 +798,7 @@ export function CategoriesList() {
               Creá categorías para clasificar tus ingresos y gastos.
             </p>
           </div>
-          <CreateCategorySheet userId={userId} />
+          <CreateCategorySheet userId={userId} isDemo={isDemo} />
         </div>
       )}
 
@@ -813,6 +832,7 @@ export function CategoriesList() {
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(category.id)}
               onToggle={ms.toggle}
+              isDemo={isDemo}
             />
           ))}
         </div>
@@ -847,7 +867,8 @@ export function CategoriesList() {
             <Button
               variant="destructive"
               onClick={handleBulkDelete}
-              disabled={bulkPending}
+              disabled={bulkPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect"
             >
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
@@ -878,7 +899,8 @@ export function CategoriesList() {
             <Button
               variant="destructive"
               onClick={handleSingleDelete}
-              disabled={deletePending}
+              disabled={deletePending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect"
             >
               {deletePending ? "Eliminando…" : "Eliminar"}
@@ -905,6 +927,7 @@ export function CategoriesList() {
             userId={userId}
             onClose={() => setEditingCategory(null)}
             onDelete={() => requestDeleteCategory(editingCategory)}
+            isDemo={isDemo}
           />
         )}
       </MangoSheet>

@@ -21,6 +21,7 @@ import {
 } from "@/lib/accounts"
 import { nextCloseDate, computeDueDate } from "@/lib/cards"
 import { cn } from "@/lib/utils"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 // Explicit type — avoids inference issues with z.coerce in zod v4
 export type AccountFormValues = {
@@ -148,6 +149,7 @@ export function AccountForm({
   userId,
 }: AccountFormProps) {
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
+  const isDemo = useIsDemo()
 
   const {
     register,
@@ -390,7 +392,12 @@ export function AccountForm({
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isLoading || isDemo}
+          title={isDemo ? "No disponible en el modo demo" : undefined}
+        >
           {isLoading ? "Guardando…" : submitLabel}
         </Button>
       </form>

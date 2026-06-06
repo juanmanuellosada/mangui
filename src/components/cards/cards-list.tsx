@@ -49,6 +49,7 @@ import type { Tables } from "@/lib/database.types"
 import { format, parseISO, isBefore, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { useQuickAdd } from "@/components/quick-add-provider"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 type Account = Tables<"accounts">
 type Movement = Tables<"movements">
@@ -320,6 +321,7 @@ function RegisterPaymentDialog({
   const [pendingComprobante, setPendingComprobante] = useState<File | null>(null)
   const [existingResumen, setExistingResumen] = useState<MovementAttachment | null>(null)
   const [existingComprobante, setExistingComprobante] = useState<MovementAttachment | null>(null)
+  const isDemo = useIsDemo()
 
   // Filtered account lists per currency
   const nonCardAccounts = allAccounts.filter(
@@ -632,7 +634,8 @@ function RegisterPaymentDialog({
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={isDisabled}
+            disabled={isDisabled || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className="flex-1 press-effect cursor-pointer"
           >
             {isDisabled ? "Guardando…" : "Registrar pago"}

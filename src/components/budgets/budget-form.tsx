@@ -18,6 +18,7 @@ import { IconPicker } from "@/components/ui/icon-picker"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip, renderCategoryIcon } from "@/lib/categories"
 import { cn, formatCurrency } from "@/lib/utils"
+import { useIsDemo } from "@/lib/use-is-demo"
 import {
   periodLabel,
   computeBudgetProgress,
@@ -163,6 +164,7 @@ export function BudgetForm({
   const initialPreset = calendarPeriodWindow("monthly")
 
   const [pickerOpen, setPickerOpen] = useState(false)
+  const isDemo = useIsDemo()
 
   const {
     register,
@@ -554,7 +556,8 @@ export function BudgetForm({
               variant="destructive"
               size="sm"
               onClick={onDelete}
-              disabled={isLoading}
+              disabled={isLoading || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect cursor-pointer"
             >
               Eliminar
@@ -562,7 +565,8 @@ export function BudgetForm({
           )}
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className="flex-1 press-effect cursor-pointer font-semibold"
           >
             {isLoading ? "Guardando…" : submitLabel}

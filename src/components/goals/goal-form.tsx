@@ -30,6 +30,7 @@ import {
 import { AccountIconChip } from "@/lib/accounts"
 import { createClient } from "@/lib/supabase/client"
 import type { Tables } from "@/lib/database.types"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 type Category = Tables<"categories">
 type Account = Tables<"accounts">
@@ -296,6 +297,7 @@ export function GoalForm({
 }: GoalFormProps) {
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
+  const isDemo = useIsDemo()
 
   const {
     register,
@@ -846,7 +848,8 @@ export function GoalForm({
               variant="destructive"
               size="sm"
               onClick={onDelete}
-              disabled={isLoading}
+              disabled={isLoading || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect cursor-pointer"
             >
               Eliminar
@@ -854,7 +857,8 @@ export function GoalForm({
           )}
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className="flex-1 press-effect cursor-pointer font-semibold"
           >
             {isLoading ? "Guardando…" : submitLabel}
