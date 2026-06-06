@@ -29,6 +29,7 @@ export function BrandLockup({ size = 28, showWord = true, wordClassName, classNa
         width={size}
         height={size}
         className="rounded-[22%] flex-shrink-0"
+        style={{ height: "auto" }}
       />
       {showWord && (
         <span

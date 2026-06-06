@@ -12,9 +12,9 @@ export const config = {
      * Match all paths except:
      * - _next/static (static files)
      * - _next/image (image optimization)
-     * - favicon.ico, sitemap.xml, robots.txt
-     * - public files (logo, manifest, icons, etc.)
+     * - Static public assets: images, icons, manifests, sw, fonts, etc.
+     *   (anything with a file extension under the root or /icons/)
      */
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|logo.png|manifest.json|icons/).*)",
+    "/((?!_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|avif|woff2?|ttf|otf|eot|json|xml|txt|js|css)).*)",
   ],
 };

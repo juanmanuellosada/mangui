@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -8,13 +7,14 @@ import { z } from "zod"
 import { useTheme } from "next-themes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Settings2, Palette, Tag, Database, LogOut, Sun, Moon, Monitor, Info, Plug, ExternalLink, Bot, ChevronRight } from "lucide-react"
+import { User, Settings2, Palette, Database, LogOut, Sun, Moon, Monitor, Info, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
+import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { createClient } from "@/lib/supabase/client"
 import { signOut } from "@/app/actions/auth"
 import { cn } from "@/lib/utils"
@@ -59,6 +59,83 @@ async function fetchPreferences(): Promise<UserPreferences | null> {
   return data
 }
 
+interface ExchangeRateRow {
+  rate_type: string
+  buy: number
+  sell: number
+  fetched_at: string
+}
+
+async function fetchExchangeRates(): Promise<Record<string, ExchangeRateRow>> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("exchange_rates")
+    .select("rate_type, buy, sell, fetched_at")
+  if (error) throw error
+  const map: Record<string, ExchangeRateRow> = {}
+  for (const row of data ?? []) {
+    map[row.rate_type] = row as ExchangeRateRow
+  }
+  return map
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+function escapeCSVField(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return ""
+  const str = String(value)
+  // Wrap in quotes if contains comma, quote, or newline
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+async function exportMovementsCSV() {
+  const supabase = createClient()
+
+  // Fetch movements, categories, accounts in parallel
+  const [movRes, catRes, accRes] = await Promise.all([
+    supabase.from("movements").select("*").order("date", { ascending: false }).limit(5000),
+    supabase.from("categories").select("id, name"),
+    supabase.from("accounts").select("id, name"),
+  ])
+
+  if (movRes.error) throw movRes.error
+  if (catRes.error) throw catRes.error
+  if (accRes.error) throw accRes.error
+
+  const catMap: Record<string, string> = {}
+  for (const c of catRes.data ?? []) catMap[c.id] = c.name
+
+  const accMap: Record<string, string> = {}
+  for (const a of accRes.data ?? []) accMap[a.id] = a.name
+
+  const header = ["fecha", "tipo", "monto", "moneda", "monto_convertido", "categoria", "cuenta", "nota"]
+  const rows = (movRes.data ?? []).map((m) => [
+    escapeCSVField(m.date),
+    escapeCSVField(m.type),
+    escapeCSVField(m.amount),
+    escapeCSVField(m.original_currency),
+    escapeCSVField(m.converted_amount),
+    escapeCSVField(catMap[m.category_id ?? ""] ?? ""),
+    escapeCSVField(accMap[m.account_id] ?? ""),
+    escapeCSVField(m.note),
+  ])
+
+  const csvContent = [header.join(","), ...rows.map((r) => r.join(","))].join("\n")
+  const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const today = new Date().toISOString().slice(0, 10)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `mangui-movimientos-${today}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getInitials(name: string | null): string {
@@ -69,6 +146,13 @@ function getInitials(name: string | null): string {
     .map((n) => n[0])
     .join("")
     .toUpperCase()
+}
+
+function formatRate(value: number): string {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
 }
 
 // ── Profile section ───────────────────────────────────────────────────────────
@@ -211,6 +295,13 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
   const rateType = watch("rate_type")
   const currency = watch("default_currency")
 
+  // Fetch live exchange rates from the cached exchange_rates table
+  const { data: exchangeRates, isLoading: ratesLoading } = useQuery({
+    queryKey: ["exchange_rates"],
+    queryFn: fetchExchangeRates,
+    staleTime: 5 * 60 * 1000, // 5 min
+  })
+
   const mutation = useMutation({
     mutationFn: async (values: PrefsFormValues) => {
       const supabase = createClient()
@@ -238,49 +329,52 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
 
   return (
     <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
-      {/* Default currency */}
+      {/* Default currency — uses CurrencyToggle with coin icons */}
       <div className="space-y-1.5">
         <Label>Moneda predeterminada</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {(["ARS", "USD"] as const).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setValue("default_currency", c, { shouldDirty: true })}
-              className={cn(
-                "h-10 rounded-xl text-sm font-semibold border transition-all duration-150 cursor-pointer press-effect",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                currency === c
-                  ? "bg-primary/15 border-primary/40 text-primary"
-                  : "bg-muted/40 border-border/60 text-muted-foreground hover:bg-muted"
-              )}
-            >
-              {c === "ARS" ? "Pesos (ARS)" : "Dólares (USD)"}
-            </button>
-          ))}
-        </div>
+        <CurrencyToggle
+          value={currency}
+          onChange={(c) => setValue("default_currency", c, { shouldDirty: true })}
+        />
       </div>
 
-      {/* Rate type */}
+      {/* Rate type — with live compra/venta values from exchange_rates table */}
       <div className="space-y-1.5">
         <Label>Tipo de cotización USD</Label>
         <div className="flex flex-wrap gap-2">
-          {(Object.entries(RATE_TYPE_LABELS) as [keyof typeof RATE_TYPE_LABELS, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setValue("rate_type", key, { shouldDirty: true })}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 cursor-pointer press-effect",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                rateType === key
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border/60 text-muted-foreground hover:border-primary/50"
-              )}
-            >
-              {label}
-            </button>
-          ))}
+          {(Object.entries(RATE_TYPE_LABELS) as [keyof typeof RATE_TYPE_LABELS, string][]).map(([key, label]) => {
+            const liveRate = key !== "manual" ? exchangeRates?.[key] : undefined
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setValue("rate_type", key, { shouldDirty: true })}
+                className={cn(
+                  "flex flex-col items-start px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 cursor-pointer press-effect",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  rateType === key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border/60 text-muted-foreground hover:border-primary/50"
+                )}
+              >
+                <span>{label}</span>
+                {key !== "manual" && (
+                  <span
+                    className={cn(
+                      "font-normal tabular-nums mt-0.5",
+                      rateType === key ? "text-primary-foreground/75" : "text-muted-foreground/70"
+                    )}
+                  >
+                    {ratesLoading
+                      ? "…"
+                      : liveRate
+                        ? `$ ${formatRate(liveRate.buy)} / $ ${formatRate(liveRate.sell)}`
+                        : "—"}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -387,8 +481,20 @@ function ThemeSection({ prefs }: { prefs: UserPreferences | null }) {
 // ── Data section ──────────────────────────────────────────────────────────────
 
 function DataSection() {
-  // Read version from environment (set at build time) or fallback
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await exportMovementsCSV()
+      toast.success("CSV descargado correctamente")
+    } catch (err) {
+      toast.error("Error al exportar", { description: err instanceof Error ? err.message : "Error desconocido" })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -401,14 +507,21 @@ function DataSection() {
         <span className="text-sm font-semibold tabular-nums">{version}</span>
       </div>
 
-      {/* Export — TODO */}
-      <div className="rounded-xl border border-border/60 px-4 py-3 flex items-center justify-between opacity-60">
+      {/* Export */}
+      <div className="rounded-xl border border-border/60 px-4 py-3 flex items-center justify-between">
         <div>
           <p className="text-sm font-medium">Exportar mis datos</p>
-          <p className="text-xs text-muted-foreground">Descargá tu historial en CSV / JSON</p>
+          <p className="text-xs text-muted-foreground">Descargá tu historial de movimientos en CSV</p>
         </div>
-        <Button variant="outline" size="sm" disabled className="cursor-not-allowed">
-          Próximamente
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={exporting}
+          className="gap-1.5 cursor-pointer press-effect flex-shrink-0"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {exporting ? "Exportando…" : "Exportar CSV"}
         </Button>
       </div>
 
@@ -494,7 +607,7 @@ export default function SettingsPage() {
   }, [prefs])
 
   return (
-    <div className="space-y-8 max-w-2xl animate-fade-in">
+    <div className="space-y-6 max-w-5xl animate-fade-in">
       {/* Page header */}
       <div className="space-y-0.5 pt-1">
         <h1
@@ -504,112 +617,55 @@ export default function SettingsPage() {
           Configuración
         </h1>
         <p className="text-sm text-muted-foreground">
-          Perfil, preferencias y categorías
+          Perfil, preferencias y cuenta
         </p>
       </div>
 
-      {/* Profile */}
-      <SettingsSection id="profile" icon={User} title="Perfil">
-        {loadingProfile ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-16 w-16 rounded-full" />
-              <div className="space-y-1.5">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24" />
+      {/* Responsive 2-column grid on lg+ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Perfil */}
+        <SettingsSection id="profile" icon={User} title="Perfil">
+          {loadingProfile ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-16 w-16 rounded-full" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
               </div>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
             </div>
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : (
-          <ProfileSection profile={profile ?? null} />
-        )}
-      </SettingsSection>
+          ) : (
+            <ProfileSection profile={profile ?? null} />
+          )}
+        </SettingsSection>
 
-      {/* Preferences */}
-      <SettingsSection id="preferences" icon={Settings2} title="Preferencias">
-        {loadingPrefs ? (
-          <div className="space-y-3">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : (
-          <PreferencesSection prefs={prefs ?? null} />
-        )}
-      </SettingsSection>
+        {/* Preferencias */}
+        <SettingsSection id="preferences" icon={Settings2} title="Preferencias">
+          {loadingPrefs ? (
+            <div className="space-y-3">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <PreferencesSection prefs={prefs ?? null} />
+          )}
+        </SettingsSection>
 
-      {/* Theme */}
-      <SettingsSection id="theme" icon={Palette} title="Tema">
-        <ThemeSection prefs={prefs ?? null} />
-      </SettingsSection>
+        {/* Tema */}
+        <SettingsSection id="theme" icon={Palette} title="Tema">
+          <ThemeSection prefs={prefs ?? null} />
+        </SettingsSection>
 
-      {/* Categories */}
-      <SettingsSection id="categories" icon={Tag} title="Categorías">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Gestioná tus categorías</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Creá, editá y organizá las categorías para clasificar tus movimientos.
-            </p>
-          </div>
-          <Link
-            href="/categorias"
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs font-semibold text-primary",
-              "hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
-            )}
-          >
-            Ver categorías
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      </SettingsSection>
+        {/* Datos y cuenta */}
+        <SettingsSection id="data" icon={Database} title="Datos y cuenta">
+          <DataSection />
+        </SettingsSection>
+      </div>
 
-      {/* IA link */}
-      <SettingsSection id="ia" icon={Bot} title="Inteligencia artificial">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Carga inteligente de movimientos</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Configurá tu API key (BYOK) para interpretar gastos con lenguaje natural.
-            </p>
-          </div>
-          <Link
-            href="/ia"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
-          >
-            Ir
-            <ExternalLink className="h-3 w-3" />
-          </Link>
-        </div>
-      </SettingsSection>
-
-      {/* Integraciones link */}
-      <SettingsSection id="integrations" icon={Plug} title="Integraciones">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Notificaciones push y PWA</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Activá avisos de tarjetas, transacciones y la instalación de la app.
-            </p>
-          </div>
-          <Link
-            href="/integraciones"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
-          >
-            Ir
-            <ExternalLink className="h-3 w-3" />
-          </Link>
-        </div>
-      </SettingsSection>
-
-      {/* Data / account */}
-      <SettingsSection id="data" icon={Database} title="Datos y cuenta">
-        <DataSection />
-      </SettingsSection>
-
-      {/* Logout */}
+      {/* Logout — full width at the bottom */}
       <div className="pb-4">
         <Separator className="mb-6" />
         <form action={signOut}>
