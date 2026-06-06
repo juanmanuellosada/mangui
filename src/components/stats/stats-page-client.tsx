@@ -29,6 +29,9 @@ import { CategoryDistributionChart } from "./category-distribution-chart"
 import { IncomeExpenseSeriesChart } from "./income-expense-series-chart"
 import { WeekdayPatternBars } from "./weekday-pattern-chart"
 import { CompareTab } from "./compare-tab"
+import { TopMovements } from "./top-movements"
+import { HealthKpis } from "./health-kpis"
+import { ExpenseByAccount } from "./expense-by-account"
 import { MoneyFlowSankeyChart } from "@/components/dashboard/money-flow-sankey-chart"
 import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
 import { GoalsSummary } from "@/components/dashboard/goals-summary"
@@ -367,6 +370,15 @@ export function StatsPageClient() {
         <div className="space-y-5">
           <SummaryCards totals={totals} currency={currency} period={periodLabel} type={filter.type} movements={filtered} />
 
+          <HealthKpis
+            totals={totals}
+            movements={filtered}
+            accounts={accounts}
+            currency={currency}
+            dateFrom={filter.date.from ?? null}
+            dateTo={filter.date.to ?? null}
+          />
+
           {/* Charts row 1: category distributions side-by-side on lg+ */}
           <div className={incomeDistribution.length > 0 ? "grid grid-cols-1 lg:grid-cols-2 gap-5" : undefined}>
             <CategoryDistributionChart
@@ -404,6 +416,21 @@ export function StatsPageClient() {
           <div className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5 space-y-3">
             <h3 className="text-sm font-semibold">Flujo</h3>
             <MoneyFlowSankeyChart movements={filtered} categories={categories} />
+          </div>
+
+          {/* Top movements + Expense by account */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <TopMovements
+              movements={filtered}
+              categories={categories}
+              accounts={accounts}
+              currency={currency}
+            />
+            <ExpenseByAccount
+              movements={filtered}
+              accounts={accounts}
+              currency={currency}
+            />
           </div>
 
           {/* Budgets + Goals widgets */}
