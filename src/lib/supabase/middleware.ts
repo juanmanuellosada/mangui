@@ -46,7 +46,7 @@ export async function updateSession(request: NextRequest) {
 
   // Public paths — accessible without authentication
   const PUBLIC_EXACT = ["/"];
-  const PUBLIC_PREFIX = ["/api", "/login", "/register", "/forgot-password", "/reset-password", "/offline"];
+  const PUBLIC_PREFIX = ["/api", "/login", "/register", "/forgot-password", "/reset-password", "/offline", "/privacidad", "/terminos"];
   const isPublic =
     PUBLIC_EXACT.includes(pathname) ||
     PUBLIC_PREFIX.some((p) => pathname === p || pathname.startsWith(p + "/"));

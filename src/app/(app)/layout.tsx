@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { QuickAddProvider } from "@/components/quick-add-provider";
+import { DemoBanner } from "@/components/demo-banner";
 
 /**
  * Protected app shell layout.
@@ -38,6 +39,9 @@ export default async function AppLayout({
 
         {/* Main content area */}
         <div className="flex-1 flex flex-col min-h-screen lg:pl-64">
+          {/* Demo read-only banner — only shown for the demo account */}
+          <DemoBanner />
+
           <main className="flex-1 pb-24 lg:pb-8 px-4 sm:px-6 lg:px-8 py-4 md:py-6">
             <div className="mx-auto w-full max-w-7xl">
               {children}

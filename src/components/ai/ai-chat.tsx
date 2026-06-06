@@ -31,6 +31,7 @@ import {
   ACCOUNTS_KEY,
   CATEGORIES_KEY,
 } from "@/lib/movements"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 type Category = Tables<"categories">
 
@@ -147,6 +148,7 @@ function CrearMovimientoCard({
   accounts,
   categories,
   onResolve,
+  isDemo,
 }: {
   toolCallId: string
   input: CrearMovimientoInput
@@ -154,6 +156,7 @@ function CrearMovimientoCard({
   accounts: Account[]
   categories: Category[]
   onResolve: (toolCallId: string, confirmed: boolean, summary?: string) => void
+  isDemo: boolean
 }) {
   const queryClient = useQueryClient()
   const [resolved, setResolved] = useState(state !== "input-available")
@@ -235,6 +238,16 @@ function CrearMovimientoCard({
     setResolved(true)
     onResolve(toolCallId, false)
   }, [toolCallId, onResolve])
+
+  // Demo mode: show a read-only notice instead of the confirmation form.
+  if (isDemo) {
+    return (
+      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs bg-muted/60 text-muted-foreground border border-border/40">
+        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+        <span>En modo demo no se pueden crear movimientos.</span>
+      </div>
+    )
+  }
 
   if (resolved) {
     // Show a compact result badge once resolved
@@ -320,11 +333,13 @@ function MessageBubble({
   accounts,
   categories,
   onAddToolOutput,
+  isDemo,
 }: {
   message: UIMessage
   accounts: Account[]
   categories: Category[]
   onAddToolOutput: (toolCallId: string, confirmed: boolean, summary?: string) => void
+  isDemo: boolean
 }) {
   const isUser = message.role === "user"
 
@@ -386,6 +401,7 @@ function MessageBubble({
                   accounts={accounts}
                   categories={categories}
                   onResolve={onAddToolOutput}
+                  isDemo={isDemo}
                 />
               )
             }
@@ -514,6 +530,7 @@ export function AiChat({ initialUsed, initialUnlimited }: AiChatProps) {
   const [generalError, setGeneralError] = useState("")
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isDemo = useIsDemo()
 
   const { data: accounts = [] } = useQuery({
     queryKey: ACCOUNTS_KEY,
@@ -634,6 +651,7 @@ export function AiChat({ initialUsed, initialUnlimited }: AiChatProps) {
                 accounts={accounts}
                 categories={categories}
                 onAddToolOutput={handleAddToolOutput}
+                isDemo={isDemo}
               />
             ))}
             {isStreaming && <StreamingIndicator />}
