@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { GOALS_KEY, computeGoalProgress, type Goal, type GoalScope, type GoalProgressStatus, type GoalType } from "@/lib/goals"
 import { fetchAllMovements } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
+import { renderCategoryIcon } from "@/lib/categories"
 import {
   GOAL_ACCOUNTS_KEY,
   GOAL_CATEGORIES_KEY,
@@ -63,7 +64,7 @@ function GoalRowSkeleton() {
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <Skeleton className="h-5 w-5 rounded-md shrink-0" />
+          <Skeleton className="h-7 w-7 rounded-lg shrink-0" />
           <Skeleton className="h-3.5 w-28" />
         </div>
         <Skeleton className="h-3.5 w-8 shrink-0" />
@@ -156,11 +157,13 @@ export function GoalsSummary() {
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span
                       className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-md shrink-0",
-                        goalTypeColor(goal.type)
+                        "flex h-7 w-7 items-center justify-center rounded-lg shrink-0",
+                        goal.icon ? "bg-muted/60" : goalTypeColor(goal.type)
                       )}
                     >
-                      {goalTypeIcon(goal.type)}
+                      {goal.icon
+                        ? renderCategoryIcon(goal.icon, { className: "text-base" })
+                        : goalTypeIcon(goal.type)}
                     </span>
                     <span className="text-sm font-medium truncate">{goal.name}</span>
                   </div>

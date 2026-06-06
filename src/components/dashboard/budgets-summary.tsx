@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronRight, AlertTriangle } from "lucide-react"
+import { ChevronRight, AlertTriangle, Wallet } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/lib/budgets"
 import { fetchAllMovements } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
+import { renderCategoryIcon } from "@/lib/categories"
 
 const MAX_VISIBLE = 5
 
@@ -116,9 +117,14 @@ export function BudgetsSummary() {
 
             return (
               <div key={budget.id} className="space-y-1.5">
-                {/* Top row: name + percent */}
+                {/* Top row: icon + name + percent */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="h-7 w-7 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
+                      {budget.icon
+                        ? renderCategoryIcon(budget.icon, { className: "text-base" })
+                        : <Wallet className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />}
+                    </span>
                     {showAlert && (
                       <AlertTriangle
                         className={cn(
