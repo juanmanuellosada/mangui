@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand-lockup";
 import { signInAsDemo } from "@/app/actions/auth";
+import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar";
 import {
   ArrowRight,
   Download,
@@ -17,6 +18,16 @@ import {
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+export const revalidate = 1800
+
+/* ─── Helpers ───────────────────────────────────────────────── */
+function formatRate(value: number): string {
+  return new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
+}
 
 /* ─── Demo CTA form ─────────────────────────────────────────── */
 function DemoCTA({
@@ -46,7 +57,9 @@ function DemoCTA({
 
 /* ─── Page ───────────────────────────────────────────────────── */
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const dolarRates: RatesMap = await fetchDolarRates()
+
   return (
     <div className="flex flex-col min-h-[100dvh]">
       {/* ══ NAV ══════════════════════════════════════════════ */}
@@ -675,12 +688,12 @@ export default function LandingPage() {
                   <Link
                     href="/register"
                     className={cn(
-                      buttonVariants({ size: "sm" }),
-                      "gap-1.5 font-semibold press-effect w-fit"
+                      buttonVariants(),
+                      "inline-flex items-center justify-center gap-2 h-11 px-6 text-sm font-semibold press-effect"
                     )}
                   >
                     Crear cuenta
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                   <DemoCTA variant="outline-dark" />
                 </div>
@@ -698,27 +711,34 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="divide-y divide-white/6">
-                    {[
-                      { tipo: "Blue", compra: "$1.280", venta: "$1.290", highlight: true },
-                      { tipo: "MEP", compra: "$1.268", venta: "$1.272", highlight: false },
-                      { tipo: "CCL", compra: "$1.285", venta: "$1.292", highlight: false },
-                      { tipo: "Oficial", compra: "$1.295", venta: "$1.305", highlight: false },
-                    ].map((row) => (
-                      <div key={row.tipo} className="flex justify-between py-2.5 text-xs">
-                        <span
-                          className={cn(
-                            "font-semibold",
-                            row.highlight ? "text-primary" : "text-white/70"
-                          )}
-                        >
-                          {row.tipo}
-                        </span>
-                        <div className="flex gap-5 tabular-nums">
-                          <span className="text-white/35">{row.compra}</span>
-                          <span className="text-white/70 font-semibold">{row.venta}</span>
-                        </div>
-                      </div>
-                    ))}
+                    {(
+                      [
+                        { key: "blue" as const, tipo: "Blue", highlight: true },
+                        { key: "mep" as const, tipo: "MEP", highlight: false },
+                        { key: "ccl" as const, tipo: "CCL", highlight: false },
+                        { key: "oficial" as const, tipo: "Oficial", highlight: false },
+                      ] satisfies { key: keyof RatesMap; tipo: string; highlight: boolean }[]
+                    )
+                      .filter(({ key }) => dolarRates[key] !== undefined)
+                      .map(({ key, tipo, highlight }) => {
+                        const rate = dolarRates[key]!
+                        return (
+                          <div key={tipo} className="flex justify-between py-2.5 text-xs">
+                            <span
+                              className={cn(
+                                "font-semibold",
+                                highlight ? "text-primary" : "text-white/70"
+                              )}
+                            >
+                              {tipo}
+                            </span>
+                            <div className="flex gap-5 tabular-nums">
+                              <span className="text-white/35">${formatRate(rate.buy)}</span>
+                              <span className="text-white/70 font-semibold">${formatRate(rate.sell)}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
                   </div>
                 </div>
 
