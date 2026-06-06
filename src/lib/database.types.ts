@@ -74,11 +74,14 @@ export type Database = {
           id: string
           note: string | null
           paid_amount: number | null
+          paid_amount_usd: number | null
           paid_date: string | null
           paid_from_account_id: string | null
+          paid_from_account_id_usd: string | null
           stamp_tax: number
           status: string
           total_amount: number
+          total_amount_usd: number
           transfer_id: string | null
           updated_at: string
           user_id: string
@@ -91,11 +94,14 @@ export type Database = {
           id?: string
           note?: string | null
           paid_amount?: number | null
+          paid_amount_usd?: number | null
           paid_date?: string | null
           paid_from_account_id?: string | null
+          paid_from_account_id_usd?: string | null
           stamp_tax?: number
           status?: string
           total_amount?: number
+          total_amount_usd?: number
           transfer_id?: string | null
           updated_at?: string
           user_id: string
@@ -108,11 +114,14 @@ export type Database = {
           id?: string
           note?: string | null
           paid_amount?: number | null
+          paid_amount_usd?: number | null
           paid_date?: string | null
           paid_from_account_id?: string | null
+          paid_from_account_id_usd?: string | null
           stamp_tax?: number
           status?: string
           total_amount?: number
+          total_amount_usd?: number
           transfer_id?: string | null
           updated_at?: string
           user_id?: string
@@ -156,6 +165,27 @@ export type Database = {
           {
             foreignKeyName: "card_statements_paid_from_account_id_fkey"
             columns: ["paid_from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_from_account_id_usd_fkey"
+            columns: ["paid_from_account_id_usd"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_from_account_id_usd_fkey"
+            columns: ["paid_from_account_id_usd"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_from_account_id_usd_fkey"
+            columns: ["paid_from_account_id_usd"]
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]

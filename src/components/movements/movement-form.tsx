@@ -32,7 +32,7 @@ import {
 import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
-import { nextCloseDate, computeDueDate } from "@/lib/cards"
+import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
 
 type Category = Tables<"categories">
 
@@ -224,6 +224,7 @@ export function MovementForm({
 
     return {
       type: "computed" as const,
+      statementLabel: formatStatementLabel(firstClose),
       closeStr: fmt(firstClose),
       dueStr: fmt(firstDue),
     }
@@ -691,9 +692,10 @@ export function MovementForm({
                       {" · "}
                     </>
                   ) : null}
-                  Primer pago entra en el resumen que cierra el{" "}
-                  <span className="font-semibold">{resumenSummary.closeStr}</span>
-                  {" "}(vence <span className="font-semibold">{resumenSummary.dueStr}</span>)
+                  Primer pago entra en el resumen de{" "}
+                  <span className="font-semibold">{resumenSummary.statementLabel}</span>
+                  {" "}(cierra <span className="font-semibold">{resumenSummary.closeStr}</span>
+                  , vence <span className="font-semibold">{resumenSummary.dueStr}</span>)
                 </p>
               ) : (
                 <p>Configurá la fecha de cierre de la tarjeta para ver en qué resumen entra

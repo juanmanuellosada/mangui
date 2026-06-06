@@ -9,7 +9,9 @@ import {
   isEqual,
   startOfDay,
   addDays,
+  format,
 } from "date-fns"
+import { es } from "date-fns/locale"
 
 // Minimal shape needed by nextCardPayment — avoids importing full DB types here.
 interface CardPaymentAccount {
@@ -272,6 +274,15 @@ export function isInCycle(dateStr: string, cycleStart: Date, cycleEnd: Date): bo
   return !isBefore(d, s) && !isAfter(d, e)
 }
 
+/**
+ * Returns the month+year label for a billing cycle, matching the format
+ * shown in the statements navigator (e.g. "junio 2026").
+ * Derived from the cycle's close date, exactly as displayed in cards-list.tsx.
+ */
+export function formatStatementLabel(closeDate: Date): string {
+  return format(closeDate, "MMMM yyyy", { locale: es })
+}
+
 // ── listCardCycles ─────────────────────────────────────────────────────────────
 
 // Minimal shapes for listCardCycles inputs — subsets of the DB row types.
@@ -287,6 +298,7 @@ interface CycleMovement {
   date: string
   amount: number
   converted_amount?: number | null
+  original_currency?: string | null
 }
 
 interface CycleStatement {
@@ -296,10 +308,13 @@ interface CycleStatement {
   due_date: string
   status: string
   total_amount: number
+  total_amount_usd: number
   stamp_tax: number
   paid_amount: number | null
+  paid_amount_usd: number | null
   paid_date: string | null
   paid_from_account_id: string | null
+  paid_from_account_id_usd: string | null
 }
 
 export interface CardCycle {
@@ -318,6 +333,12 @@ export interface CardCycle {
    * This is the autocalculated total; for paid cycles prefer statement.total_amount.
    */
   total: number
+  /**
+   * Per-currency subtotals computed from expense movements, grouped by
+   * original_currency and summed using the ORIGINAL amount (not converted_amount).
+   * Zero when the currency has no movements in the cycle.
+   */
+  totalsByCurrency: { ARS: number; USD: number }
   /**
    * The matching card_statements row, if a payment has been registered for
    * this cycle. null when the cycle is virtual (not yet paid).
@@ -368,7 +389,7 @@ export function listCardCycles(
     const stmt = statements.find(
       (s) => s.account_id === accountId && s.close_date === toDateString(cycleEnd)
     ) ?? null
-    return [{ closeDate: toDateString(cycleEnd), dueDate, cycleStart, cycleEnd, movements: [], total: 0, statement: stmt }]
+    return [{ closeDate: toDateString(cycleEnd), dueDate, cycleStart, cycleEnd, movements: [], total: 0, totalsByCurrency: { ARS: 0, USD: 0 }, statement: stmt }]
   }
 
   // Find the oldest movement date to determine the earliest cycle
@@ -407,9 +428,16 @@ export function listCardCycles(
       isInCycle(m.date, cycleStart, cycleEnd)
     )
 
-    const total = cycleMovements
-      .filter((m) => m.type === "expense")
+    const expenseMovements = cycleMovements.filter((m) => m.type === "expense")
+
+    const total = expenseMovements
       .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+
+    const totalsByCurrency: { ARS: number; USD: number } = { ARS: 0, USD: 0 }
+    for (const m of expenseMovements) {
+      const cur = m.original_currency === "USD" ? "USD" : "ARS"
+      totalsByCurrency[cur] += m.amount
+    }
 
     const closeDateStr = toDateString(cycleEnd)
     const dueDay = account.due_day
@@ -421,7 +449,7 @@ export function listCardCycles(
         (s) => s.account_id === accountId && s.close_date === closeDateStr
       ) ?? null
 
-    cycles.push({ closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, total, statement: stmt })
+    cycles.push({ closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, total, totalsByCurrency, statement: stmt })
 
     // Advance to the next cycle end: same day next month (clamped)
     const nextCycleEndRaw = addMonths(cycleEnd, 1)

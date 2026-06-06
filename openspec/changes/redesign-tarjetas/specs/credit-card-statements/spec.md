@@ -93,3 +93,22 @@ Al registrar un pago el sistema SHALL permitir adjuntar dos archivos independien
 
 - **WHEN** el usuario abre un resumen ya pagado que tiene adjuntos
 - **THEN** se muestran los adjuntos de resumen y comprobante con su preview vía URL firmada
+
+### Requirement: Pago de resúmenes con consumos en más de una moneda
+
+Cuando un resumen contiene consumos en más de una moneda (p. ej. pesos y dólares), el sistema SHALL calcular un subtotal por cada moneda (agrupando por `original_currency`, sin convertir) y, al registrar el pago, SHALL pedir una cuenta de origen y un monto por cada moneda con saldo distinto de cero. La cuenta de cada moneda SHALL filtrarse a cuentas de esa misma moneda. La fila `card_statements` SHALL persistir el pago de cada moneda (monto, cuenta de origen) sin perder ninguna de las dos.
+
+#### Scenario: Resumen con consumos en pesos y dólares
+
+- **WHEN** el usuario abre el resumen de una tarjeta que tiene consumos en ARS y en USD
+- **THEN** el resumen muestra dos subtotales (uno en ARS y uno en USD) en vez de un único total convertido
+
+#### Scenario: Registrar pago de un resumen multi-moneda
+
+- **WHEN** el usuario registra el pago de un resumen con saldo en ARS y en USD
+- **THEN** el modal pide DOS cuentas de origen y DOS montos —una cuenta ARS para el saldo en pesos y una cuenta USD para el saldo en dólares— y al confirmar persiste ambos pagos
+
+#### Scenario: Resumen con una sola moneda
+
+- **WHEN** un resumen tiene consumos en una sola moneda
+- **THEN** el modal pide una única cuenta y monto de esa moneda (comportamiento previo)

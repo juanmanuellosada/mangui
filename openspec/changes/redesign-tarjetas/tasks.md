@@ -42,6 +42,15 @@
 - [x] 7.2 Redactar el SQL para insertar 1 tarjeta nueva + varios ciclos de movimientos + upsert de `card_statements` pagados, y MOSTRARLO al usuario para aprobación antes de ejecutar.
 - [x] 7.3 Ejecutar el SQL en prod tras aprobación y verificar en la app demo. (Mastercard Macro `e9e102a8-…`, 19 gastos, 3 resúmenes pagados.)
 
-## 8. Pendiente — aplicar migración de esquema a prod
+## 8. Aplicar migración de esquema a prod
 
-- [ ] 8.1 Aplicar `0028`/`0029` a la base de producción (bloqueado por el guardrail de permisos; lo aplica el usuario vía pipeline de migraciones / `supabase db push` o dashboard). Necesario para los adjuntos de resúmenes en prod.
+- [x] 8.1 Aplicar `0028`/`0029` a la base de producción. Aplicadas y verificadas. Código pusheado a `main` (deploy Vercel).
+
+## 9. Pago multi-moneda (consumos en pesos y dólares)
+
+- [x] 9.1 Migración `0030`: agregar a `card_statements` columnas para el saldo/pago en la 2ª moneda — `total_amount_usd numeric default 0`, `paid_amount_usd numeric`, `paid_from_account_id_usd uuid` (FK accounts). El `total_amount`/`paid_amount`/`paid_from_account_id` existentes representan el saldo en la moneda principal (ARS).
+- [x] 9.2 `listCardCycles` (`src/lib/cards.ts`): calcular subtotales por `original_currency` (sin convertir) además del total. Exponer p. ej. `totalsByCurrency: { ARS, USD }` por ciclo.
+- [x] 9.3 UI del bloque de tarjeta: cuando un resumen tiene más de una moneda, mostrar los dos subtotales (ARS y USD) en lugar del único total convertido.
+- [x] 9.4 `RegisterPaymentDialog`: si el resumen tiene saldo en 2 monedas, mostrar dos `MoneyInput` (prellenados con cada subtotal) y dos `MangoSelect` de cuenta, cada selector filtrado a cuentas de esa moneda. Si hay una sola moneda, comportamiento actual. Al confirmar, persistir ambos pagos en `card_statements`.
+- [x] 9.5 Build/typecheck; checkear que tipos de `database.types.ts` incluyan las columnas nuevas.
+- [x] 9.6 Ops: aplicar `0030` a prod y sembrar 1-2 consumos en USD en el resumen de Mayo de la demo (Mastercard Macro). Aplicada y verificada; Mayo = ARS 125.200 + USD 64,99.

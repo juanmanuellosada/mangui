@@ -32,6 +32,7 @@ import { createClient } from "@/lib/supabase/client"
 import {
   listCardCycles,
   toDateString,
+  formatStatementLabel,
   type CardCycle,
 } from "@/lib/cards"
 import {
@@ -168,9 +169,13 @@ function CreditCardVisual({
   cycle: CardCycle
 }) {
   const cardColor = account.color ?? "#65a30d"
-  const displayTotal = cycle.statement?.status === "pagado"
-    ? cycle.statement.total_amount
-    : cycle.total
+  const isPaid = cycle.statement?.status === "pagado"
+
+  // Determine whether to show dual-currency subtotals or a single total.
+  // Dual: when the live cycle has both ARS and USD non-zero expenses.
+  // For paid cycles we show the stored totals instead.
+  const { ARS: arsTotal, USD: usdTotal } = cycle.totalsByCurrency
+  const isMultiCurrency = !isPaid && arsTotal > 0 && usdTotal > 0
 
   return (
     <div
@@ -188,17 +193,31 @@ function CreditCardVisual({
           <CreditCard className="h-6 w-6 text-white/60" />
         </div>
 
-        {/* Total amount */}
+        {/* Total amount — single or dual currency */}
         <div>
           <p className="text-white/60 text-xs font-medium mb-0.5">
             Resumen · cierre {format(cycle.cycleEnd, "d MMM", { locale: es })}
           </p>
-          <p
-            className="text-white text-3xl font-bold tabular-nums leading-none"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {formatCurrency(displayTotal, account.currency)}
-          </p>
+          {isMultiCurrency ? (
+            <p
+              className="text-white text-2xl font-bold tabular-nums leading-none"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {formatCurrency(arsTotal, "ARS")}
+              <span className="text-white/60 mx-2 font-normal">·</span>
+              {formatCurrency(usdTotal, "USD")}
+            </p>
+          ) : (
+            <p
+              className="text-white text-3xl font-bold tabular-nums leading-none"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {formatCurrency(
+                isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total,
+                account.currency
+              )}
+            </p>
+          )}
         </div>
 
         {/* Dates */}
@@ -242,25 +261,72 @@ function RegisterPaymentDialog({
   onOpenChange: (v: boolean) => void
 }) {
   const queryClient = useQueryClient()
-  const cycleTotal = cycle.statement?.total_amount ?? cycle.total
 
-  const [paidAmount, setPaidAmount] = useState(String(cycleTotal.toFixed(2)))
-  const [paidDate, setPaidDate] = useState<Date>(new Date())
-  const [paidFromAccountId, setPaidFromAccountId] = useState(
-    allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito")?.id ?? ""
+  const isPaidCycle = cycle.statement?.status === "pagado"
+
+  // Determine which currencies are present in the cycle.
+  // For unpaid cycles: use live totalsByCurrency.
+  // For paid cycles: use the stored statement totals.
+  const { ARS: arsCycleTotal, USD: usdCycleTotal } = cycle.totalsByCurrency
+  const hasARS = isPaidCycle
+    ? (cycle.statement?.total_amount ?? 0) > 0
+    : arsCycleTotal > 0
+  const hasUSD = isPaidCycle
+    ? (cycle.statement?.total_amount_usd ?? 0) > 0
+    : usdCycleTotal > 0
+  const isMultiCurrency = hasARS && hasUSD
+
+  // Per-currency initial amounts
+  const initialARS = isPaidCycle
+    ? String((cycle.statement?.paid_amount ?? cycle.statement?.total_amount ?? arsCycleTotal).toFixed(2))
+    : String(arsCycleTotal.toFixed(2))
+  const initialUSD = isPaidCycle
+    ? String((cycle.statement?.paid_amount_usd ?? cycle.statement?.total_amount_usd ?? usdCycleTotal).toFixed(2))
+    : String(usdCycleTotal.toFixed(2))
+
+  // For single-currency mode, use the card's own currency total
+  const singleCurrency = hasUSD && !hasARS ? "USD" : account.currency
+  const singleCycleTotal = singleCurrency === "USD"
+    ? usdCycleTotal
+    : (cycle.statement?.total_amount ?? arsCycleTotal)
+  const initialSingle = isPaidCycle
+    ? String((cycle.statement?.paid_amount ?? singleCycleTotal).toFixed(2))
+    : String(singleCycleTotal.toFixed(2))
+
+  // State — multi-currency
+  const [paidAmountARS, setPaidAmountARS] = useState(initialARS)
+  const [paidFromAccountIdARS, setPaidFromAccountIdARS] = useState(
+    () => cycle.statement?.paid_from_account_id ??
+      allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito" && a.currency === "ARS")?.id ?? ""
   )
+  const [paidAmountUSD, setPaidAmountUSD] = useState(initialUSD)
+  const [paidFromAccountIdUSD, setPaidFromAccountIdUSD] = useState(
+    () => cycle.statement?.paid_from_account_id_usd ??
+      allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito" && a.currency === "USD")?.id ?? ""
+  )
+
+  // State — single-currency (reuses the ARS slot; currency overridden by singleCurrency)
+  const [paidAmountSingle, setPaidAmountSingle] = useState(initialSingle)
+  const [paidFromAccountIdSingle, setPaidFromAccountIdSingle] = useState(
+    () => cycle.statement?.paid_from_account_id ??
+      allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito")?.id ?? ""
+  )
+
+  const [paidDate, setPaidDate] = useState<Date>(new Date())
   const [pendingResumen, setPendingResumen] = useState<File | null>(null)
   const [pendingComprobante, setPendingComprobante] = useState<File | null>(null)
   const [existingResumen, setExistingResumen] = useState<MovementAttachment | null>(null)
   const [existingComprobante, setExistingComprobante] = useState<MovementAttachment | null>(null)
 
-  const otherAccounts = allAccounts.filter(
+  // Filtered account lists per currency
+  const nonCardAccounts = allAccounts.filter(
     (a) => a.id !== account.id && a.type !== "tarjeta_credito"
   )
+  const arsAccounts = nonCardAccounts.filter((a) => a.currency === "ARS")
+  const usdAccounts = nonCardAccounts.filter((a) => a.currency === "USD")
 
   // Load existing attachments when viewing an already-paid cycle
   const statementId = cycle.statement?.id
-  const isPaidCycle = cycle.statement?.status === "pagado"
 
   useQuery({
     queryKey: ["statement_attachments", statementId],
@@ -284,23 +350,42 @@ function RegisterPaymentDialog({
 
       const paidDateStr = toDateString(paidDate)
 
-      const { data: stmt, error } = await supabase
-        .from("card_statements")
-        .upsert(
-          {
+      // Build the upsert payload depending on single vs multi-currency
+      const upsertPayload = isMultiCurrency
+        ? {
             user_id: user.id,
             account_id: account.id,
             close_date: cycle.closeDate,
             due_date: cycle.dueDate ?? cycle.closeDate,
-            total_amount: cycleTotal,
+            total_amount: arsCycleTotal,
+            total_amount_usd: usdCycleTotal,
             stamp_tax: cycle.statement?.stamp_tax ?? 0,
             status: "pagado",
-            paid_amount: parseFloat(paidAmount) || cycleTotal,
+            paid_amount: parseFloat(paidAmountARS) || arsCycleTotal,
+            paid_from_account_id: paidFromAccountIdARS || null,
+            paid_amount_usd: parseFloat(paidAmountUSD) || usdCycleTotal,
+            paid_from_account_id_usd: paidFromAccountIdUSD || null,
             paid_date: paidDateStr,
-            paid_from_account_id: paidFromAccountId || null,
-          },
-          { onConflict: "account_id,close_date" }
-        )
+          }
+        : {
+            user_id: user.id,
+            account_id: account.id,
+            close_date: cycle.closeDate,
+            due_date: cycle.dueDate ?? cycle.closeDate,
+            total_amount: singleCurrency === "ARS" ? singleCycleTotal : 0,
+            total_amount_usd: singleCurrency === "USD" ? singleCycleTotal : 0,
+            stamp_tax: cycle.statement?.stamp_tax ?? 0,
+            status: "pagado",
+            paid_amount: singleCurrency === "ARS" ? (parseFloat(paidAmountSingle) || singleCycleTotal) : null,
+            paid_from_account_id: singleCurrency === "ARS" ? (paidFromAccountIdSingle || null) : null,
+            paid_amount_usd: singleCurrency === "USD" ? (parseFloat(paidAmountSingle) || singleCycleTotal) : null,
+            paid_from_account_id_usd: singleCurrency === "USD" ? (paidFromAccountIdSingle || null) : null,
+            paid_date: paidDateStr,
+          }
+
+      const { data: stmt, error } = await supabase
+        .from("card_statements")
+        .upsert(upsertPayload, { onConflict: "account_id,close_date" })
         .select()
         .single()
       if (error) throw error
@@ -350,20 +435,127 @@ function RegisterPaymentDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Amount */}
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground font-medium">Monto pagado</Label>
-            <MoneyInput
-              step="0.01"
-              currency={account.currency}
-              value={paidAmount}
-              onChange={(e) => setPaidAmount(e.target.value)}
-              disabled={isDisabled}
-              className="tabular-nums font-semibold w-full"
-            />
-          </div>
+          {isMultiCurrency ? (
+            /* ── Multi-currency: two sections separated by a divider ── */
+            <>
+              {/* ARS section */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Pesos (ARS)
+                </p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-medium">Monto pagado</Label>
+                  <MoneyInput
+                    step="0.01"
+                    currency="ARS"
+                    value={paidAmountARS}
+                    onChange={(e) => setPaidAmountARS(e.target.value)}
+                    disabled={isDisabled}
+                    className="tabular-nums font-semibold w-full"
+                  />
+                </div>
+                {arsAccounts.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-medium">Pagado desde</Label>
+                    <MangoSelect
+                      value={paidFromAccountIdARS}
+                      onChange={(v) => setPaidFromAccountIdARS(v ?? "")}
+                      options={[
+                        { value: "", label: "Sin especificar" },
+                        ...arsAccounts.map((a) => ({
+                          value: a.id,
+                          label: a.name,
+                          leading: <AccountIconChip icon={a.icon} />,
+                        })),
+                      ]}
+                      placeholder="Cuenta en pesos"
+                      showSearch
+                      disabled={isDisabled}
+                    />
+                  </div>
+                )}
+              </div>
 
-          {/* Date */}
+              {/* Separator */}
+              <div className="border-t border-border/60" />
+
+              {/* USD section */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Dólares (USD)
+                </p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-medium">Monto pagado</Label>
+                  <MoneyInput
+                    step="0.01"
+                    currency="USD"
+                    value={paidAmountUSD}
+                    onChange={(e) => setPaidAmountUSD(e.target.value)}
+                    disabled={isDisabled}
+                    className="tabular-nums font-semibold w-full"
+                  />
+                </div>
+                {usdAccounts.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-medium">Pagado desde</Label>
+                    <MangoSelect
+                      value={paidFromAccountIdUSD}
+                      onChange={(v) => setPaidFromAccountIdUSD(v ?? "")}
+                      options={[
+                        { value: "", label: "Sin especificar" },
+                        ...usdAccounts.map((a) => ({
+                          value: a.id,
+                          label: a.name,
+                          leading: <AccountIconChip icon={a.icon} />,
+                        })),
+                      ]}
+                      placeholder="Cuenta en dólares"
+                      showSearch
+                      disabled={isDisabled}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ── Single-currency: original layout ── */
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-medium">Monto pagado</Label>
+                <MoneyInput
+                  step="0.01"
+                  currency={singleCurrency}
+                  value={paidAmountSingle}
+                  onChange={(e) => setPaidAmountSingle(e.target.value)}
+                  disabled={isDisabled}
+                  className="tabular-nums font-semibold w-full"
+                />
+              </div>
+
+              {nonCardAccounts.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-medium">Pagado desde</Label>
+                  <MangoSelect
+                    value={paidFromAccountIdSingle}
+                    onChange={(v) => setPaidFromAccountIdSingle(v ?? "")}
+                    options={[
+                      { value: "", label: "Sin especificar" },
+                      ...nonCardAccounts.map((a) => ({
+                        value: a.id,
+                        label: a.name,
+                        leading: <AccountIconChip icon={a.icon} />,
+                      })),
+                    ]}
+                    placeholder="Cuenta origen"
+                    showSearch
+                    disabled={isDisabled}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Date — shared */}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground font-medium">Fecha de pago</Label>
             <MangoDatePicker
@@ -372,36 +564,27 @@ function RegisterPaymentDialog({
             />
           </div>
 
-          {/* Source account */}
-          {otherAccounts.length > 0 && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground font-medium">Pagado desde</Label>
-              <MangoSelect
-                value={paidFromAccountId}
-                onChange={(v) => setPaidFromAccountId(v ?? "")}
-                options={[
-                  { value: "", label: "Sin especificar" },
-                  ...otherAccounts.map((a) => ({
-                    value: a.id,
-                    label: a.name,
-                    leading: <AccountIconChip icon={a.icon} />,
-                  })),
-                ]}
-                placeholder="Cuenta origen"
-                showSearch
-                disabled={isDisabled}
-              />
-            </div>
-          )}
-
           {/* Summary info */}
           <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-1">
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Total resumen</span>
-              <span className="tabular-nums font-semibold">
-                {formatCurrency(cycleTotal, account.currency)}
-              </span>
-            </div>
+            {isMultiCurrency ? (
+              <>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Total pesos</span>
+                  <span className="tabular-nums font-semibold">{formatCurrency(arsCycleTotal, "ARS")}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Total dólares</span>
+                  <span className="tabular-nums font-semibold">{formatCurrency(usdCycleTotal, "USD")}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Total resumen</span>
+                <span className="tabular-nums font-semibold">
+                  {formatCurrency(singleCycleTotal, singleCurrency)}
+                </span>
+              </div>
+            )}
             {cycle.dueDate && (
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Vencimiento</span>
@@ -533,6 +716,8 @@ function CardBlock({
   const cuotaMovements = cycle.movements.filter((m) => (m as Movement).installment_purchase_id !== null)
   const regularMovements = cycle.movements.filter((m) => (m as Movement).installment_purchase_id === null)
 
+  const { ARS: arsTotal, USD: usdTotal } = cycle.totalsByCurrency
+  const isMultiCurrency = !isPaid && arsTotal > 0 && usdTotal > 0
   const displayTotal = isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total
 
   return (
@@ -563,7 +748,7 @@ function CardBlock({
 
         <div className="text-center">
           <p className="text-xs font-semibold text-foreground tabular-nums">
-            {format(cycle.cycleEnd, "MMMM yyyy", { locale: es })}
+            {formatStatementLabel(cycle.cycleEnd)}
           </p>
           <p className="text-[10px] text-muted-foreground tabular-nums">
             {safeIndex + 1} / {cycles.length}
@@ -594,15 +779,26 @@ function CardBlock({
         <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">A pagar</p>
           <div className="flex items-end justify-between gap-2">
-            <p
-              className={cn(
-                "text-2xl font-bold tabular-nums leading-none",
-                isOverdue ? "text-destructive" : "text-foreground"
-              )}
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {formatCurrency(displayTotal, account.currency)}
-            </p>
+            {isMultiCurrency ? (
+              <p
+                className="text-xl font-bold tabular-nums leading-none text-foreground"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {formatCurrency(arsTotal, "ARS")}
+                <span className="text-muted-foreground mx-2 font-normal text-base">·</span>
+                {formatCurrency(usdTotal, "USD")}
+              </p>
+            ) : (
+              <p
+                className={cn(
+                  "text-2xl font-bold tabular-nums leading-none",
+                  isOverdue ? "text-destructive" : "text-foreground"
+                )}
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {formatCurrency(displayTotal, account.currency)}
+              </p>
+            )}
             {isPaid && cycle.statement?.paid_date && (
               <p className="text-xs font-semibold text-success pb-0.5">
                 Pagado {format(parseISO(cycle.statement.paid_date), "d MMM", { locale: es })}
@@ -716,12 +912,15 @@ function CardBlock({
         {/* Actions */}
         <div className="flex gap-2 pt-1">
           {isPaid ? (
-            <div className="flex-1 flex items-center gap-2 justify-center py-2.5 rounded-xl bg-success/10 border border-success/20">
-              <CheckCircle2 className="h-4 w-4 text-success" />
+            <div className="flex-1 flex items-center gap-2 justify-center py-2.5 rounded-xl bg-success/10 border border-success/20 flex-wrap">
+              <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0" />
               <p className="text-sm font-semibold text-success">
                 Pago registrado
-                {cycle.statement?.paid_amount != null
-                  ? ` — ${formatCurrency(cycle.statement.paid_amount, account.currency)}`
+                {cycle.statement?.paid_amount != null && cycle.statement.paid_amount > 0
+                  ? ` — ${formatCurrency(cycle.statement.paid_amount, "ARS")}`
+                  : ""}
+                {cycle.statement?.paid_amount_usd != null && cycle.statement.paid_amount_usd > 0
+                  ? ` · ${formatCurrency(cycle.statement.paid_amount_usd, "USD")}`
                   : ""}
               </p>
               {/* Allow viewing/editing attachments on paid cycle */}
