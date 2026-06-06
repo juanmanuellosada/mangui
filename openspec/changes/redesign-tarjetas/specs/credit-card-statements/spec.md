@@ -112,3 +112,36 @@ Cuando un resumen contiene consumos en más de una moneda (p. ej. pesos y dólar
 
 - **WHEN** un resumen tiene consumos en una sola moneda
 - **THEN** el modal pide una única cuenta y monto de esa moneda (comportamiento previo)
+
+### Requirement: Gastos del resumen unificados con íconos de categoría
+
+La lista "Gastos del resumen" SHALL incluir TODOS los movimientos del ciclo —gastos regulares y cuotas— en una sola lista. Cada fila SHALL mostrar el ícono de la categoría del movimiento (no un ícono fijo). Las filas de cuota SHALL indicar que son cuotas (p. ej. "Cuota X/Y"). SHALL eliminarse la sección separada "Cuotas que caen en este resumen".
+
+#### Scenario: Cuotas dentro de la lista de gastos
+
+- **WHEN** un resumen tiene cuotas que caen en su ciclo
+- **THEN** esas cuotas aparecen dentro de "Gastos del resumen" marcadas como cuota ("Cuota X/Y"), no en una sección aparte
+
+#### Scenario: Ícono de categoría por fila
+
+- **WHEN** se renderiza una fila de gasto del resumen
+- **THEN** muestra el `CategoryIconChip` de la categoría del movimiento
+
+### Requirement: Detalle de cuotas como modal con postergación en cascada
+
+El detalle de una compra en cuotas SHALL abrirse como modal (`MangoSheet`) desde la lista de gastos del resumen. Dentro del detalle, cada cuota NO pagada SHALL poder moverse un mes adelante o atrás; al mover una cuota, esa cuota y TODAS las siguientes SHALL desplazarse el mismo mes (cascada), manteniendo el espaciado mensual. Las cuotas que caen en un resumen ya pagado NO SHALL moverse, y un movimiento NO SHALL desplazar ninguna cuota afectada hacia un resumen ya pagado.
+
+#### Scenario: Abrir detalle como modal
+
+- **WHEN** el usuario toca una cuota en la lista de gastos del resumen
+- **THEN** se abre un modal con el detalle de la compra en cuotas (sin navegar fuera de la sección)
+
+#### Scenario: Postergar una cuota en cascada
+
+- **WHEN** el usuario mueve una cuota no pagada un mes adelante
+- **THEN** esa cuota y todas las posteriores se corren un mes, y los totales de los resúmenes afectados se recalculan
+
+#### Scenario: Cuotas pagadas bloqueadas
+
+- **WHEN** una cuota cae en un resumen ya pagado
+- **THEN** no ofrece controles de mover y ningún desplazamiento puede llevar otra cuota a ese resumen pagado

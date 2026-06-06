@@ -7,7 +7,6 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
-  ShoppingBag,
   CheckCircle2,
   Plus,
 } from "lucide-react"
@@ -42,6 +41,9 @@ import {
 } from "@/lib/attachments"
 import { ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
 import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
+import { MangoSheet } from "@/components/ui/mango-sheet"
+import { InstallmentDetailBody } from "@/components/installments/installment-detail"
 import type { Tables } from "@/lib/database.types"
 import { format, parseISO, isBefore, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
@@ -680,6 +682,7 @@ function CardBlock({
   const cycle = cycles[safeIndex]
 
   const [paymentOpen, setPaymentOpen] = useState(false)
+  const [cuotaDetailId, setCuotaDetailId] = useState<string | null>(null)
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -712,9 +715,14 @@ function CardBlock({
   const isOverdue = !isPaid && dueDate != null && isBefore(dueDate, today)
   const isDueToday = !isPaid && !isOverdue && dueDate != null && toDateString(dueDate) === toDateString(today)
 
-  // Split movements
-  const cuotaMovements = cycle.movements.filter((m) => (m as Movement).installment_purchase_id !== null)
-  const regularMovements = cycle.movements.filter((m) => (m as Movement).installment_purchase_id === null)
+  // Unified list: all expense movements sorted by date ascending
+  const allCycleMovements = useMemo(
+    () =>
+      [...cycle.movements].sort((a, b) =>
+        (a as Movement).date.localeCompare((b as Movement).date)
+      ),
+    [cycle.movements]
+  )
 
   const { ARS: arsTotal, USD: usdTotal } = cycle.totalsByCurrency
   const isMultiCurrency = !isPaid && arsTotal > 0 && usdTotal > 0
@@ -825,44 +833,8 @@ function CardBlock({
           </div>
         </div>
 
-        {/* Cuotas this cycle */}
-        {cuotaMovements.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Cuotas que caen en este resumen
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {cuotaMovements.map((m) => {
-                const mv = m as Movement
-                const cat = mv.category_id ? categoryMap.get(mv.category_id) : undefined
-                return (
-                  <Link
-                    key={mv.id}
-                    href={`/app/cuotas/${mv.installment_purchase_id}`}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
-                      "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-                      "transition-colors duration-150 cursor-pointer",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      mv.is_future && "opacity-70 italic"
-                    )}
-                  >
-                    <span className="tabular-nums">
-                      Cuota {mv.installment_number}/{mv.installment_total}
-                    </span>
-                    {cat && <span>· {cat.name}</span>}
-                    <span className="tabular-nums font-bold">
-                      {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Regular expenses */}
-        {regularMovements.length > 0 && (
+        {/* Unified gastos del resumen */}
+        {allCycleMovements.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -876,14 +848,44 @@ function CardBlock({
               </Link>
             </div>
             <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-              {regularMovements.slice(0, 8).map((m) => {
+              {allCycleMovements.slice(0, 8).map((m) => {
                 const mv = m as Movement
                 const cat = mv.category_id ? categoryMap.get(mv.category_id) : undefined
-                return (
-                  <div key={mv.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                      <ShoppingBag className="h-3.5 w-3.5 text-destructive" />
+                const isCuota = mv.installment_purchase_id !== null
+                return isCuota ? (
+                  <button
+                    key={mv.id}
+                    type="button"
+                    onClick={() => setCuotaDetailId(mv.installment_purchase_id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 text-left",
+                      "hover:bg-muted/40 transition-colors duration-150 cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                      mv.is_future && "opacity-70"
+                    )}
+                  >
+                    <CategoryIconChip icon={cat?.icon} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {cat?.name ?? "Sin categoría"}
+                        </p>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground flex-shrink-0">
+                          {mv.installment_number}/{mv.installment_total}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground tabular-nums">
+                        {format(parseISO(mv.date), "d MMM", { locale: es })}
+                        {mv.note ? ` · ${mv.note}` : ""}
+                      </p>
                     </div>
+                    <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
+                      − {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
+                    </p>
+                  </button>
+                ) : (
+                  <div key={mv.id} className="flex items-center gap-3 px-4 py-3">
+                    <CategoryIconChip icon={cat?.icon} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
                         {cat?.name ?? "Sin categoría"}
@@ -903,7 +905,7 @@ function CardBlock({
           </div>
         )}
 
-        {regularMovements.length === 0 && cuotaMovements.length === 0 && (
+        {allCycleMovements.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-3">
             Sin gastos en este resumen.
           </p>
@@ -964,6 +966,21 @@ function CardBlock({
           onOpenChange={setPaymentOpen}
         />
       )}
+
+      {/* Cuota detail modal */}
+      <MangoSheet
+        open={cuotaDetailId !== null}
+        onOpenChange={(v) => { if (!v) setCuotaDetailId(null) }}
+        title="Detalle de cuotas"
+      >
+        {cuotaDetailId && (
+          <InstallmentDetailBody
+            purchaseId={cuotaDetailId}
+            cardAccount={account}
+            cardStatements={statements}
+          />
+        )}
+      </MangoSheet>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Clock,
   Circle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useMultiSelect } from "@/hooks/use-multi-select"
@@ -33,14 +35,18 @@ import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { INSTALLMENTS_KEY } from "@/lib/installments"
 import { MOVEMENTS_KEY, BALANCES_KEY, ACCOUNTS_KEY } from "@/lib/movements"
+import { isInCycle, listCardCycles, type CardCycle } from "@/lib/cards"
+import { isFutureDate } from "@/lib/date-utils"
+import { addMonths, parseISO } from "date-fns"
 import type { Tables } from "@/lib/database.types"
-import { format, parseISO } from "date-fns"
+import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
 type InstallmentPurchase = Tables<"installment_purchases">
 type Movement = Tables<"movements">
 type Account = Tables<"accounts">
 type Category = Tables<"categories">
+type CardStatement = Tables<"card_statements">
 
 // ── Data fetchers ──────────────────────────────────────────────────────────────
 
@@ -88,6 +94,27 @@ async function fetchCategory(id: string): Promise<Category> {
   return data
 }
 
+async function fetchAllMovementsForAccount(accountId: string): Promise<Movement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .eq("account_id", accountId)
+    .eq("type", "expense")
+  if (error) throw error
+  return data
+}
+
+async function fetchStatementsForAccount(accountId: string): Promise<CardStatement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("card_statements")
+    .select("*")
+    .eq("account_id", accountId)
+  if (error) throw error
+  return data
+}
+
 // ── Installment status ─────────────────────────────────────────────────────────
 
 type CuotaStatus = "pagada" | "proxima" | "futura"
@@ -115,6 +142,27 @@ const STATUS_ICONS: Record<CuotaStatus, typeof CheckCircle2> = {
   pagada: CheckCircle2,
   proxima: Clock,
   futura: Circle,
+}
+
+// ── Helpers: paid-cycle detection ──────────────────────────────────────────────
+
+/**
+ * Given a date string and the list of cycles for the card, returns whether that date
+ * falls in a cycle whose statement has status "pagado".
+ */
+function isDateInPaidCycle(
+  dateStr: string,
+  cycles: CardCycle[]
+): boolean {
+  for (const cycle of cycles) {
+    if (
+      cycle.statement?.status === "pagado" &&
+      isInCycle(dateStr, cycle.cycleStart, cycle.cycleEnd)
+    ) {
+      return true
+    }
+  }
+  return false
 }
 
 // ── Delete purchase dialog ─────────────────────────────────────────────────────
@@ -257,7 +305,7 @@ function DeleteCuotaDialog({
   )
 }
 
-// ── Cuota row ──────────────────────────────────────────────────────────────────
+// ── Cuota row (detail list) ────────────────────────────────────────────────────
 
 function CuotaRow({
   movement,
@@ -266,6 +314,7 @@ function CuotaRow({
   selectionMode,
   isSelected,
   onToggle,
+  postponeControls,
 }: {
   movement: Movement
   currency: "ARS" | "USD"
@@ -273,6 +322,7 @@ function CuotaRow({
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  postponeControls?: React.ReactNode
 }) {
   const status = getCuotaStatus(movement)
   const StatusIcon = STATUS_ICONS[status]
@@ -311,18 +361,23 @@ function CuotaRow({
         </p>
       </div>
 
+      {/* Postpone controls */}
+      {!selectionMode && postponeControls}
+
       {/* Status badge */}
-      <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full", STATUS_COLORS[status])}>
-        {STATUS_LABELS[status]}
-      </span>
+      {!postponeControls && (
+        <span className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full", STATUS_COLORS[status])}>
+          {STATUS_LABELS[status]}
+        </span>
+      )}
 
       {/* Amount */}
       <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
         − {formatCurrency(displayAmount, currency)}
       </p>
 
-      {/* Delete action — hidden in selection mode */}
-      {!selectionMode && (
+      {/* Delete action — hidden in selection mode or when postpone controls shown */}
+      {!selectionMode && !postponeControls && (
         <button
           type="button"
           title="Eliminar cuota"
@@ -341,10 +396,141 @@ function CuotaRow({
   )
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── PostponeControls ───────────────────────────────────────────────────────────
 
-export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
-  const router = useRouter()
+function PostponeControls({
+  movement,
+  allMovements,
+  cycles,
+  purchaseId,
+  startDate,
+}: {
+  movement: Movement
+  allMovements: Movement[]
+  cycles: CardCycle[]
+  purchaseId: string
+  startDate: string
+}) {
+  const queryClient = useQueryClient()
+
+  // Movements from installment_number >= this one (cascade targets)
+  const affectedMovements = allMovements.filter(
+    (m) => (m.installment_number ?? 0) >= (movement.installment_number ?? 0)
+  )
+
+  function wouldLandInPaid(deltaMonths: number): boolean {
+    for (const m of affectedMovements) {
+      const newDate = addMonths(parseISO(m.date), deltaMonths)
+        .toISOString()
+        .split("T")[0]
+      if (isDateInPaidCycle(newDate, cycles)) return true
+    }
+    return false
+  }
+
+  const canMinus = !wouldLandInPaid(-1)
+  const canPlus = !wouldLandInPaid(1)
+
+  const postponeMutation = useMutation({
+    mutationFn: async (deltaMonths: number) => {
+      const supabase = createClient()
+      // Shift each affected movement
+      for (const m of affectedMovements) {
+        const newDate = addMonths(parseISO(m.date), deltaMonths)
+          .toISOString()
+          .split("T")[0]
+        const newIsFuture = isFutureDate(newDate)
+        const { error } = await supabase
+          .from("movements")
+          .update({ date: newDate, is_future: newIsFuture, updated_at: new Date().toISOString() })
+          .eq("id", m.id)
+        if (error) throw error
+      }
+
+      // If installment 1 is among the shifted ones, update installment_purchases.start_date
+      const firstCuota = allMovements.find((m) => m.installment_number === 1)
+      if (firstCuota && affectedMovements.some((m) => m.id === firstCuota.id)) {
+        const newStart = addMonths(parseISO(startDate), deltaMonths)
+          .toISOString()
+          .split("T")[0]
+        const { error } = await supabase
+          .from("installment_purchases")
+          .update({ start_date: newStart })
+          .eq("id", purchaseId)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ["installment_movements", purchaseId] })
+      // Also invalidate card movements so statements recompute
+      queryClient.invalidateQueries({ queryKey: ["movements", "card"] })
+      toast.success("Cuotas actualizadas")
+    },
+    onError: (err: Error) => {
+      toast.error("Error al postergar", { description: err.message })
+    },
+  })
+
+  const isPending = postponeMutation.isPending
+
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      <button
+        type="button"
+        disabled={!canMinus || isPending}
+        onClick={() => postponeMutation.mutate(-1)}
+        title="−1 mes"
+        aria-label="Mover cuota un mes atrás"
+        className={cn(
+          "h-7 w-7 rounded-lg flex items-center justify-center",
+          "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+          "transition-colors duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "disabled:opacity-30 disabled:cursor-not-allowed"
+        )}
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        disabled={!canPlus || isPending}
+        onClick={() => postponeMutation.mutate(1)}
+        title="+1 mes"
+        aria-label="Mover cuota un mes adelante"
+        className={cn(
+          "h-7 w-7 rounded-lg flex items-center justify-center",
+          "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+          "transition-colors duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "disabled:opacity-30 disabled:cursor-not-allowed"
+        )}
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
+// ── InstallmentDetailBody ──────────────────────────────────────────────────────
+// Shared body used both in the full-page route and in the modal from cards-list.
+
+export interface InstallmentDetailBodyProps {
+  purchaseId: string
+  /**
+   * When provided, enables postpone controls.
+   * Pass the card account so we can compute listCardCycles to evaluate paid cycles.
+   */
+  cardAccount?: Account
+  cardStatements?: CardStatement[]
+}
+
+export function InstallmentDetailBody({
+  purchaseId,
+  cardAccount,
+  cardStatements,
+}: InstallmentDetailBodyProps) {
   const [deletePurchaseOpen, setDeletePurchaseOpen] = useState(false)
   const [deletingCuota, setDeletingCuota] = useState<Movement | null>(null)
   const ms = useMultiSelect()
@@ -363,11 +549,14 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
     enabled: !!purchase,
   })
 
-  const { data: account } = useQuery({
+  // When cardAccount is not provided, fetch account from purchase
+  const { data: fetchedAccount } = useQuery({
     queryKey: ["account", purchase?.account_id],
     queryFn: () => fetchAccount(purchase!.account_id),
-    enabled: !!purchase?.account_id,
+    enabled: !!purchase?.account_id && !cardAccount,
   })
+
+  const account = cardAccount ?? fetchedAccount
 
   const { data: category } = useQuery({
     queryKey: ["category", purchase?.category_id],
@@ -375,9 +564,29 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
     enabled: !!purchase?.category_id,
   })
 
+  // Fetch all card movements (needed for cycle computation) only when postpone controls are needed
+  const { data: allCardMovements = [] } = useQuery({
+    queryKey: ["movements", "card", cardAccount?.id],
+    queryFn: () => fetchAllMovementsForAccount(cardAccount!.id),
+    enabled: !!cardAccount,
+  })
+
+  // Fetch statements for card if not passed in
+  const { data: fetchedStatements = [] } = useQuery({
+    queryKey: ["card_statements", cardAccount?.id],
+    queryFn: () => fetchStatementsForAccount(cardAccount!.id),
+    enabled: !!cardAccount && !cardStatements,
+  })
+
+  const statements: CardStatement[] = cardStatements ?? fetchedStatements
+
+  // Build cycles for paid-cycle detection
+  const cycles: CardCycle[] = cardAccount
+    ? listCardCycles(cardAccount.id, cardAccount, allCardMovements, statements)
+    : []
+
   const isLoading = loadingPurchase || loadingMovements
 
-  // Count non-future (paid/upcoming) cuotas
   const paidCount = movements?.filter((m) => !m.is_future).length ?? 0
   const currency = (purchase?.currency as "ARS" | "USD") ?? "ARS"
   const movementIds = movements?.map((m) => m.id) ?? []
@@ -399,6 +608,180 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
       toast.warning(`Se eliminaron ${result.deleted}. ${result.failed} no se pud${result.failed !== 1 ? "ieron" : "o"} eliminar.`)
     }
   }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <Skeleton className="h-28 rounded-2xl" />
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-14 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!purchase) {
+    return (
+      <p className="text-muted-foreground">No se encontró la compra.</p>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Purchase summary card */}
+      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+        <h2 className="text-lg font-bold truncate">{purchase.description}</h2>
+        <p
+          className="text-3xl font-bold tabular-nums text-foreground leading-none"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Total {formatCurrency(purchase.total_amount, currency)}
+        </p>
+        <p className="text-sm text-muted-foreground tabular-nums">
+          Cuota {paidCount} de {purchase.installments_count}
+        </p>
+
+        <div className="flex items-center gap-4 pt-1">
+          {account && (
+            <div className="flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground font-medium">{account.name}</span>
+            </div>
+          )}
+          {category && (
+            <div className="flex items-center gap-1.5">
+              <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground font-medium">{category.name}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Cuotas list */}
+      {movements && movements.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Todas las cuotas
+            </p>
+            {!ms.selectionMode && (
+              <SelectButton onClick={ms.enter} />
+            )}
+          </div>
+          <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+            {movements.map((m) => {
+              const isInPaid = isDateInPaidCycle(m.date, cycles)
+              // Show postpone controls when: cardAccount is available, cuota is not in a paid cycle
+              const showPostpone = !!cardAccount && !isInPaid && !ms.selectionMode
+
+              return (
+                <CuotaRow
+                  key={m.id}
+                  movement={m}
+                  currency={currency}
+                  onDelete={setDeletingCuota}
+                  selectionMode={ms.selectionMode}
+                  isSelected={ms.isSelected(m.id)}
+                  onToggle={ms.toggle}
+                  postponeControls={
+                    showPostpone ? (
+                      <PostponeControls
+                        movement={m}
+                        allMovements={movements}
+                        cycles={cycles}
+                        purchaseId={purchaseId}
+                        startDate={purchase.start_date}
+                      />
+                    ) : undefined
+                  }
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Danger zone */}
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <p className="text-sm font-semibold text-destructive">Danger zone</p>
+        </div>
+        <Button
+          variant="destructive"
+          onClick={() => setDeletePurchaseOpen(true)}
+          className="w-full press-effect"
+        >
+          Eliminar compra completa
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Al eliminar la compra se eliminan las {purchase.installments_count} cuotas asociadas.
+        </p>
+      </div>
+
+      {/* Dialogs */}
+      <DeletePurchaseDialog
+        purchase={purchase}
+        open={deletePurchaseOpen}
+        onOpenChange={setDeletePurchaseOpen}
+        onDeleted={() => setDeletePurchaseOpen(false)}
+      />
+
+      {deletingCuota && (
+        <DeleteCuotaDialog
+          movement={deletingCuota}
+          open={!!deletingCuota}
+          onOpenChange={(v) => { if (!v) setDeletingCuota(null) }}
+        />
+      )}
+
+      {/* Selection bar */}
+      {ms.selectionMode && (
+        <SelectionBar
+          count={ms.count}
+          total={movementIds.length}
+          onSelectAll={() => ms.toggleAll(movementIds)}
+          onDelete={() => setConfirmOpen(true)}
+          onCancel={ms.exit}
+          isPending={bulkPending}
+        />
+      )}
+
+      {/* Bulk delete confirm */}
+      <ConfirmSheet
+        compact
+        open={confirmOpen}
+        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
+        title="Eliminar cuotas"
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          ¿Eliminar {ms.count} cuota{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
+        </p>
+      </ConfirmSheet>
+    </div>
+  )
+}
+
+// ── Main component (full-page route) ───────────────────────────────────────────
+
+export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
+  const router = useRouter()
+  const [deletePurchaseOpen, setDeletePurchaseOpen] = useState(false)
+
+  const { data: purchase, isLoading } = useQuery({
+    queryKey: ["installment_purchase", purchaseId],
+    queryFn: () => fetchPurchase(purchaseId),
+  })
 
   if (isLoading) {
     return (
@@ -469,127 +852,15 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
         </button>
       </div>
 
-      {/* Purchase summary card */}
-      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
-        <h2 className="text-lg font-bold truncate">{purchase.description}</h2>
-        <p
-          className="text-3xl font-bold tabular-nums text-foreground leading-none"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Total {formatCurrency(purchase.total_amount, currency)}
-        </p>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          Cuota {paidCount} de {purchase.installments_count}
-        </p>
+      <InstallmentDetailBody purchaseId={purchaseId} />
 
-        <div className="flex items-center gap-4 pt-1">
-          {account && (
-            <div className="flex items-center gap-1.5">
-              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">{account.name}</span>
-            </div>
-          )}
-          {category && (
-            <div className="flex items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">{category.name}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Cuotas list */}
-      {movements && movements.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Todas las cuotas
-            </p>
-            {!ms.selectionMode && (
-              <SelectButton onClick={ms.enter} />
-            )}
-          </div>
-          <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-            {movements.map((m) => (
-              <CuotaRow
-                key={m.id}
-                movement={m}
-                currency={currency}
-                onDelete={setDeletingCuota}
-                selectionMode={ms.selectionMode}
-                isSelected={ms.isSelected(m.id)}
-                onToggle={ms.toggle}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Danger zone */}
-      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <p className="text-sm font-semibold text-destructive">Danger zone</p>
-        </div>
-        <Button
-          variant="destructive"
-          onClick={() => setDeletePurchaseOpen(true)}
-          className="w-full press-effect"
-        >
-          Eliminar compra completa
-        </Button>
-        <p className="text-xs text-muted-foreground">
-          Al eliminar la compra se eliminan las {purchase.installments_count} cuotas asociadas.
-        </p>
-      </div>
-
-      {/* Dialogs */}
+      {/* Delete purchase dialog (for the header button — body has its own) */}
       <DeletePurchaseDialog
         purchase={purchase}
         open={deletePurchaseOpen}
         onOpenChange={setDeletePurchaseOpen}
         onDeleted={() => router.push("/app/movimientos")}
       />
-
-      {deletingCuota && (
-        <DeleteCuotaDialog
-          movement={deletingCuota}
-          open={!!deletingCuota}
-          onOpenChange={(v) => { if (!v) setDeletingCuota(null) }}
-        />
-      )}
-
-      {/* Selection bar */}
-      {ms.selectionMode && (
-        <SelectionBar
-          count={ms.count}
-          total={movementIds.length}
-          onSelectAll={() => ms.toggleAll(movementIds)}
-          onDelete={() => setConfirmOpen(true)}
-          onCancel={ms.exit}
-          isPending={bulkPending}
-        />
-      )}
-
-      {/* Bulk delete confirm */}
-      <ConfirmSheet
-        compact
-        open={confirmOpen}
-        onOpenChange={(v) => { if (!v) setConfirmOpen(false) }}
-        title="Eliminar cuotas"
-        footer={
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
-              {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          ¿Eliminar {ms.count} cuota{ms.count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.
-        </p>
-      </ConfirmSheet>
     </div>
   )
 }

@@ -54,3 +54,12 @@
 - [x] 9.4 `RegisterPaymentDialog`: si el resumen tiene saldo en 2 monedas, mostrar dos `MoneyInput` (prellenados con cada subtotal) y dos `MangoSelect` de cuenta, cada selector filtrado a cuentas de esa moneda. Si hay una sola moneda, comportamiento actual. Al confirmar, persistir ambos pagos en `card_statements`.
 - [x] 9.5 Build/typecheck; checkear que tipos de `database.types.ts` incluyan las columnas nuevas.
 - [x] 9.6 Ops: aplicar `0030` a prod y sembrar 1-2 consumos en USD en el resumen de Mayo de la demo (Mastercard Macro). Aplicada y verificada; Mayo = ARS 125.200 + USD 64,99.
+
+## 10. Gastos del resumen unificados + detalle de cuotas como modal con postergación
+
+- [x] 10.1 En `cards-list.tsx`, fusionar `cuotaMovements` y `regularMovements` en una sola lista "Gastos del resumen" (eliminar la sección separada "Cuotas que caen en este resumen"). Las filas de cuota muestran "Cuota X/Y".
+- [x] 10.2 Cada fila de gasto usa `CategoryIconChip` (de `src/lib/categories.ts`) con el ícono de la categoría, reemplazando el `ShoppingBag` fijo.
+- [x] 10.3 Convertir el "Detalle de cuotas" en un modal (`MangoSheet`): extraer el cuerpo de `installment-detail.tsx` a un componente reutilizable y abrirlo desde la fila de cuota (sin navegar a `/app/cuotas/[id]`). Mantener la ruta `/app/cuotas/[id]` funcionando reusando el mismo componente.
+- [x] 10.4 En el detalle, agregar controles +1 mes / −1 mes por cuota NO pagada: al mover una cuota, esa y todas las siguientes se corren ese mes (cascada), recomputando `is_future`. Batch update de `movements.date`. Si cuota 1 se mueve, actualizar `installment_purchases.start_date`.
+- [x] 10.5 Reglas de bloqueo: las cuotas en un resumen pagado no se mueven; deshabilitar −1 (o +1) cuando el desplazamiento llevaría una cuota afectada a un resumen ya pagado. Invalidar queries para que los resúmenes recalculen.
+- [x] 10.6 Build/typecheck; QA visual (lista unificada con íconos, modal de cuotas, postergar +1/−1 con cascada).
