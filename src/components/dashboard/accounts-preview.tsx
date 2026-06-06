@@ -248,17 +248,17 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
                           ? `Vence ${format(parseISO(cardDueDate), "d/M", { locale: es })}`
                           : "A pagar"}
                       </p>
-                      <p className="text-sm font-bold tabular-nums text-foreground">
+                      <p className="text-sm font-bold tabular-nums text-destructive">
                         {currency === "ARS"
-                          ? formatCurrency(cardAmountARS, "ARS")
-                          : formatCurrency(cardAmountUSD ?? 0, "USD")}
+                          ? formatCurrency(-cardAmountARS, "ARS")
+                          : formatCurrency(-(cardAmountUSD ?? 0), "USD")}
                       </p>
-                      <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
+                      <p className="text-[11px] text-destructive/80 tabular-nums mt-0.5">
                         {currency === "ARS"
                           ? cardAmountUSD != null
-                            ? formatCurrency(cardAmountUSD, "USD")
+                            ? formatCurrency(-cardAmountUSD, "USD")
                             : "—"
-                          : formatCurrency(cardAmountARS, "ARS")}
+                          : formatCurrency(-cardAmountARS, "ARS")}
                       </p>
                     </>
                   ) : (
