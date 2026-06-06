@@ -434,20 +434,27 @@ const EXAMPLE_PROMPTS = [
 
 function EmptyState({ onSend }: { onSend: (text: string) => void }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[200px] gap-6 py-8">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-          <Sparkles className="h-5 w-5 text-primary" />
+    <div className="flex flex-col gap-4 py-4">
+      {/* Greeting bubble — styled like an assistant MessageBubble, display-only */}
+      <div className="flex gap-2.5 items-start">
+        <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <Bot className="h-3.5 w-3.5 text-primary" />
         </div>
-        <div className="text-center">
-          <p className="text-sm font-semibold">Asistente financiero</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Consultá tus finanzas o cargá movimientos por chat
+        <div className="rounded-2xl rounded-tl-sm bg-card border border-border/60 px-4 py-2.5 max-w-[85%]">
+          <p className="text-sm leading-relaxed">
+            ¡Hola! Soy <strong>Manguito</strong> 🥭, tu asistente de finanzas en mangui.
+          </p>
+          <p className="text-sm leading-relaxed mt-1.5 text-muted-foreground">
+            Puedo ayudarte a consultar saldos, ver estadísticas de gastos, decirte qué pagos se vienen (recurrentes, cuotas o vencimientos de tarjeta), buscar movimientos, revisar presupuestos y metas, y cargar un movimiento con tu confirmación.
+          </p>
+          <p className="text-sm leading-relaxed mt-1.5">
+            ¿En qué te ayudo hoy?
           </p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 w-full max-w-xs">
+      {/* Example prompt chips */}
+      <div className="flex flex-col gap-2 pl-9">
         {EXAMPLE_PROMPTS.map((prompt) => (
           <button
             key={prompt}
