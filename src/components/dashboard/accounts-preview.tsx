@@ -16,12 +16,11 @@ import { formatCurrency, cn } from "@/lib/utils"
 import type { RateType, RatesMap } from "@/lib/rates/dolar"
 import type { Tables } from "@/lib/database.types"
 import { fetchAllMovements } from "@/lib/movements"
-import { currentCycleRange, isInCycle } from "@/lib/cards"
+import { nextCardPayment } from "@/lib/cards"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 
 type CardStatement = Tables<"card_statements">
-type Movement = Tables<"movements">
 
 interface AccountsPreviewProps {
   rateType: RateType
@@ -152,32 +151,14 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
             let cardDueDate: string | null = null
 
             if (isCreditCard) {
-              // Try to find the nearest pending statement
-              const pendingStatement = (statements ?? [])
-                .filter((s) => s.account_id === account.id)
-                .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null
-
-              if (pendingStatement) {
-                cardAmountARS = pendingStatement.total_amount
-                cardDueDate = pendingStatement.due_date
-              } else {
-                // Fallback: sum current cycle movements from fetchAllMovements
-                const closingDay = account.closing_day
-                if (closingDay != null) {
-                  const { cycleStart, cycleEnd } = currentCycleRange(closingDay)
-                  const cycleMovements = (allMovements ?? []).filter(
-                    (m: Movement) =>
-                      m.account_id === account.id &&
-                      m.type === "expense" &&
-                      isInCycle(m.date, cycleStart, cycleEnd)
-                  )
-                  cardAmountARS = cycleMovements.reduce(
-                    (sum: number, m: Movement) => sum + (m.converted_amount ?? m.amount),
-                    0
-                  )
-                  // due_date from cards.ts is not trivially available here without importing; omit
-                }
-              }
+              const { amount, dueDate } = nextCardPayment(
+                account.id,
+                account,
+                statements ?? [],
+                allMovements ?? []
+              )
+              cardAmountARS = amount
+              cardDueDate = dueDate
 
               // Convert ARS → USD
               if (currency === "ARS") {

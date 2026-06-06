@@ -9,6 +9,79 @@ import {
   startOfDay,
 } from "date-fns"
 
+// Minimal shape needed by nextCardPayment — avoids importing full DB types here.
+interface CardPaymentAccount {
+  closing_day: number | null
+  due_day?: number | null
+}
+
+interface CardPaymentStatement {
+  account_id: string
+  total_amount: number
+  due_date: string
+}
+
+interface CardPaymentMovement {
+  account_id: string
+  type: string
+  date: string
+  amount: number
+  converted_amount?: number | null
+}
+
+/**
+ * Returns the next card payment details for a given credit card account.
+ *
+ * Logic (mirrors the dashboard AccountsPreview):
+ *  1. Look for the earliest pending statement for this account.
+ *  2. If none, sum current-cycle expense movements as a fallback.
+ *
+ * @param accountId   The account's UUID.
+ * @param account     The account row (needs closing_day / due_day).
+ * @param statements  All pending card_statements (pre-filtered to "pendiente").
+ * @param movements   All movements (e.g. from fetchAllMovements).
+ * @param ref         Optional reference date (defaults to today).
+ * @returns           { amount: number (positive, in the card's native currency),
+ *                      dueDate: string | null (ISO date) }
+ */
+export function nextCardPayment(
+  accountId: string,
+  account: CardPaymentAccount,
+  statements: CardPaymentStatement[],
+  movements: CardPaymentMovement[],
+  ref?: Date
+): { amount: number; dueDate: string | null } {
+  // 1. Nearest pending statement
+  const pendingStatement = statements
+    .filter((s) => s.account_id === accountId)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null
+
+  if (pendingStatement) {
+    return {
+      amount: pendingStatement.total_amount,
+      dueDate: pendingStatement.due_date,
+    }
+  }
+
+  // 2. Fallback: current cycle total from movements
+  const closingDay = account.closing_day
+  if (closingDay == null) {
+    return { amount: 0, dueDate: null }
+  }
+
+  const { cycleStart, cycleEnd } = currentCycleRange(closingDay, ref)
+  const cycleTotal = movements
+    .filter(
+      (m) =>
+        m.account_id === accountId &&
+        m.type === "expense" &&
+        isInCycle(m.date, cycleStart, cycleEnd)
+    )
+    .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+
+  return { amount: cycleTotal, dueDate: null }
+}
+
 /**
  * Clamp a day-of-month to the actual number of days in the given month.
  * e.g. day=31 for February → 28/29.

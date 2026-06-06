@@ -35,12 +35,46 @@ import {
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import type { RateType, RatesMap } from "@/lib/rates/dolar"
+import type { Tables } from "@/lib/database.types"
+import { fetchAllMovements } from "@/lib/movements"
+import { nextCardPayment } from "@/lib/cards"
+import { format, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+
+type CardStatement = Tables<"card_statements">
 
 // ── Query keys ────────────────────────────────────────────────
 const ACCOUNTS_KEY = ["accounts"] as const
 const BALANCES_KEY = ["account_balances"] as const
+const STATEMENTS_KEY = ["card_statements"] as const
+const MOVEMENTS_KEY = ["movements", "stats-all"] as const
+
+// ── Conversion helper (mirrors accounts-preview.tsx) ─────────
+function getConversionRate(
+  rateType: RateType,
+  rates: RatesMap,
+  manualRate: number | null,
+  fromCurrency: "ARS" | "USD"
+): number {
+  if (rateType === "manual") return manualRate ?? 1
+  const data = rates[rateType as keyof RatesMap]
+  if (!data) return 0
+  return fromCurrency === "ARS" ? (data.sell || 0) : (data.buy || 0)
+}
 
 // ── Data fetchers ─────────────────────────────────────────────
+async function fetchAllStatements(): Promise<CardStatement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("card_statements")
+    .select("*")
+    .eq("status", "pendiente")
+    .order("due_date", { ascending: true })
+  if (error) throw error
+  return data
+}
+
 async function fetchAccounts(): Promise<Account[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -318,10 +352,22 @@ function DeleteAccountDialog({ account }: { account: Account }) {
   )
 }
 
+// ── Card payment display data ─────────────────────────────────
+interface CardPaymentDisplay {
+  /** Amount in native currency of the card (positive) */
+  amount: number
+  /** Secondary display amount in ARS (when card is USD) or USD (when card is ARS) */
+  amountSecondary: number | null
+  dueDate: string | null
+  /** Whether the primary currency is ARS */
+  primaryIsARS: boolean
+}
+
 // ── Account card ──────────────────────────────────────────────
 function AccountCard({
   account,
   balance,
+  cardPayment,
   userId,
   selectionMode,
   isSelected,
@@ -329,12 +375,14 @@ function AccountCard({
 }: {
   account: Account
   balance: AccountBalance | undefined
+  cardPayment?: CardPaymentDisplay
   userId?: string
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
 }) {
   const currentBalance = balance?.current_balance ?? account.initial_balance
+  const isCreditCard = account.type === "tarjeta_credito"
 
   function handleCardClick() {
     if (selectionMode && onToggle) onToggle(account.id)
@@ -383,20 +431,42 @@ function AccountCard({
         </div>
       </div>
 
-      {/* Balance */}
+      {/* Balance / Amount due */}
       <div className="text-right flex-shrink-0 mr-1">
-        <p
-          className={cn(
-            "text-sm font-bold tabular-nums",
-            currentBalance < 0 ? "text-destructive" : "text-foreground"
-          )}
-        >
-          {formatCurrency(currentBalance, account.currency)}
-        </p>
+        {isCreditCard && cardPayment ? (
+          <>
+            <p className="text-[10px] text-muted-foreground leading-none mb-0.5">
+              {cardPayment.dueDate
+                ? `Vence ${format(parseISO(cardPayment.dueDate), "d/M", { locale: es })}`
+                : "A pagar"}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-destructive">
+              {cardPayment.primaryIsARS
+                ? formatCurrency(-cardPayment.amount, "ARS")
+                : formatCurrency(-cardPayment.amount, "USD")}
+            </p>
+            <p className="text-[11px] text-destructive/80 tabular-nums mt-0.5">
+              {cardPayment.amountSecondary != null
+                ? cardPayment.primaryIsARS
+                  ? formatCurrency(-cardPayment.amountSecondary, "USD")
+                  : formatCurrency(-cardPayment.amountSecondary, "ARS")
+                : "—"}
+            </p>
+          </>
+        ) : (
+          <p
+            className={cn(
+              "text-sm font-bold tabular-nums",
+              currentBalance < 0 ? "text-destructive" : "text-foreground"
+            )}
+          >
+            {formatCurrency(currentBalance, account.currency)}
+          </p>
+        )}
       </div>
 
       {/* Credit card shortcut — hidden in selection mode */}
-      {!selectionMode && account.type === "tarjeta_credito" && (
+      {!selectionMode && isCreditCard && (
         <Link
           href="/app/tarjetas"
           className={cn(
@@ -702,8 +772,14 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
   )
 }
 
+interface AccountsListProps {
+  rateType: RateType
+  manualRate: number | null
+  rates: RatesMap
+}
+
 // ── Main component ─────────────────────────────────────────────
-export function AccountsList() {
+export function AccountsList({ rateType, manualRate, rates }: AccountsListProps) {
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
     queryKey: ACCOUNTS_KEY,
     queryFn: fetchAccounts,
@@ -712,6 +788,16 @@ export function AccountsList() {
   const { data: balances = [] } = useQuery({
     queryKey: BALANCES_KEY,
     queryFn: fetchBalances,
+  })
+
+  const { data: statements } = useQuery({
+    queryKey: STATEMENTS_KEY,
+    queryFn: fetchAllStatements,
+  })
+
+  const { data: allMovements } = useQuery({
+    queryKey: MOVEMENTS_KEY,
+    queryFn: fetchAllMovements,
   })
 
   const [userId, setUserId] = useState<string | undefined>(undefined)
@@ -730,6 +816,41 @@ export function AccountsList() {
   const queryClient = useQueryClient()
 
   const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
+
+  // Compute credit-card next-payment for each tarjeta_credito account
+  const cardPaymentMap = useMemo(() => {
+    const map = new Map<string, CardPaymentDisplay>()
+    if (!accounts || !statements || !allMovements) return map
+    for (const account of accounts) {
+      if (account.type !== "tarjeta_credito") continue
+      const currency = account.currency ?? "ARS"
+      const { amount, dueDate } = nextCardPayment(
+        account.id,
+        account,
+        statements,
+        allMovements
+      )
+      if (currency === "ARS") {
+        const rate = getConversionRate(rateType, rates, manualRate, "ARS")
+        map.set(account.id, {
+          amount,
+          amountSecondary: rate > 0 ? amount / rate : null,
+          dueDate,
+          primaryIsARS: true,
+        })
+      } else {
+        // USD card: primary is USD, secondary is ARS
+        const rate = getConversionRate(rateType, rates, manualRate, "USD")
+        map.set(account.id, {
+          amount,
+          amountSecondary: rate > 0 ? amount * rate : null,
+          dueDate,
+          primaryIsARS: false,
+        })
+      }
+    }
+    return map
+  }, [accounts, statements, allMovements, rateType, rates, manualRate])
 
   const filtersActive = isFiltersActive(filters)
 
@@ -897,6 +1018,7 @@ export function AccountsList() {
               key={account.id}
               account={account}
               balance={balanceMap.get(account.id) ?? undefined}
+              cardPayment={cardPaymentMap.get(account.id)}
               userId={userId}
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(account.id)}
@@ -921,6 +1043,7 @@ export function AccountsList() {
                     key={account.id}
                     account={account}
                     balance={balanceMap.get(account.id) ?? undefined}
+                    cardPayment={cardPaymentMap.get(account.id)}
                     userId={userId}
                     selectionMode={ms.selectionMode}
                     isSelected={ms.isSelected(account.id)}
@@ -943,6 +1066,7 @@ export function AccountsList() {
                     key={account.id}
                     account={account}
                     balance={balanceMap.get(account.id) ?? undefined}
+                    cardPayment={cardPaymentMap.get(account.id)}
                     userId={userId}
                     selectionMode={ms.selectionMode}
                     isSelected={ms.isSelected(account.id)}
