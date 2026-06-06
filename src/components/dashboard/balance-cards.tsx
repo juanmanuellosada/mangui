@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Skeleton } from "@/components/ui/skeleton"
+import { CurrencyChip } from "@/components/ui/currency-chip"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { AccountBalance } from "@/lib/accounts"
@@ -127,7 +128,7 @@ export function BalanceCards({
               <Skeleton className="h-3 w-20 bg-primary-foreground/20" />
             ) : (
               <>
-                <span className="text-[10px] font-bold opacity-70">ARS</span>
+                <CurrencyChip currency="ARS" className="opacity-70 text-primary-foreground" />
                 {formatCurrency(totalARS, "ARS")}
               </>
             )}
@@ -149,7 +150,7 @@ export function BalanceCards({
               <Skeleton className="h-3 w-16 bg-primary-foreground/20" />
             ) : (
               <>
-                <span className="text-[10px] font-bold opacity-70">USD</span>
+                <CurrencyChip currency="USD" className="opacity-70 text-primary-foreground" />
                 {formatCurrency(totalUSD, "USD")}
               </>
             )}
