@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { decryptSecret } from "@/lib/crypto"
 import { generateObject } from "ai"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { createOpenAI } from "@ai-sdk/openai"
-import { createAnthropic } from "@ai-sdk/anthropic"
 import { z } from "zod"
 
 // Argentina timezone offset for "today"
 const AR_TZ = "America/Argentina/Buenos_Aires"
+
+const DAILY_LIMIT = 30
+const MODEL_ID = "gemini-2.5-flash"
 
 function getTodayAR(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: AR_TZ })
@@ -45,21 +45,6 @@ function findMatch(
   return fuzzy?.id ?? null
 }
 
-function friendlyProviderError(error: unknown): string {
-  const msg = error instanceof Error ? error.message : String(error)
-  const lower = msg.toLowerCase()
-  if (lower.includes("401") || lower.includes("403") || lower.includes("invalid api key") || lower.includes("authentication")) {
-    return "API key inválida. Verificá la clave en Ajustes › Inteligencia artificial."
-  }
-  if (lower.includes("429") || lower.includes("rate limit") || lower.includes("quota") || lower.includes("limit exceeded")) {
-    return "Límite o cuota de tu proveedor de IA alcanzado. Intentá en unos minutos."
-  }
-  if (lower.includes("model") && (lower.includes("not found") || lower.includes("does not exist"))) {
-    return "El modelo seleccionado no está disponible. Cambiá el modelo en Ajustes › Inteligencia artificial."
-  }
-  return "No se pudo interpretar el texto con tu proveedor de IA. Intentá de nuevo."
-}
-
 export async function POST(req: NextRequest) {
   // 1. Authenticate
   const supabase = await createServerClient()
@@ -84,7 +69,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
   }
 
-  // 3. Load AI settings via admin client (bypasses RLS on api_key_encrypted)
+  // 3. Check server-side API key
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "La IA no está disponible en este momento. Contactá soporte." },
+      { status: 500 }
+    )
+  }
+
+  // 4. Rate limiting — admin client bypasses RLS
   const admin = createAdminClient()
   if (!admin) {
     return NextResponse.json(
@@ -93,57 +87,43 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { data: aiSettings, error: settingsError } = await admin
-    .from("user_ai_settings")
-    .select("provider, model, api_key_encrypted")
-    .eq("user_id", user.id)
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("ai_unlimited")
+    .eq("id", user.id)
     .maybeSingle()
 
-  if (settingsError) {
-    return NextResponse.json({ error: "Error al cargar configuración de IA." }, { status: 500 })
-  }
+  const isUnlimited = profile?.ai_unlimited === true
 
-  if (!aiSettings?.api_key_encrypted) {
-    return NextResponse.json(
-      {
-        error: "no_key",
-        message:
-          "Configurá tu API key de IA en Ajustes › Inteligencia artificial para usar esta función.",
-      },
-      { status: 400 }
-    )
-  }
+  if (!isUnlimited) {
+    const todayStart = `${getTodayAR()}T00:00:00.000Z`
+    const { count, error: countError } = await admin
+      .from("ai_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", todayStart)
 
-  // 4. Decrypt key (server-side only)
-  let apiKey: string
-  try {
-    apiKey = await decryptSecret(aiSettings.api_key_encrypted)
-  } catch {
-    return NextResponse.json(
-      { error: "Error al acceder a tu API key. Reconectá tu clave en Ajustes." },
-      { status: 500 }
-    )
-  }
-
-  const provider = aiSettings.provider as "google" | "openai" | "anthropic"
-  const modelId = aiSettings.model
-
-  // 5. Build AI model instance
-  let model
-  try {
-    if (provider === "google") {
-      const google = createGoogleGenerativeAI({ apiKey })
-      model = google(modelId || "gemini-2.0-flash")
-    } else if (provider === "openai") {
-      const openai = createOpenAI({ apiKey })
-      model = openai(modelId || "gpt-4o-mini")
-    } else {
-      const anthropic = createAnthropic({ apiKey })
-      model = anthropic(modelId || "claude-3-5-haiku-latest")
+    if (countError) {
+      return NextResponse.json(
+        { error: "Error al verificar uso diario." },
+        { status: 500 }
+      )
     }
-  } catch (err) {
-    return NextResponse.json({ error: friendlyProviderError(err) }, { status: 500 })
+
+    if ((count ?? 0) >= DAILY_LIMIT) {
+      return NextResponse.json(
+        {
+          error: "rate_limited",
+          message: "Alcanzaste el límite diario de interpretaciones. Probá de nuevo mañana.",
+        },
+        { status: 429 }
+      )
+    }
   }
+
+  // 5. Build AI model
+  const google = createGoogleGenerativeAI({ apiKey })
+  const model = google(MODEL_ID)
 
   // 6. Fetch user categories and accounts
   const [categoriesRes, accountsRes] = await Promise.all([
@@ -195,10 +175,24 @@ Reglas:
     })
     parsed = result.object
   } catch (err) {
-    return NextResponse.json({ error: friendlyProviderError(err) }, { status: 422 })
+    const msg = err instanceof Error ? err.message.toLowerCase() : ""
+    const isQuota =
+      msg.includes("429") || msg.includes("rate limit") || msg.includes("quota")
+    return NextResponse.json(
+      {
+        error: "ai_unavailable",
+        message: isQuota
+          ? "La IA está temporalmente ocupada. Probá de nuevo en unos minutos."
+          : "La IA no está disponible en este momento, probá más tarde.",
+      },
+      { status: 503 }
+    )
   }
 
-  // 8. Map categoryName → category_id and accountName → account_id server-side
+  // 8. Log usage (fire-and-forget; non-blocking)
+  admin.from("ai_usage").insert({ user_id: user.id, model: MODEL_ID }).then()
+
+  // 9. Map categoryName → category_id and accountName → account_id server-side
   const relevantCategories = categories.filter(
     (c) => c.type === (parsed.kind === "income" ? "income" : "expense")
   )

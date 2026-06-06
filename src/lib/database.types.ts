@@ -886,8 +886,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage: {
+        Row: {
+          created_at: string
+          id: string
+          model: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
+          ai_unlimited: boolean
           avatar_url: string | null
           created_at: string
           email: string | null
@@ -896,6 +918,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_unlimited?: boolean
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -904,6 +927,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_unlimited?: boolean
           avatar_url?: string | null
           created_at?: string
           email?: string | null

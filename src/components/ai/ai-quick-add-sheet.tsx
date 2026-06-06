@@ -12,7 +12,6 @@ import {
   X,
   AlertCircle,
 } from "lucide-react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -191,18 +190,13 @@ export function AiQuickAddSheet({
       setView("confirm")
     },
     onError: (err: Error & { code?: string }) => {
-      if (err.code === "no_key") {
-        toast.error("Sin API key configurada", {
-          description: (
-            <span>
-              {err.message}{" "}
-              <Link href="/ia" className="underline font-medium" onClick={() => onOpenChange(false)}>
-                Configurar →
-              </Link>
-            </span>
-          ),
+      if (err.code === "rate_limited") {
+        toast.error("Límite diario alcanzado", {
+          description: err.message,
           duration: 6000,
         })
+      } else if (err.code === "ai_unavailable") {
+        toast.error("IA no disponible", { description: err.message })
       } else {
         toast.error("No se pudo interpretar", { description: err.message })
       }
