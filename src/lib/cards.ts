@@ -1,6 +1,7 @@
 import {
   addMonths,
   subMonths,
+  subDays,
   getDaysInMonth,
   parseISO,
   isAfter,
@@ -19,6 +20,7 @@ interface CardPaymentStatement {
   account_id: string
   total_amount: number
   due_date: string
+  close_date: string
 }
 
 interface CardPaymentMovement {
@@ -31,10 +33,11 @@ interface CardPaymentMovement {
 
 /**
  * Returns the next card payment details for a given credit card account.
+ * "A pagar" = the already-closed statement with the nearest due date.
  *
- * Logic (mirrors the dashboard AccountsPreview):
- *  1. Look for the earliest pending statement for this account.
- *  2. If none, sum current-cycle expense movements as a fallback.
+ * Logic:
+ *  1. Look for the earliest pending statement with close_date <= ref (already closed).
+ *  2. If none, sum the last closed cycle's expense movements as a fallback.
  *
  * @param accountId   The account's UUID.
  * @param account     The account row (needs closing_day / due_day).
@@ -51,26 +54,75 @@ export function nextCardPayment(
   movements: CardPaymentMovement[],
   ref?: Date
 ): { amount: number; dueDate: string | null } {
-  // 1. Nearest pending statement
-  const pendingStatement = statements
-    .filter((s) => s.account_id === accountId)
+  const refDate = startOfDay(ref ?? new Date())
+  const refStr = toDateString(refDate)
+
+  // 1. Nearest pending statement that has already closed (close_date <= today)
+  const closedPending = statements
+    .filter((s) => s.account_id === accountId && s.close_date <= refStr)
     .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null
 
-  if (pendingStatement) {
+  if (closedPending) {
     return {
-      amount: pendingStatement.total_amount,
-      dueDate: pendingStatement.due_date,
+      amount: closedPending.total_amount,
+      dueDate: closedPending.due_date,
     }
   }
 
-  // 2. Fallback: current cycle total from movements
+  // 2. Fallback: sum the last CLOSED cycle from movements (not the open cycle)
   const closingDay = account.closing_day
   if (closingDay == null) {
     return { amount: 0, dueDate: null }
   }
 
-  const { cycleStart, cycleEnd } = currentCycleRange(closingDay, ref)
-  const cycleTotal = movements
+  // Determine the last closed cycle: go one day before the current open cycle start
+  const open = currentCycleRange(closingDay, refDate)
+  const prevRef = subDays(open.cycleStart, 1)
+  const closed = currentCycleRange(closingDay, prevRef)
+
+  const closedTotal = movements
+    .filter(
+      (m) =>
+        m.account_id === accountId &&
+        m.type === "expense" &&
+        isInCycle(m.date, closed.cycleStart, closed.cycleEnd)
+    )
+    .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+
+  const dueDay = account.due_day
+  const dueDate =
+    dueDay != null
+      ? toDateString(computeDueDate(closed.cycleEnd, dueDay, closingDay))
+      : null
+
+  return { amount: closedTotal, dueDate }
+}
+
+/**
+ * Returns the current open cycle summary for a credit card account.
+ * "Resumen en curso" = the cycle that is still accumulating (not yet closed).
+ *
+ * @param accountId   The account's UUID.
+ * @param account     The account row (needs closing_day / due_day).
+ * @param movements   All movements for this account (expense type).
+ * @param ref         Optional reference date (defaults to today).
+ * @returns           { amount, closeDate, dueDate } — ISO strings or null.
+ */
+export function currentCycleSummary(
+  accountId: string,
+  account: CardPaymentAccount,
+  movements: CardPaymentMovement[],
+  ref?: Date
+): { amount: number; closeDate: string | null; dueDate: string | null } {
+  const closingDay = account.closing_day
+  if (closingDay == null) {
+    return { amount: 0, closeDate: null, dueDate: null }
+  }
+
+  const refDate = ref ?? new Date()
+  const { cycleStart, cycleEnd } = currentCycleRange(closingDay, refDate)
+
+  const amount = movements
     .filter(
       (m) =>
         m.account_id === accountId &&
@@ -79,7 +131,15 @@ export function nextCardPayment(
     )
     .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
 
-  return { amount: cycleTotal, dueDate: null }
+  const closeDate = toDateString(cycleEnd)
+
+  const dueDay = account.due_day
+  const dueDate =
+    dueDay != null
+      ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay))
+      : null
+
+  return { amount, closeDate, dueDate }
 }
 
 /**

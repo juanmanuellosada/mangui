@@ -33,12 +33,13 @@ import {
   nextCloseDate,
   computeDueDate,
   currentCycleRange,
+  nextCardPayment,
   isInCycle,
   toDateString,
 } from "@/lib/cards"
 import { ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
 import type { Tables } from "@/lib/database.types"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, isBefore, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 
 type Account = Tables<"accounts">
@@ -309,7 +310,7 @@ function CreditCardVisual({
 
         {/* Total amount */}
         <div>
-          <p className="text-white/60 text-xs font-medium mb-0.5">Total resumen actual</p>
+          <p className="text-white/60 text-xs font-medium mb-0.5">Resumen en curso</p>
           <p
             className="text-white text-3xl font-bold tabular-nums leading-none"
             style={{ fontFamily: "var(--font-display)" }}
@@ -392,15 +393,65 @@ function CardSection({
   const existingStatement = statements.find((s) => s.close_date === cycleCloseStr)
   const isPaid = existingStatement?.status === "pagado"
 
+  // "A pagar": closed statement or last closed cycle
+  const pendingStatements = statements.filter((s) => s.status === "pendiente")
+  const { amount: payAmount, dueDate: payDueDateStr } = nextCardPayment(
+    account.id,
+    account,
+    pendingStatements,
+    movements
+  )
+  const payDueDate = payDueDateStr ? parseISO(payDueDateStr) : null
+  const today0 = startOfDay(today)
+  const payIsOverdue = payDueDate != null && isBefore(payDueDate, today0)
+  const payIsDueToday =
+    payDueDate != null && !payIsOverdue && toDateString(payDueDate) === toDateString(today0)
+
   return (
     <div className="space-y-5">
-      {/* Card visual */}
+      {/* Card visual (Resumen en curso) */}
       <CreditCardVisual
         account={account}
         cycleTotal={cycleTotal}
         nextClose={nextClose}
         nextDue={nextDue}
       />
+
+      {/* A pagar — closed statement */}
+      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+          A pagar
+        </p>
+        <div className="flex items-end justify-between gap-2">
+          <p
+            className={cn(
+              "text-2xl font-bold tabular-nums leading-none",
+              payIsOverdue ? "text-destructive" : "text-foreground"
+            )}
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {formatCurrency(payAmount, account.currency)}
+          </p>
+          {payDueDate != null && (
+            <p
+              className={cn(
+                "text-xs font-semibold tabular-nums pb-0.5",
+                payIsOverdue
+                  ? "text-destructive"
+                  : payIsDueToday
+                  ? "text-amber-500"
+                  : "text-muted-foreground"
+              )}
+            >
+              {payIsOverdue
+                ? "Vencido"
+                : payIsDueToday
+                ? "Vence hoy"
+                : `Vence ${format(payDueDate, "d MMM", { locale: es })}`}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* Cuotas this month */}
       {cuotaMovements.length > 0 && (
