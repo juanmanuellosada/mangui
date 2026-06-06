@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
-import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
 import { BudgetForm, budgetToFormValues, type BudgetFormValues } from "./budget-form"
 import {
@@ -53,6 +52,8 @@ import { CategoryIconChip } from "@/lib/categories"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Tables } from "@/lib/database.types"
+import { DateRangeFilter, defaultDateRange } from "@/components/ui/date-range-filter"
+import type { DateRangeValue } from "@/components/ui/date-range-filter"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -109,7 +110,6 @@ function normalize(s: string) {
 
 type EstadoFilter = "todos" | "activos" | "pausados"
 type MonedaFilter = "todas" | "ARS" | "USD"
-type PeriodoFilter = "todos" | "weekly" | "biweekly" | "monthly" | "quarterly" | "annual" | "custom"
 type SortKey = "recientes" | "nombre" | "porcentaje" | "limite"
 type SortDir = "asc" | "desc"
 
@@ -117,7 +117,7 @@ interface BudgetFilters {
   search: string
   estado: EstadoFilter
   moneda: MonedaFilter
-  periodo: PeriodoFilter
+  dateRange: DateRangeValue
   categoryIds: string[]
   accountIds: string[]
   sortKey: SortKey
@@ -128,24 +128,12 @@ const DEFAULT_FILTERS: BudgetFilters = {
   search: "",
   estado: "todos",
   moneda: "todas",
-  periodo: "todos",
+  dateRange: defaultDateRange(),
   categoryIds: [],
   accountIds: [],
   sortKey: "recientes",
   sortDir: "desc",
 }
-
-// ── Period options for MangoSelect ────────────────────────────────────────────
-
-const PERIODO_OPTIONS: MangoSelectOption[] = [
-  { value: "todos", label: "Todos los períodos" },
-  { value: "weekly", label: "Semanal" },
-  { value: "biweekly", label: "Quincenal" },
-  { value: "monthly", label: "Mensual" },
-  { value: "quarterly", label: "Trimestral" },
-  { value: "annual", label: "Anual" },
-  { value: "custom", label: "Personalizado" },
-]
 
 // ── Sort pills ────────────────────────────────────────────────────────────────
 
@@ -220,11 +208,13 @@ function BudgetFilterBar({
 }) {
   const [mobileExpanded, setMobileExpanded] = useState(false)
 
+  const dateRangeIsDefault = filters.dateRange.preset === "all_time"
+
   const hasActiveFilters =
     filters.search.trim() !== "" ||
     filters.estado !== "todos" ||
     filters.moneda !== "todas" ||
-    filters.periodo !== "todos" ||
+    !dateRangeIsDefault ||
     filters.categoryIds.length > 0 ||
     filters.accountIds.length > 0 ||
     filters.sortKey !== "recientes"
@@ -235,9 +225,7 @@ function BudgetFilterBar({
     activeChips.push(filters.estado === "activos" ? "Activos" : "Pausados")
   }
   if (filters.moneda !== "todas") activeChips.push(filters.moneda)
-  if (filters.periodo !== "todos") {
-    activeChips.push(PERIODO_OPTIONS.find((o) => o.value === filters.periodo)?.label ?? "")
-  }
+  if (!dateRangeIsDefault) activeChips.push(filters.dateRange.label)
   if (filters.categoryIds.length > 0) {
     activeChips.push(`${filters.categoryIds.length} categoría${filters.categoryIds.length !== 1 ? "s" : ""}`)
   }
@@ -339,11 +327,10 @@ function BudgetFilterBar({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label className="text-xs">Período</Label>
-          <MangoSelect
-            value={filters.periodo}
-            onChange={(v) => onChange({ ...filters, periodo: v as PeriodoFilter })}
-            options={PERIODO_OPTIONS}
-            aria-label="Filtrar por período"
+          <DateRangeFilter
+            value={filters.dateRange}
+            onChange={(dateRange) => onChange({ ...filters, dateRange })}
+            triggerClassName="w-full"
           />
         </div>
 
@@ -1006,6 +993,17 @@ export function BudgetsList() {
     },
   })
 
+  // Movements filtered to the selected date range — used for spending progress
+  const rangedMovements = useMemo(() => {
+    const { from, to } = filters.dateRange
+    if (!from && !to) return movements
+    return movements.filter((m) => {
+      if (from && m.date < from) return false
+      if (to && m.date > to) return false
+      return true
+    })
+  }, [movements, filters.dateRange])
+
   // Client-side filtering + sorting
   const filteredBudgets = useMemo(() => {
     const q = normalize(filters.search)
@@ -1018,14 +1016,6 @@ export function BudgetsList() {
         if (filters.estado === "pausados" && b.status !== "paused") return false
         // Moneda
         if (filters.moneda !== "todas" && b.currency !== filters.moneda) return false
-        // Período: "custom" means period === null
-        if (filters.periodo !== "todos") {
-          if (filters.periodo === "custom") {
-            if (b.period !== null) return false
-          } else {
-            if (b.period !== filters.periodo) return false
-          }
-        }
         // Categorías: empty scope (category_ids = []) matches any filter (budget applies to all)
         if (filters.categoryIds.length > 0 && b.category_ids.length > 0) {
           if (!filters.categoryIds.some((id) => b.category_ids.includes(id))) return false
@@ -1043,8 +1033,8 @@ export function BudgetsList() {
             return filters.sortDir === "asc" ? cmp : -cmp
           }
           case "porcentaje": {
-            const pa = computeBudgetProgress(a, movements).percent
-            const pb = computeBudgetProgress(b, movements).percent
+            const pa = computeBudgetProgress(a, rangedMovements).percent
+            const pb = computeBudgetProgress(b, rangedMovements).percent
             return filters.sortDir === "asc" ? pa - pb : pb - pa
           }
           case "limite": {
@@ -1058,13 +1048,13 @@ export function BudgetsList() {
           }
         }
       })
-  }, [budgets, filters, movements])
+  }, [budgets, filters, rangedMovements])
 
   const isFiltered =
     filters.search.trim() !== "" ||
     filters.estado !== "todos" ||
     filters.moneda !== "todas" ||
-    filters.periodo !== "todos" ||
+    filters.dateRange.preset !== "all_time" ||
     filters.categoryIds.length > 0 ||
     filters.accountIds.length > 0 ||
     filters.sortKey !== "recientes"
@@ -1100,7 +1090,7 @@ export function BudgetsList() {
           </h1>
           {!loadingBudgets && budgets.length > 0 && (
             <div className="mt-1">
-              <SummaryBar budgets={budgets} movements={movements} />
+              <SummaryBar budgets={budgets} movements={rangedMovements} />
             </div>
           )}
         </div>
@@ -1188,7 +1178,7 @@ export function BudgetsList() {
             <BudgetCard
               key={budget.id}
               budget={budget}
-              movements={movements}
+              movements={rangedMovements}
               categories={categories}
               accounts={accounts}
               onEdit={setEditingBudget}
