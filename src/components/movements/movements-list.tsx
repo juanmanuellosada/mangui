@@ -19,6 +19,11 @@ import {
   X,
   ChevronDown,
   LayoutList,
+  TrendingUp,
+  TrendingDown,
+  Scale,
+  Hash,
+  Divide,
 } from "lucide-react"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
@@ -76,7 +81,6 @@ import {
   startOfDay,
 } from "date-fns"
 import { es } from "date-fns/locale"
-import { SummaryCards } from "@/components/stats/summary-cards"
 import { summaryTotals } from "@/lib/stats"
 import { useQuickAdd } from "@/components/quick-add-provider"
 import { listAttachments, uploadAttachment } from "@/lib/attachments"
@@ -1397,10 +1401,26 @@ export function MovementsList() {
     return [...movementItems, ...transferItems]
   }, [movements, transfers])
 
-  // ── Totals for SummaryCards (movements only, no transfers) ────────────────
+  // ── Totals for summary cards ───────────────────────────────────────────────
   const totals = useMemo(
     () => summaryTotals(movements ?? [], "ARS"),
     [movements]
+  )
+
+  const incomeCount = useMemo(
+    () => (movements ?? []).filter((m) => m.type === "income").length,
+    [movements]
+  )
+  const expenseCount = useMemo(
+    () => (movements ?? []).filter((m) => m.type === "expense").length,
+    [movements]
+  )
+  const avgIncome = incomeCount ? totals.income / incomeCount : 0
+  const avgExpense = expenseCount ? totals.expense / expenseCount : 0
+  const transferCount = transfers?.length ?? 0
+  const transferTotal = useMemo(
+    () => (transfers ?? []).reduce((acc, t) => acc + t.from_amount, 0),
+    [transfers]
   )
 
   // ── Build grouped feed parametrized by groupBy ───────────────────────────
@@ -1582,13 +1602,144 @@ export function MovementsList() {
         onGroupByChange={setGroupBy}
       />
 
-      {/* Summary cards */}
+      {/* Adaptive summary cards */}
       {!isLoading && totalItems > 0 && (
         <div className="space-y-2">
-          <SummaryCards totals={totals} currency="ARS" period={filter.date.label} />
-          <p className="text-xs text-muted-foreground px-1">
-            {totalItems} {totalItems === 1 ? "movimiento" : "movimientos"}
-          </p>
+          {filter.type === "all" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-success flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Ingresos</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-success leading-tight">
+                  +{formatCurrency(totals.income, "ARS")}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Gastos</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-destructive leading-tight">
+                  −{formatCurrency(totals.expense, "ARS")}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Scale className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Balance</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className={`text-base font-bold tabular-nums leading-tight ${totals.net >= 0 ? "text-success" : "text-destructive"}`}>
+                  {totals.net >= 0 ? "+" : "−"}{formatCurrency(Math.abs(totals.net), "ARS")}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {filter.type === "income" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-success flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Total ingresos</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-success leading-tight">
+                  +{formatCurrency(totals.income, "ARS")}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Cantidad</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
+                  {incomeCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Divide className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Promedio</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
+                  {formatCurrency(avgIncome, "ARS")}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {filter.type === "expense" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Total gastos</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-destructive leading-tight">
+                  −{formatCurrency(totals.expense, "ARS")}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Cantidad</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
+                  {expenseCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Divide className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Promedio</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
+                  {formatCurrency(avgExpense, "ARS")}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {filter.type === "transfer" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <ArrowLeftRight className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Transferencias</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
+                  {transferCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <p className="text-xs font-medium text-muted-foreground truncate">Total movido</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
+                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
+                  {formatCurrency(transferTotal, "ARS")}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {filter.type !== "transfer" && (
+            <p className="text-xs text-muted-foreground px-1">
+              {totalItems} {totalItems === 1 ? "movimiento" : "movimientos"}
+            </p>
+          )}
         </div>
       )}
       {isLoading && (
