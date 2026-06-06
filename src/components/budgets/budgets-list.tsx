@@ -267,8 +267,8 @@ function BudgetFilterBar({
   // Secondary filters panel — shared between desktop (always visible) and mobile (expanded)
   const secondaryFilters = (
     <div className="space-y-4">
-      {/* Estado + Moneda segmented row */}
-      <div className="flex flex-wrap gap-3">
+      {/* Estado | Ordenar | Moneda — primera fila */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="space-y-1.5">
           <Label className="text-xs">Estado</Label>
           <div role="group" aria-label="Filtrar por estado" className="flex items-center gap-1">
@@ -295,6 +295,15 @@ function BudgetFilterBar({
               )
             })}
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Ordenar</Label>
+          <BudgetSortControl
+            sortKey={filters.sortKey}
+            sortDir={filters.sortDir}
+            onChange={(key, dir) => onChange({ ...filters, sortKey: key, sortDir: dir })}
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -326,7 +335,7 @@ function BudgetFilterBar({
         </div>
       </div>
 
-      {/* Período + Alcance row */}
+      {/* Período + Categorías + Cuentas row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label className="text-xs">Período</Label>
@@ -361,16 +370,6 @@ function BudgetFilterBar({
             aria-label="Filtrar por cuenta"
           />
         </div>
-      </div>
-
-      {/* Sort row */}
-      <div className="space-y-1.5">
-        <Label className="text-xs">Ordenar</Label>
-        <BudgetSortControl
-          sortKey={filters.sortKey}
-          sortDir={filters.sortDir}
-          onChange={(key, dir) => onChange({ ...filters, sortKey: key, sortDir: dir })}
-        />
       </div>
     </div>
   )
