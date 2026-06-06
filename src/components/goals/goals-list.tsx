@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
+import { CurrencySegmented } from "@/components/ui/currency-segmented"
 import { GoalForm, goalToFormValues, saveGoal, type GoalFormValues } from "./goal-form"
 import { GoalProgressBar } from "@/components/goals/goal-progress-bar"
 import {
@@ -357,22 +358,10 @@ function GoalFilterBar({
 
         <div className="space-y-1.5">
           <Label className="text-xs">Moneda</Label>
-          <div role="group" aria-label="Filtrar por moneda" className="flex items-center gap-1">
-            {(["todas", "ARS", "USD"] as const).map((v) => {
-              const label = v === "todas" ? "Todas" : v
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => onChange({ ...filters, moneda: v })}
-                  aria-pressed={filters.moneda === v}
-                  className={pillClass(filters.moneda === v)}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          <CurrencySegmented
+            value={filters.moneda === "todas" ? "all" : filters.moneda}
+            onChange={(v) => onChange({ ...filters, moneda: v === "all" ? "todas" : v })}
+          />
         </div>
       </div>
 

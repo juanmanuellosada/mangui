@@ -54,6 +54,7 @@ import { es } from "date-fns/locale"
 import type { Tables } from "@/lib/database.types"
 import { DateRangeFilter, defaultDateRange } from "@/components/ui/date-range-filter"
 import type { DateRangeValue } from "@/components/ui/date-range-filter"
+import { CurrencySegmented } from "@/components/ui/currency-segmented"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -296,30 +297,10 @@ function BudgetFilterBar({
 
         <div className="space-y-1.5">
           <Label className="text-xs">Moneda</Label>
-          <div role="group" aria-label="Filtrar por moneda" className="flex items-center gap-1">
-            {(["todas", "ARS", "USD"] as const).map((v) => {
-              const label = v === "todas" ? "Todas" : v
-              const isSelected = filters.moneda === v
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => onChange({ ...filters, moneda: v })}
-                  aria-pressed={isSelected}
-                  className={cn(
-                    "inline-flex items-center h-8 px-2.5 rounded-lg text-xs font-medium",
-                    "border transition-all duration-150 cursor-pointer select-none",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isSelected
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20"
-                      : "bg-background border-input text-muted-foreground hover:border-ring/60 hover:text-foreground dark:bg-input/30"
-                  )}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          <CurrencySegmented
+            value={filters.moneda === "todas" ? "all" : filters.moneda}
+            onChange={(v) => onChange({ ...filters, moneda: v === "all" ? "todas" : v })}
+          />
         </div>
       </div>
 
