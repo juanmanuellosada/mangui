@@ -121,7 +121,7 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-medium text-muted-foreground">Cuentas</h2>
         <Link
-          href="/app/cuentas"
+          href="/cuentas"
           className="flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           Ver todas

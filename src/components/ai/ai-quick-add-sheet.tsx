@@ -196,7 +196,7 @@ export function AiQuickAddSheet({
           description: (
             <span>
               {err.message}{" "}
-              <Link href="/app/ia" className="underline font-medium" onClick={() => onOpenChange(false)}>
+              <Link href="/ia" className="underline font-medium" onClick={() => onOpenChange(false)}>
                 Configurar →
               </Link>
             </span>

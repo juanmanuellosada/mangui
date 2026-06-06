@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
                 daysUntil === 0
                   ? `Hoy cierra tu tarjeta ${card.name}.`
                   : `Tu tarjeta ${card.name} cierra en ${daysUntil} día${daysUntil !== 1 ? "s" : ""}.`,
-              url: "/app/tarjetas",
+              url: "/tarjetas",
             })
           })
           if (sent) totalSent++
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
                 daysUntil === 0
                   ? `Hoy vence el pago de ${card.name}.`
                   : `El pago de ${card.name} vence en ${daysUntil} día${daysUntil !== 1 ? "s" : ""}.`,
-              url: "/app/tarjetas",
+              url: "/tarjetas",
             })
           })
           if (sent) totalSent++
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
         await sendPushToUser(admin, userId, {
           title: "Transacción recurrente pendiente",
           body: `Tenés una transacción recurrente programada para hoy (${format(parseISO(occ.scheduled_date), "d MMM")}).`,
-          url: "/app/recurrentes",
+          url: "/recurrentes",
         })
       })
       if (sent) totalSent++

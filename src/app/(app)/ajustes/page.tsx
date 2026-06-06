@@ -554,7 +554,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <Link
-            href="/app/categorias"
+            href="/categorias"
             className={cn(
               "inline-flex items-center gap-1.5 text-xs font-semibold text-primary",
               "hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
@@ -576,7 +576,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <Link
-            href="/app/ia"
+            href="/ia"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
           >
             Ir
@@ -595,7 +595,7 @@ export default function SettingsPage() {
             </p>
           </div>
           <Link
-            href="/app/integraciones"
+            href="/integraciones"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-pointer flex-shrink-0"
           >
             Ir

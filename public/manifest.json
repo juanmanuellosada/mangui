@@ -2,7 +2,7 @@
   "name": "mangui — Finanzas personales",
   "short_name": "mangui",
   "description": "Controlá tus finanzas en pesos y dólares con mangui. Multimoneda, cuotas, presupuestos y más.",
-  "start_url": "/app/inicio",
+  "start_url": "/inicio",
   "display": "standalone",
   "background_color": "#FAFAF9",
   "theme_color": "#FAFAF9",

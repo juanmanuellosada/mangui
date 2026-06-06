@@ -54,7 +54,7 @@ export function ResetPasswordForm() {
 
     setDone(true);
     toast.success("Contraseña actualizada correctamente.");
-    setTimeout(() => router.push("/app/inicio"), 1500);
+    setTimeout(() => router.push("/inicio"), 1500);
   }
 
   if (done) {

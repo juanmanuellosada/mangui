@@ -78,7 +78,7 @@ export function BudgetsSummary() {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Presupuestos</h3>
         <Link
-          href="/app/presupuestos"
+          href="/presupuestos"
           className="flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           Ver todos
@@ -100,7 +100,7 @@ export function BudgetsSummary() {
         <p className="text-sm text-muted-foreground py-1">
           No tenés presupuestos activos.{" "}
           <Link
-            href="/app/presupuestos"
+            href="/presupuestos"
             className="text-primary hover:underline"
           >
             Crear uno

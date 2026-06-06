@@ -5,10 +5,12 @@ import type { Database } from "@/lib/database.types";
 /**
  * Refreshes the Supabase session on every request and enforces route protection.
  *
- * Protected routes: /app/**
- * Redirect unauthenticated users to /login.
+ * Public routes: /, /login, /register, /forgot-password, /reset-password, /offline
+ * /api/* is also bypassed — each API route handles its own auth (e.g. cron and AI routes
+ * are called without a user session).
+ * Everything else requires authentication → redirect to /login.
  *
- * NOTE: Must be called from src/middleware.ts — not a standalone middleware.
+ * NOTE: Must be called from src/proxy.ts — not a standalone middleware.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -42,8 +44,15 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Protect /app/* routes
-  if (pathname.startsWith("/app") && !user) {
+  // Public paths — accessible without authentication
+  const PUBLIC_EXACT = ["/"];
+  const PUBLIC_PREFIX = ["/api", "/login", "/register", "/forgot-password", "/reset-password", "/offline"];
+  const isPublic =
+    PUBLIC_EXACT.includes(pathname) ||
+    PUBLIC_PREFIX.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  // Protect all non-public routes
+  if (!isPublic && !user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("redirectTo", pathname);
@@ -53,7 +62,7 @@ export async function updateSession(request: NextRequest) {
   // Redirect authenticated users away from auth pages
   if (user && (pathname === "/login" || pathname === "/register")) {
     const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/app/inicio";
+    dashboardUrl.pathname = "/inicio";
     return NextResponse.redirect(dashboardUrl);
   }
 

@@ -116,7 +116,7 @@ export function GoalsSummary() {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Metas</h3>
         <Link
-          href="/app/metas"
+          href="/metas"
           className="flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           Ver todas
@@ -137,7 +137,7 @@ export function GoalsSummary() {
       {!isLoading && activeGoals.length === 0 && (
         <p className="text-sm text-muted-foreground py-1">
           No tenés metas activas.{" "}
-          <Link href="/app/metas" className="text-primary hover:underline">
+          <Link href="/metas" className="text-primary hover:underline">
             Crear una
           </Link>
         </p>

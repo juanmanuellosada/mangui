@@ -42,7 +42,7 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar z-30 shadow-sm">
       {/* Brand */}
       <div className="flex items-center px-5 h-16 border-b border-sidebar-border">
-        <Link href="/app/inicio" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+        <Link href="/inicio" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
           <BrandLockup size={28} />
         </Link>
       </div>

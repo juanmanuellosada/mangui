@@ -1300,7 +1300,7 @@ export function InstallmentDetail({ purchaseId }: { purchaseId: string }) {
         purchase={purchase}
         open={deletePurchaseOpen}
         onOpenChange={setDeletePurchaseOpen}
-        onDeleted={() => router.push("/app/movimientos")}
+        onDeleted={() => router.push("/movimientos")}
       />
     </div>
   )

@@ -843,7 +843,7 @@ function CardBlock({
                 Gastos del resumen
               </p>
               <Link
-                href={`/app/movimientos?account=${account.id}`}
+                href={`/movimientos?account=${account.id}`}
                 className="text-xs text-primary hover:underline font-medium"
               >
                 Ver todos
@@ -1084,7 +1084,7 @@ export function CardsList() {
             </p>
           </div>
           <Link
-            href="/app/cuentas"
+            href="/cuentas"
             className={cn(
               "inline-flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-semibold",
               "bg-primary text-primary-foreground shadow-sm shadow-primary/20 press-effect cursor-pointer",

@@ -61,7 +61,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/app/inicio");
+    router.push("/inicio");
     router.refresh();
   }
 
@@ -70,7 +70,7 @@ export function LoginForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/app/inicio`,
+        redirectTo: `${window.location.origin}/inicio`,
       },
     });
     if (error) {

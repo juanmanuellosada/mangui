@@ -114,7 +114,7 @@ export function CategoryDistributionChart({ items, type, currency = "ARS" }: Cat
         {displayItems.map((item) => (
           <Link
             key={item.categoryId || item.name}
-            href={`/app/movimientos?categoryId=${item.categoryId}&type=${type}`}
+            href={`/movimientos?categoryId=${item.categoryId}&type=${type}`}
             className="flex items-center gap-2 px-1 py-1 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
             aria-label={`Ver movimientos de ${item.name}`}
           >

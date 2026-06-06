@@ -253,7 +253,7 @@ function MovementRow({
           )}
           {isCuota && movement.installment_number !== null && movement.installment_total !== null && (
             <Link
-              href={`/app/cuotas/${movement.installment_purchase_id}`}
+              href={`/cuotas/${movement.installment_purchase_id}`}
               className={cn(
                 "inline-flex items-center gap-0.5 px-1.5 py-0 rounded-md text-[10px] font-bold",
                 "bg-primary/10 text-primary hover:bg-primary/20 transition-colors duration-150",

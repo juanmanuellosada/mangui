@@ -520,7 +520,7 @@ function AccountCard({
       {/* Credit card shortcut — hidden in selection mode */}
       {!selectionMode && isCreditCard && (
         <Link
-          href="/app/tarjetas"
+          href="/tarjetas"
           className={cn(
             "flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center",
             "text-primary hover:bg-primary/10 transition-colors duration-150",

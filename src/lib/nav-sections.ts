@@ -29,23 +29,23 @@ export interface NavSection {
 
 /** All primary nav items — in sidebar order. */
 export const PRIMARY_NAV: NavSection[] = [
-  { icon: Home, label: "Inicio", href: "/app/inicio" },
-  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movimientos" },
-  { icon: PiggyBank, label: "Cuentas", href: "/app/cuentas" },
-  { icon: Tag, label: "Categorías", href: "/app/categorias" },
-  { icon: BarChart3, label: "Estadísticas", href: "/app/estadisticas" },
-  { icon: CreditCard, label: "Tarjetas", href: "/app/tarjetas" },
-  { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
-  { icon: Zap, label: "Reglas", href: "/app/reglas" },
-  { icon: Wallet, label: "Presupuestos", href: "/app/presupuestos" },
-  { icon: Target, label: "Metas", href: "/app/metas" },
+  { icon: Home, label: "Inicio", href: "/inicio" },
+  { icon: ArrowLeftRight, label: "Movimientos", href: "/movimientos" },
+  { icon: PiggyBank, label: "Cuentas", href: "/cuentas" },
+  { icon: Tag, label: "Categorías", href: "/categorias" },
+  { icon: BarChart3, label: "Estadísticas", href: "/estadisticas" },
+  { icon: CreditCard, label: "Tarjetas", href: "/tarjetas" },
+  { icon: Repeat, label: "Recurrentes", href: "/recurrentes" },
+  { icon: Zap, label: "Reglas", href: "/reglas" },
+  { icon: Wallet, label: "Presupuestos", href: "/presupuestos" },
+  { icon: Target, label: "Metas", href: "/metas" },
 ];
 
 /** Footer / utility items — shown below the divider in the sidebar. */
 export const FOOTER_NAV: NavSection[] = [
-  { icon: Bot, label: "Inteligencia artificial", href: "/app/ia" },
-  { icon: Plug, label: "Integraciones", href: "/app/integraciones" },
-  { icon: Settings, label: "Configuración", href: "/app/ajustes" },
+  { icon: Bot, label: "Inteligencia artificial", href: "/ia" },
+  { icon: Plug, label: "Integraciones", href: "/integraciones" },
+  { icon: Settings, label: "Configuración", href: "/ajustes" },
 ];
 
 /**
@@ -54,14 +54,14 @@ export const FOOTER_NAV: NavSection[] = [
  * Includes all non-primary sections plus footer utilities.
  */
 export const MORE_SHEET_NAV: NavSection[] = [
-  { icon: Tag, label: "Categorías", href: "/app/categorias" },
-  { icon: BarChart3, label: "Estadísticas", href: "/app/estadisticas" },
-  { icon: CreditCard, label: "Tarjetas", href: "/app/tarjetas" },
-  { icon: Repeat, label: "Recurrentes", href: "/app/recurrentes" },
-  { icon: Zap, label: "Reglas", href: "/app/reglas" },
-  { icon: Wallet, label: "Presupuestos", href: "/app/presupuestos" },
-  { icon: Target, label: "Metas", href: "/app/metas" },
-  { icon: Bot, label: "IA", href: "/app/ia" },
-  { icon: Plug, label: "Integraciones", href: "/app/integraciones" },
-  { icon: Settings, label: "Ajustes", href: "/app/ajustes" },
+  { icon: Tag, label: "Categorías", href: "/categorias" },
+  { icon: BarChart3, label: "Estadísticas", href: "/estadisticas" },
+  { icon: CreditCard, label: "Tarjetas", href: "/tarjetas" },
+  { icon: Repeat, label: "Recurrentes", href: "/recurrentes" },
+  { icon: Zap, label: "Reglas", href: "/reglas" },
+  { icon: Wallet, label: "Presupuestos", href: "/presupuestos" },
+  { icon: Target, label: "Metas", href: "/metas" },
+  { icon: Bot, label: "IA", href: "/ia" },
+  { icon: Plug, label: "Integraciones", href: "/integraciones" },
+  { icon: Settings, label: "Ajustes", href: "/ajustes" },
 ];

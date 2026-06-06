@@ -10,10 +10,10 @@ import { MORE_SHEET_NAV } from "@/lib/nav-sections";
 import React from "react";
 
 const BOTTOM_NAV = [
-  { icon: Home, label: "Inicio", href: "/app/inicio" },
-  { icon: ArrowLeftRight, label: "Movimientos", href: "/app/movimientos" },
+  { icon: Home, label: "Inicio", href: "/inicio" },
+  { icon: ArrowLeftRight, label: "Movimientos", href: "/movimientos" },
   null, // center slot — replaced by the "+" quick-add button
-  { icon: PiggyBank, label: "Cuentas", href: "/app/cuentas" },
+  { icon: PiggyBank, label: "Cuentas", href: "/cuentas" },
 ];
 
 /**
@@ -30,7 +30,7 @@ export function AppBottomNav() {
   const moreIsActive =
     !BOTTOM_NAV.some(
       (item) => item !== null && (pathname === item.href || pathname.startsWith(item.href + "/"))
-    ) && pathname !== "/app/inicio";
+    ) && pathname !== "/inicio";
 
   return (
     <>
