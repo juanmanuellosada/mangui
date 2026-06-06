@@ -34,7 +34,7 @@
 ## 6. Verificación
 
 - [x] 6.1 `next build` / `eslint` sin errores; revisar tipos.
-- [ ] 6.2 QA manual: navegación de resúmenes, pago con doble adjunto (resumen + comprobante), alta de gasto en resumen no pagado, monedas ARS/USD.
+- [x] 6.2 QA manual: navegación de resúmenes, pago con doble adjunto (resumen + comprobante), alta de gasto en resumen no pagado, monedas ARS/USD. Validado por el usuario.
 
 ## 7. Ops — seed de la cuenta demo (prod)
 
