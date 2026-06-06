@@ -1092,7 +1092,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
         </div>
       </div>
 
-      {/* Date range + Grouping (same row) */}
+      {/* Fecha · Agrupar · Cuentas · Categorías — single row */}
       <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-end gap-3">
         <div className="space-y-1.5 flex-1 min-w-0">
           <Label className="text-xs">Fecha</Label>
@@ -1113,33 +1113,29 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
             aria-label="Agrupar movimientos"
           />
         </div>
-      </div>
-
-      {/* Accounts */}
-      <div className="space-y-1.5">
-        <Label className="text-xs">Cuentas</Label>
-        <MangoMultiSelect
-          values={filter.accountIds}
-          onChange={(accountIds) => onChange({ ...filter, accountIds })}
-          options={accountOptions}
-          placeholder="Todas las cuentas"
-          showSearch
-          aria-label="Filtrar por cuenta"
-        />
-      </div>
-
-      {/* Categories */}
-      <div className="space-y-1.5">
-        <Label className="text-xs">Categorías</Label>
-        <MangoMultiSelect
-          values={filter.categoryIds}
-          onChange={(categoryIds) => onChange({ ...filter, categoryIds })}
-          options={categoryOptions}
-          placeholder={filter.type === "transfer" ? "No aplica" : "Todas las categorías"}
-          showSearch
-          disabled={filter.type === "transfer"}
-          aria-label="Filtrar por categoría"
-        />
+        <div className="space-y-1.5 w-44 shrink-0">
+          <Label className="text-xs">Cuentas</Label>
+          <MangoMultiSelect
+            values={filter.accountIds}
+            onChange={(accountIds) => onChange({ ...filter, accountIds })}
+            options={accountOptions}
+            placeholder="Todas las cuentas"
+            showSearch
+            aria-label="Filtrar por cuenta"
+          />
+        </div>
+        <div className="space-y-1.5 w-44 shrink-0">
+          <Label className="text-xs">Categorías</Label>
+          <MangoMultiSelect
+            values={filter.categoryIds}
+            onChange={(categoryIds) => onChange({ ...filter, categoryIds })}
+            options={categoryOptions}
+            placeholder={filter.type === "transfer" ? "No aplica" : "Todas las categorías"}
+            showSearch
+            disabled={filter.type === "transfer"}
+            aria-label="Filtrar por categoría"
+          />
+        </div>
       </div>
 
     </div>
