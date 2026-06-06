@@ -16,6 +16,7 @@ import { AccountsPreview } from "@/components/dashboard/accounts-preview"
 import { MoneyFlowSankey } from "@/components/dashboard/money-flow-sankey"
 import { DashboardFiltersProvider, DashboardGlobalFilters } from "@/components/dashboard/dashboard-filters"
 import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
+import { GoalsSummary } from "@/components/dashboard/goals-summary"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -125,6 +126,9 @@ export default async function DashboardPage() {
 
       {/* Budgets summary widget */}
       {hasAccounts && <BudgetsSummary />}
+
+      {/* Goals summary widget */}
+      {hasAccounts && <GoalsSummary />}
 
       {/* Exchange rates strip */}
       <Suspense fallback={<Skeleton className="h-9 w-full rounded-xl" />}>

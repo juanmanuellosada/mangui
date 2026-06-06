@@ -58,12 +58,12 @@ type Account = Tables<"accounts">
 
 // ── Scope query keys ──────────────────────────────────────────────────────────
 
-const GOAL_ACCOUNTS_KEY = ["goal_accounts"] as const
-const GOAL_CATEGORIES_KEY = ["goal_categories"] as const
+export const GOAL_ACCOUNTS_KEY = ["goal_accounts"] as const
+export const GOAL_CATEGORIES_KEY = ["goal_categories"] as const
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
-async function fetchGoals(): Promise<Goal[]> {
+export async function fetchGoals(): Promise<Goal[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("goals")
@@ -98,14 +98,14 @@ async function fetchAccounts(): Promise<Account[]> {
   return data
 }
 
-async function fetchGoalAccounts(): Promise<{ goal_id: string; account_id: string }[]> {
+export async function fetchGoalAccounts(): Promise<{ goal_id: string; account_id: string }[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("goal_accounts").select("goal_id, account_id")
   if (error) throw error
   return data
 }
 
-async function fetchGoalCategories(): Promise<{ goal_id: string; category_id: string }[]> {
+export async function fetchGoalCategories(): Promise<{ goal_id: string; category_id: string }[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("goal_categories").select("goal_id, category_id")
   if (error) throw error
@@ -114,7 +114,7 @@ async function fetchGoalCategories(): Promise<{ goal_id: string; category_id: st
 
 // ── Scope builder ─────────────────────────────────────────────────────────────
 
-function buildScopeMap(
+export function buildScopeMap(
   goalAccountRows: { goal_id: string; account_id: string }[],
   goalCategoryRows: { goal_id: string; category_id: string }[]
 ): Map<string, GoalScope> {
@@ -132,7 +132,7 @@ function buildScopeMap(
   return map
 }
 
-function scopeFor(goalId: string, scopeMap: Map<string, GoalScope>): GoalScope {
+export function scopeFor(goalId: string, scopeMap: Map<string, GoalScope>): GoalScope {
   return scopeMap.get(goalId) ?? { accountIds: [], categoryIds: [] }
 }
 
