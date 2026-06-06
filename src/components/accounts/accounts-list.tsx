@@ -430,7 +430,7 @@ function PatrimonioCard({
   balances: AccountBalance[]
   accounts: Account[]
 }) {
-  const visibleBalances = balances.filter((b) => !b.is_hidden)
+  const visibleBalances = balances.filter((b) => !b.is_hidden && b.account_type !== "tarjeta_credito")
 
   const totalARS = visibleBalances
     .filter((b) => b.currency === "ARS")
