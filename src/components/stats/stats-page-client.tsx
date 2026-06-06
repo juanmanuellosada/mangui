@@ -28,7 +28,6 @@ import { SummaryCards } from "./summary-cards"
 import { CategoryDistributionChart } from "./category-distribution-chart"
 import { IncomeExpenseSeriesChart } from "./income-expense-series-chart"
 import { WeekdayPatternBars } from "./weekday-pattern-chart"
-import { BudgetComplianceStrip } from "./budget-compliance-strip"
 import { CompareTab } from "./compare-tab"
 import { MoneyFlowSankeyChart } from "@/components/dashboard/money-flow-sankey-chart"
 import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
@@ -406,9 +405,6 @@ export function StatsPageClient() {
             <h3 className="text-sm font-semibold">Flujo</h3>
             <MoneyFlowSankeyChart movements={filtered} categories={categories} />
           </div>
-
-          {/* Budget compliance */}
-          <BudgetComplianceStrip budgets={budgets} movements={movements} />
 
           {/* Budgets + Goals widgets */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
