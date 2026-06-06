@@ -22,7 +22,8 @@ import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
-import { CurrencyChip, CurrencyLogo } from "@/components/ui/currency-chip"
+import { CurrencyChip } from "@/components/ui/currency-chip"
+import { CurrencySegmented } from "@/components/ui/currency-segmented"
 import { AccountForm, accountToFormValues, type AccountFormValues } from "./account-form"
 import {
   ACCOUNT_TYPE_LABELS,
@@ -655,11 +656,6 @@ const TIPO_OPTIONS: MangoSelectOption[] = [
   ),
 ]
 
-const MONEDA_OPTIONS: MangoSelectOption[] = [
-  { value: "todas", label: "Moneda" },
-  { value: "ARS", label: "ARS", leading: <CurrencyLogo currency="ARS" /> },
-  { value: "USD", label: "USD", leading: <CurrencyLogo currency="USD" /> },
-]
 
 const VISIBILIDAD_OPTIONS: MangoSelectOption[] = [
   { value: "todas", label: "Todas" },
@@ -770,14 +766,10 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
         </div>
 
         {/* Moneda */}
-        <div className="w-[108px] shrink-0">
-          <MangoSelect
-            value={filters.moneda}
-            onChange={(v) => onChange({ ...filters, moneda: v as MonedaFilter })}
-            options={MONEDA_OPTIONS}
-            aria-label="Filtrar por moneda"
-          />
-        </div>
+        <CurrencySegmented
+          value={filters.moneda === "todas" ? "all" : filters.moneda}
+          onChange={(v) => onChange({ ...filters, moneda: v === "all" ? "todas" : v })}
+        />
 
         {/* Visibilidad */}
         <div className="w-[110px] shrink-0">
