@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import { useState, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -426,8 +427,9 @@ function TransferRow({
 function QuickAddMenu({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const quickAdd = useQuickAdd()
+  const router = useRouter()
 
-  const openDialog = (m: "movement" | "transfer" | "ai", type?: "income" | "expense") => {
+  const openDialog = (m: "movement" | "transfer", type?: "income" | "expense") => {
     setMenuOpen(false)
     quickAdd.open(m, type)
   }
@@ -487,7 +489,7 @@ function QuickAddMenu({ accounts }: { accounts: Account[] }) {
               <span className="font-medium">Transferencia</span>
             </button>
             <div className="h-px bg-border/60 mx-2" />
-            <button type="button" onClick={() => openDialog("ai")} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
+            <button type="button" onClick={() => { setMenuOpen(false); router.push("/ia") }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm hover:bg-muted transition-colors cursor-pointer">
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
               <span className="font-medium">Cargar con IA</span>
             </button>
@@ -503,8 +505,9 @@ function QuickAddMenu({ accounts }: { accounts: Account[] }) {
 function FABQuickAdd({ accounts }: { accounts: Account[] }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const quickAdd = useQuickAdd()
+  const router = useRouter()
 
-  const openDialog = (m: "movement" | "transfer" | "ai", type?: "income" | "expense") => {
+  const openDialog = (m: "movement" | "transfer", type?: "income" | "expense") => {
     setMenuOpen(false)
     quickAdd.open(m, type)
   }
@@ -519,16 +522,23 @@ function FABQuickAdd({ accounts }: { accounts: Account[] }) {
           <div className="relative z-20 flex flex-col items-end gap-2">
             {(
               [
-                { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white" },
-                { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white" },
-                { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white" },
-                { m: "ai" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground" },
+                { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white", isAI: false },
+                { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white", isAI: false },
+                { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white", isAI: false },
+                { m: "movement" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground", isAI: true },
               ] as const
-            ).map(({ m, type, icon: Icon, label, color }) => (
+            ).map(({ m, type, icon: Icon, label, color, isAI }) => (
               <button
                 key={label}
                 type="button"
-                onClick={() => openDialog(m, type as "income" | "expense" | undefined)}
+                onClick={() => {
+                  setMenuOpen(false)
+                  if (isAI) {
+                    router.push("/ia")
+                  } else {
+                    openDialog(m, type as "income" | "expense" | undefined)
+                  }
+                }}
                 className={cn(
                   "flex items-center gap-2 h-11 px-4 rounded-full shadow-md press-effect",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

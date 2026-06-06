@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * QuickAddProvider — global quick-add modal for new movements/transfers/AI.
+ * QuickAddProvider — global quick-add modal for new movements/transfers.
  *
  * Mount once in the (app) layout. Any component in the tree can call
  * `useQuickAdd().open(mode?, type?)` to open the modal, regardless of route.
@@ -12,7 +12,8 @@
  *    When the account is a credit card and type=expense, cuotas are
  *    handled inline — selecting ≥2 cuotas creates an installment purchase.
  *  - "transfer"           — opens directly in transfer mode (same sheet)
- *  - "ai"                 — opens AiQuickAddSheet
+ *
+ * AI mode ("ai") was removed: the AI entry points now navigate to /ia.
  */
 
 import * as React from "react"
@@ -22,7 +23,6 @@ import { MangoSheet } from "@/components/ui/mango-sheet"
 import { MovementForm, type MovementFormValues, type PendingAttachments, type MovementMode } from "@/components/movements/movement-form"
 import type { TransferFormValues } from "@/components/transfers/transfer-form"
 import type { InstallmentFormValues } from "@/components/installments/installment-form"
-import { AiQuickAddSheet } from "@/components/ai/ai-quick-add-sheet"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
@@ -40,7 +40,7 @@ import { uploadAttachment } from "@/lib/attachments"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 
 type Category = Tables<"categories">
-export type QuickAddMode = "movement" | "transfer" | "ai"
+export type QuickAddMode = "movement" | "transfer"
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -366,17 +366,9 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     <QuickAddContext.Provider value={{ open: openWithTransferTracking }}>
       {children}
 
-      {/* AI Quick Add Sheet */}
-      <AiQuickAddSheet
-        open={isOpen && mode === "ai"}
-        onOpenChange={(v) => { if (!v) setIsOpen(false) }}
-        accounts={accounts}
-        categories={categories}
-      />
-
       {/* MangoSheet — movement (3-way toggle: Gasto / Ingreso / Transferencia) */}
       <MangoSheet
-        open={isOpen && mode !== "ai"}
+        open={isOpen}
         onOpenChange={setIsOpen}
         title={sheetTitle}
         description={sheetDescription}
