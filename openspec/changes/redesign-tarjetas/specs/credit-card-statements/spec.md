@@ -127,6 +127,11 @@ La lista "Gastos del resumen" SHALL incluir TODOS los movimientos del ciclo —g
 - **WHEN** se renderiza una fila de gasto del resumen
 - **THEN** muestra el `CategoryIconChip` de la categoría del movimiento
 
+#### Scenario: Editar o borrar un gasto regular desde el resumen
+
+- **WHEN** el usuario toca una fila de gasto regular (no cuota) en "Gastos del resumen"
+- **THEN** se abre el modal de edición del movimiento, con la posibilidad de editarlo o borrarlo
+
 ### Requirement: Detalle de cuotas como modal con postergación en cascada
 
 El detalle de una compra en cuotas SHALL abrirse como modal (`MangoSheet`) desde la lista de gastos del resumen. Dentro del detalle, cada cuota NO pagada SHALL poder moverse un mes adelante o atrás; al mover una cuota, esa cuota y TODAS las siguientes SHALL desplazarse el mismo mes (cascada), manteniendo el espaciado mensual. Las cuotas que caen en un resumen ya pagado NO SHALL moverse, y un movimiento NO SHALL desplazar ninguna cuota afectada hacia un resumen ya pagado.
@@ -140,6 +145,11 @@ El detalle de una compra en cuotas SHALL abrirse como modal (`MangoSheet`) desde
 
 - **WHEN** el usuario mueve una cuota no pagada un mes adelante
 - **THEN** esa cuota y todas las posteriores se corren un mes, y los totales de los resúmenes afectados se recalculan
+
+#### Scenario: Confirmación antes de mover
+
+- **WHEN** el usuario toca −1 / +1 mes en una cuota
+- **THEN** se pide confirmación (indicando cuántas cuotas se moverán y hacia dónde) antes de aplicar el cambio
 
 #### Scenario: Cuotas pagadas bloqueadas
 

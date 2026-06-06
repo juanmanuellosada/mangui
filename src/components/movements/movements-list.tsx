@@ -759,7 +759,7 @@ function DeleteTransferDialog({
 
 // ── Edit/Delete dialogs for movements ─────────────────────────────────────────
 
-function EditMovementDialog({
+export function EditMovementDialog({
   movement,
   accounts,
   categories,

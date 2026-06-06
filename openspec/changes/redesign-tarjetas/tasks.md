@@ -63,3 +63,9 @@
 - [x] 10.4 En el detalle, agregar controles +1 mes / −1 mes por cuota NO pagada: al mover una cuota, esa y todas las siguientes se corren ese mes (cascada), recomputando `is_future`. Batch update de `movements.date`. Si cuota 1 se mueve, actualizar `installment_purchases.start_date`.
 - [x] 10.5 Reglas de bloqueo: las cuotas en un resumen pagado no se mueven; deshabilitar −1 (o +1) cuando el desplazamiento llevaría una cuota afectada a un resumen ya pagado. Invalidar queries para que los resúmenes recalculen.
 - [x] 10.6 Build/typecheck; QA visual (lista unificada con íconos, modal de cuotas, postergar +1/−1 con cascada).
+
+## 11. Refinamientos: confirmación al postergar + editar/borrar gasto regular
+
+- [x] 11.1 Postergar (+1/−1 mes) pide confirmación antes de aplicar, indicando cuántas cuotas se moverán y hacia dónde.
+- [x] 11.2 Al tocar una fila de gasto regular (no cuota) en "Gastos del resumen", abrir el modal de edición del movimiento (reusar `EditMovementDialog`/patrón de `movements-list.tsx`), con editar y borrar.
+- [x] 11.3 Build/typecheck.

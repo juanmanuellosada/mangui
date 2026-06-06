@@ -44,6 +44,7 @@ import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { InstallmentDetailBody } from "@/components/installments/installment-detail"
+import { EditMovementDialog } from "@/components/movements/movements-list"
 import type { Tables } from "@/lib/database.types"
 import { format, parseISO, isBefore, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
@@ -683,6 +684,7 @@ function CardBlock({
 
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [cuotaDetailId, setCuotaDetailId] = useState<string | null>(null)
+  const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -884,7 +886,16 @@ function CardBlock({
                     </p>
                   </button>
                 ) : (
-                  <div key={mv.id} className="flex items-center gap-3 px-4 py-3">
+                  <button
+                    key={mv.id}
+                    type="button"
+                    onClick={() => setEditingMovement(mv)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 text-left",
+                      "hover:bg-muted/40 transition-colors duration-150 cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    )}
+                  >
                     <CategoryIconChip icon={cat?.icon} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
@@ -898,7 +909,7 @@ function CardBlock({
                     <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
                       − {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
                     </p>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -981,6 +992,17 @@ function CardBlock({
           />
         )}
       </MangoSheet>
+
+      {/* Edit regular movement modal */}
+      {editingMovement && (
+        <EditMovementDialog
+          movement={editingMovement}
+          accounts={allAccounts}
+          categories={categories}
+          open={editingMovement !== null}
+          onOpenChange={(v) => { if (!v) setEditingMovement(null) }}
+        />
+      )}
     </div>
   )
 }

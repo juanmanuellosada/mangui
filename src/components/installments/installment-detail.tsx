@@ -412,6 +412,7 @@ function PostponeControls({
   startDate: string
 }) {
   const queryClient = useQueryClient()
+  const [pendingDelta, setPendingDelta] = useState<-1 | 1 | null>(null)
 
   // Movements from installment_number >= this one (cascade targets)
   const affectedMovements = allMovements.filter(
@@ -474,42 +475,81 @@ function PostponeControls({
   })
 
   const isPending = postponeMutation.isPending
+  const count = affectedMovements.length
+  const directionLabel = pendingDelta === 1 ? "adelante" : "atrás"
+
+  function handleConfirm() {
+    if (pendingDelta !== null) {
+      postponeMutation.mutate(pendingDelta)
+      setPendingDelta(null)
+    }
+  }
 
   return (
-    <div className="flex items-center gap-1 flex-shrink-0">
-      <button
-        type="button"
-        disabled={!canMinus || isPending}
-        onClick={() => postponeMutation.mutate(-1)}
-        title="−1 mes"
-        aria-label="Mover cuota un mes atrás"
-        className={cn(
-          "h-7 w-7 rounded-lg flex items-center justify-center",
-          "text-muted-foreground hover:text-foreground hover:bg-muted/60",
-          "transition-colors duration-150 cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          "disabled:opacity-30 disabled:cursor-not-allowed"
-        )}
-      >
-        <ChevronLeft className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        disabled={!canPlus || isPending}
-        onClick={() => postponeMutation.mutate(1)}
-        title="+1 mes"
-        aria-label="Mover cuota un mes adelante"
-        className={cn(
-          "h-7 w-7 rounded-lg flex items-center justify-center",
-          "text-muted-foreground hover:text-foreground hover:bg-muted/60",
-          "transition-colors duration-150 cursor-pointer",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          "disabled:opacity-30 disabled:cursor-not-allowed"
-        )}
-      >
-        <ChevronRight className="h-3.5 w-3.5" />
-      </button>
-    </div>
+    <>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          type="button"
+          disabled={!canMinus || isPending}
+          onClick={() => setPendingDelta(-1)}
+          title="−1 mes"
+          aria-label="Mover cuota un mes atrás"
+          className={cn(
+            "h-7 w-7 rounded-lg flex items-center justify-center",
+            "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+            "transition-colors duration-150 cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "disabled:opacity-30 disabled:cursor-not-allowed"
+          )}
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          disabled={!canPlus || isPending}
+          onClick={() => setPendingDelta(1)}
+          title="+1 mes"
+          aria-label="Mover cuota un mes adelante"
+          className={cn(
+            "h-7 w-7 rounded-lg flex items-center justify-center",
+            "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+            "transition-colors duration-150 cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "disabled:opacity-30 disabled:cursor-not-allowed"
+          )}
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Confirmation dialog */}
+      <Dialog open={pendingDelta !== null} onOpenChange={(v) => { if (!v) setPendingDelta(null) }}>
+        <DialogContent compact className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mover cuotas</DialogTitle>
+            <DialogDescription>
+              Se moverán {count} cuota{count !== 1 ? "s" : ""} un mes hacia {directionLabel}. ¿Confirmás?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingDelta(null)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={isPending}
+              className="press-effect"
+            >
+              {isPending ? "Moviendo…" : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
