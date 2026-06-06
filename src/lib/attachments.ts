@@ -38,9 +38,10 @@ interface UploadAttachmentParams {
   file: File
   userId: string
   kind: AttachmentKind
-  /** Provide exactly one of movementId or transferId. */
+  /** Provide exactly one of movementId, transferId, or statementId. */
   movementId?: string
   transferId?: string
+  statementId?: string
 }
 
 interface UploadAttachmentResult {
@@ -52,7 +53,7 @@ interface UploadAttachmentResult {
  * Uploads a file to the "attachments" bucket and inserts a row in
  * movement_attachments. Stores the storage path (not a public URL).
  *
- * Exactly one of movementId or transferId must be provided.
+ * Exactly one of movementId, transferId, or statementId must be provided.
  *
  * Upload-then-insert: if the insert fails after a successful upload,
  * the storage object remains (orphaned). The caller can retry from
@@ -64,6 +65,7 @@ export async function uploadAttachment({
   kind,
   movementId,
   transferId,
+  statementId,
 }: UploadAttachmentParams): Promise<UploadAttachmentResult> {
   const validationError = validateAttachmentFile(file)
   if (validationError) {
@@ -88,6 +90,7 @@ export async function uploadAttachment({
       user_id: userId,
       movement_id: movementId ?? null,
       transfer_id: transferId ?? null,
+      statement_id: statementId ?? null,
       kind,
       file_url: path,
       file_name: file.name,
@@ -175,6 +178,26 @@ export async function listTransferAttachments(transferId: string): Promise<ListA
     .from("movement_attachments")
     .select("*")
     .eq("transfer_id", transferId)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    return { data: [], error: error.message }
+  }
+
+  return { data: data ?? [], error: null }
+}
+
+/**
+ * Returns all attachments for a given card statement, ordered by created_at.
+ * Covers both kind='resumen' and kind='comprobante' linked via statement_id.
+ */
+export async function listStatementAttachments(statementId: string): Promise<ListAttachmentsResult> {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from("movement_attachments")
+    .select("*")
+    .eq("statement_id", statementId)
     .order("created_at", { ascending: true })
 
   if (error) {

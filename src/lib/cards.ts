@@ -8,6 +8,7 @@ import {
   isBefore,
   isEqual,
   startOfDay,
+  addDays,
 } from "date-fns"
 
 // Minimal shape needed by nextCardPayment — avoids importing full DB types here.
@@ -269,4 +270,165 @@ export function isInCycle(dateStr: string, cycleStart: Date, cycleEnd: Date): bo
   const s = startOfDay(cycleStart)
   const e = startOfDay(cycleEnd)
   return !isBefore(d, s) && !isAfter(d, e)
+}
+
+// ── listCardCycles ─────────────────────────────────────────────────────────────
+
+// Minimal shapes for listCardCycles inputs — subsets of the DB row types.
+interface CycleAccount {
+  closing_day: number | null
+  due_day?: number | null
+}
+
+interface CycleMovement {
+  id: string
+  account_id: string
+  type: string
+  date: string
+  amount: number
+  converted_amount?: number | null
+}
+
+interface CycleStatement {
+  id: string
+  account_id: string
+  close_date: string
+  due_date: string
+  status: string
+  total_amount: number
+  stamp_tax: number
+  paid_amount: number | null
+  paid_date: string | null
+  paid_from_account_id: string | null
+}
+
+export interface CardCycle {
+  /** ISO date string of the cycle's closing date */
+  closeDate: string
+  /** ISO date string of the payment due date (null if card has no due_day) */
+  dueDate: string | null
+  /** Inclusive start of the cycle (day after the previous close) */
+  cycleStart: Date
+  /** Inclusive end of the cycle (the close date itself) */
+  cycleEnd: Date
+  /** Movements whose date falls within this cycle */
+  movements: CycleMovement[]
+  /**
+   * Sum of `converted_amount ?? amount` for expense movements in the cycle.
+   * This is the autocalculated total; for paid cycles prefer statement.total_amount.
+   */
+  total: number
+  /**
+   * The matching card_statements row, if a payment has been registered for
+   * this cycle. null when the cycle is virtual (not yet paid).
+   */
+  statement: CycleStatement | null
+}
+
+/**
+ * Returns the ordered list of billing cycles for a credit-card account.
+ *
+ * Order: oldest → newest (chronological). The UI defaults the selected
+ * index to the current open cycle (the last element whose cycleEnd >= today
+ * or simply the last element when all cycles are in the past).
+ *
+ * Range covered:
+ *  - From the cycle that contains the earliest movement for this account.
+ *  - Up to the current open cycle (always included, even if empty).
+ *  - Plus any future cycles that contain at least one movement (installments
+ *    landing in the future).
+ *
+ * @param accountId   The credit-card account's UUID.
+ * @param account     The account row (needs closing_day / due_day).
+ * @param movements   All movements for the user (filtered internally to this account).
+ * @param statements  All card_statements for this account (may be a superset).
+ * @param ref         Optional reference date for "today" (defaults to now).
+ */
+export function listCardCycles(
+  accountId: string,
+  account: CycleAccount,
+  movements: CycleMovement[],
+  statements: CycleStatement[],
+  ref?: Date
+): CardCycle[] {
+  const closingDay = account.closing_day
+  if (closingDay == null) return []
+
+  const today = startOfDay(ref ?? new Date())
+
+  // Filter movements belonging to this account
+  const accountMovements = movements.filter((m) => m.account_id === accountId)
+
+  if (accountMovements.length === 0) {
+    // No movements: return only the current open cycle (empty)
+    const { cycleStart, cycleEnd } = currentCycleRange(closingDay, today)
+    const dueDay = account.due_day
+    const dueDate =
+      dueDay != null ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay)) : null
+    const stmt = statements.find(
+      (s) => s.account_id === accountId && s.close_date === toDateString(cycleEnd)
+    ) ?? null
+    return [{ closeDate: toDateString(cycleEnd), dueDate, cycleStart, cycleEnd, movements: [], total: 0, statement: stmt }]
+  }
+
+  // Find the oldest movement date to determine the earliest cycle
+  const oldestDate = accountMovements
+    .map((m) => m.date)
+    .sort()[0]
+
+  // Build the cycle that contains the oldest movement
+  const oldestMovementDate = startOfDay(parseISO(oldestDate))
+  const firstCycleRange = currentCycleRange(closingDay, oldestMovementDate)
+  let cursor = firstCycleRange.cycleEnd // we'll walk forward from here
+
+  // Find the latest date we need to cover:
+  //   max(today, latest future movement date)
+  const latestMovementDate = accountMovements
+    .map((m) => startOfDay(parseISO(m.date)))
+    .reduce((latest, d) => (isAfter(d, latest) ? d : latest), today)
+
+  const cycles: CardCycle[] = []
+
+  // Walk month by month until we've passed the latest date we need to cover
+  while (!isAfter(cursor, latestMovementDate)) {
+    const cycleEnd = cursor
+    // cycleStart = day after previous close
+    const prevClose = new Date(cycleEnd)
+    prevClose.setMonth(prevClose.getMonth() - 1)
+    // clamp previous close to valid day
+    const prevCloseClamped = startOfDay(new Date(
+      prevClose.getFullYear(),
+      prevClose.getMonth(),
+      Math.min(closingDay, getDaysInMonth(prevClose))
+    ))
+    const cycleStart = addDays(prevCloseClamped, 1)
+
+    const cycleMovements = accountMovements.filter((m) =>
+      isInCycle(m.date, cycleStart, cycleEnd)
+    )
+
+    const total = cycleMovements
+      .filter((m) => m.type === "expense")
+      .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+
+    const closeDateStr = toDateString(cycleEnd)
+    const dueDay = account.due_day
+    const dueDate =
+      dueDay != null ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay)) : null
+
+    const stmt =
+      statements.find(
+        (s) => s.account_id === accountId && s.close_date === closeDateStr
+      ) ?? null
+
+    cycles.push({ closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, total, statement: stmt })
+
+    // Advance to the next cycle end: same day next month (clamped)
+    const nextCycleEndRaw = addMonths(cycleEnd, 1)
+    const nextY = nextCycleEndRaw.getFullYear()
+    const nextM = nextCycleEndRaw.getMonth() + 1
+    cursor = startOfDay(new Date(nextY, nextM - 1, Math.min(closingDay, getDaysInMonth(new Date(nextY, nextM - 1)))))
+  }
+
+  return cycles
 }

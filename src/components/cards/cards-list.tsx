@@ -1,15 +1,14 @@
-﻿"use client"
+"use client"
 
-import { useState } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   CreditCard,
   ChevronLeft,
-  Calendar,
+  ChevronRight,
   ShoppingBag,
   CheckCircle2,
-  Clock,
   Plus,
 } from "lucide-react"
 import Link from "next/link"
@@ -21,26 +20,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
+import { MangoDatePicker } from "@/components/ui/mango-date-picker"
+import { AttachmentSlot } from "@/components/ui/attachment-slot"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import {
-  nextCloseDate,
-  computeDueDate,
-  currentCycleRange,
-  nextCardPayment,
-  isInCycle,
+  listCardCycles,
   toDateString,
+  type CardCycle,
 } from "@/lib/cards"
+import {
+  uploadAttachment,
+  listStatementAttachments,
+  type MovementAttachment,
+} from "@/lib/attachments"
 import { ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
+import { AccountIconChip } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
 import { format, parseISO, isBefore, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
+import { useQuickAdd } from "@/components/quick-add-provider"
 
 type Account = Tables<"accounts">
 type Movement = Tables<"movements">
@@ -48,6 +52,7 @@ type Category = Tables<"categories">
 type CardStatement = Tables<"card_statements">
 
 // ── Query keys ─────────────────────────────────────────────────────────────────
+
 const CARD_STATEMENTS_KEY = ["card_statements"] as const
 
 // ── Data fetchers ──────────────────────────────────────────────────────────────
@@ -102,40 +107,174 @@ async function fetchStatements(accountId: string): Promise<CardStatement[]> {
     .select("*")
     .eq("account_id", accountId)
     .order("close_date", { ascending: false })
-    .limit(6)
   if (error) throw error
   return data
+}
+
+// ── Status chip ────────────────────────────────────────────────────────────────
+
+function CycleStatusChip({ cycle }: { cycle: CardCycle }) {
+  const today = startOfDay(new Date())
+  const isPaid = cycle.statement?.status === "pagado"
+  const dueDate = cycle.dueDate ? parseISO(cycle.dueDate) : null
+  const isOverdue = !isPaid && dueDate != null && isBefore(dueDate, today)
+  const isDueToday = !isPaid && !isOverdue && dueDate != null && toDateString(dueDate) === toDateString(today)
+  const isClosed = toDateString(cycle.cycleEnd) < toDateString(today)
+
+  if (isPaid) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-success/15 text-success border border-success/20">
+        <CheckCircle2 className="h-2.5 w-2.5" />
+        Pagado
+      </span>
+    )
+  }
+  if (isOverdue) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/15 text-destructive border border-destructive/20">
+        Vencido
+      </span>
+    )
+  }
+  if (isDueToday) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-600 border border-amber-500/20">
+        Vence hoy
+      </span>
+    )
+  }
+  if (isClosed) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground border border-border/60">
+        Pendiente
+      </span>
+    )
+  }
+  // Open / current cycle
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+      En curso
+    </span>
+  )
+}
+
+// ── Card visual ────────────────────────────────────────────────────────────────
+
+function CreditCardVisual({
+  account,
+  cycle,
+}: {
+  account: Account
+  cycle: CardCycle
+}) {
+  const cardColor = account.color ?? "#65a30d"
+  const displayTotal = cycle.statement?.status === "pagado"
+    ? cycle.statement.total_amount
+    : cycle.total
+
+  return (
+    <div
+      className="relative rounded-2xl p-5 overflow-hidden"
+      style={{ background: `linear-gradient(135deg, ${cardColor}dd, ${cardColor}88)` }}
+    >
+      {/* Decorative circles */}
+      <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-20 bg-white" aria-hidden />
+      <div className="absolute -right-4 top-8 h-20 w-20 rounded-full opacity-10 bg-white" aria-hidden />
+
+      <div className="relative space-y-4">
+        {/* Card name */}
+        <div className="flex items-center justify-between">
+          <p className="text-white/80 text-sm font-medium">{account.name}</p>
+          <CreditCard className="h-6 w-6 text-white/60" />
+        </div>
+
+        {/* Total amount */}
+        <div>
+          <p className="text-white/60 text-xs font-medium mb-0.5">
+            Resumen · cierre {format(cycle.cycleEnd, "d MMM", { locale: es })}
+          </p>
+          <p
+            className="text-white text-3xl font-bold tabular-nums leading-none"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {formatCurrency(displayTotal, account.currency)}
+          </p>
+        </div>
+
+        {/* Dates */}
+        <div className="flex items-end justify-between gap-4">
+          <div className="flex gap-4">
+            <div>
+              <p className="text-white/60 text-[10px] font-medium uppercase tracking-wider">Cierre</p>
+              <p className="text-white text-xs font-semibold tabular-nums">
+                {format(cycle.cycleEnd, "d MMM", { locale: es })}
+              </p>
+            </div>
+            {cycle.dueDate && (
+              <div>
+                <p className="text-white/60 text-[10px] font-medium uppercase tracking-wider">Vencimiento</p>
+                <p className="text-white text-xs font-semibold tabular-nums">
+                  {format(parseISO(cycle.dueDate), "d MMM", { locale: es })}
+                </p>
+              </div>
+            )}
+          </div>
+          <CycleStatusChip cycle={cycle} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── Register payment dialog ────────────────────────────────────────────────────
 
 function RegisterPaymentDialog({
   account,
-  cycleClose,
-  cycleDue,
-  cycleTotal,
+  cycle,
   allAccounts,
   open,
   onOpenChange,
 }: {
   account: Account
-  cycleClose: Date
-  cycleDue: Date
-  cycleTotal: number
+  cycle: CardCycle
   allAccounts: Account[]
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const cycleTotal = cycle.statement?.total_amount ?? cycle.total
+
   const [paidAmount, setPaidAmount] = useState(String(cycleTotal.toFixed(2)))
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0])
+  const [paidDate, setPaidDate] = useState<Date>(new Date())
   const [paidFromAccountId, setPaidFromAccountId] = useState(
     allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito")?.id ?? ""
   )
+  const [pendingResumen, setPendingResumen] = useState<File | null>(null)
+  const [pendingComprobante, setPendingComprobante] = useState<File | null>(null)
+  const [existingResumen, setExistingResumen] = useState<MovementAttachment | null>(null)
+  const [existingComprobante, setExistingComprobante] = useState<MovementAttachment | null>(null)
 
   const otherAccounts = allAccounts.filter(
     (a) => a.id !== account.id && a.type !== "tarjeta_credito"
   )
+
+  // Load existing attachments when viewing an already-paid cycle
+  const statementId = cycle.statement?.id
+  const isPaidCycle = cycle.statement?.status === "pagado"
+
+  useQuery({
+    queryKey: ["statement_attachments", statementId],
+    queryFn: async () => {
+      if (!statementId) return []
+      const { data } = await listStatementAttachments(statementId)
+      const resumen = data.find((a) => a.kind === "resumen") ?? null
+      const comprobante = data.find((a) => a.kind === "comprobante") ?? null
+      setExistingResumen(resumen)
+      setExistingComprobante(comprobante)
+      return data
+    },
+    enabled: isPaidCycle && !!statementId,
+  })
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -143,25 +282,47 @@ function RegisterPaymentDialog({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
 
-      const { error } = await supabase
+      const paidDateStr = toDateString(paidDate)
+
+      const { data: stmt, error } = await supabase
         .from("card_statements")
         .upsert(
           {
             user_id: user.id,
             account_id: account.id,
-            close_date: toDateString(cycleClose),
-            due_date: toDateString(cycleDue),
+            close_date: cycle.closeDate,
+            due_date: cycle.dueDate ?? cycle.closeDate,
             total_amount: cycleTotal,
-            stamp_tax: 0,
+            stamp_tax: cycle.statement?.stamp_tax ?? 0,
             status: "pagado",
             paid_amount: parseFloat(paidAmount) || cycleTotal,
-            paid_date: paidDate,
+            paid_date: paidDateStr,
             paid_from_account_id: paidFromAccountId || null,
-            // TODO: link to actual transfer movement when transfer flow is integrated
           },
           { onConflict: "account_id,close_date" }
         )
+        .select()
+        .single()
       if (error) throw error
+
+      const newStatementId = stmt.id
+
+      // Upload pending attachments
+      const uploads: Array<{ file: File; kind: "resumen" | "comprobante" }> = []
+      if (pendingResumen) uploads.push({ file: pendingResumen, kind: "resumen" })
+      if (pendingComprobante) uploads.push({ file: pendingComprobante, kind: "comprobante" })
+
+      for (const { file, kind } of uploads) {
+        const result = await uploadAttachment({
+          file,
+          userId: user.id,
+          kind,
+          statementId: newStatementId,
+        })
+        if (result.error) {
+          toast.warning(`Pago registrado, pero no se pudo subir "${file.name}": ${result.error}`)
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CARD_STATEMENTS_KEY })
@@ -175,60 +336,65 @@ function RegisterPaymentDialog({
     },
   })
 
+  const isDisabled = mutation.isPending
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Registrar pago</DialogTitle>
           <DialogDescription>
-            Registrá el pago del resumen de {account.name}
-            {" · "}cierre {format(cycleClose, "d MMM", { locale: es })}
+            {account.name}
+            {" · "}cierre {format(cycle.cycleEnd, "d MMM", { locale: es })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Amount */}
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground font-medium">
-              Monto pagado
-            </Label>
+            <Label className="text-xs text-muted-foreground font-medium">Monto pagado</Label>
             <MoneyInput
               step="0.01"
-              currency="ARS"
+              currency={account.currency}
               value={paidAmount}
               onChange={(e) => setPaidAmount(e.target.value)}
+              disabled={isDisabled}
               className="tabular-nums font-semibold w-full"
             />
           </div>
 
+          {/* Date */}
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground font-medium">
-              Fecha de pago
-            </Label>
-            <Input
-              type="date"
+            <Label className="text-xs text-muted-foreground font-medium">Fecha de pago</Label>
+            <MangoDatePicker
               value={paidDate}
-              onChange={(e) => setPaidDate(e.target.value)}
-              className="text-sm"
+              onChange={(d) => setPaidDate(d)}
             />
           </div>
 
+          {/* Source account */}
           {otherAccounts.length > 0 && (
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground font-medium">
-                Pagado desde
-              </Label>
+              <Label className="text-xs text-muted-foreground font-medium">Pagado desde</Label>
               <MangoSelect
                 value={paidFromAccountId}
                 onChange={(v) => setPaidFromAccountId(v ?? "")}
                 options={[
-                  { value: "none-selected", label: "Sin especificar" },
-                  ...otherAccounts.map((a) => ({ value: a.id, label: a.name })),
+                  { value: "", label: "Sin especificar" },
+                  ...otherAccounts.map((a) => ({
+                    value: a.id,
+                    label: a.name,
+                    leading: <AccountIconChip icon={a.icon} />,
+                  })),
                 ]}
                 placeholder="Cuenta origen"
+                showSearch
+                disabled={isDisabled}
               />
             </div>
           )}
 
+          {/* Summary info */}
           <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-1">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Total resumen</span>
@@ -236,12 +402,36 @@ function RegisterPaymentDialog({
                 {formatCurrency(cycleTotal, account.currency)}
               </span>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Vencimiento</span>
-              <span className="tabular-nums">
-                {format(cycleDue, "d MMM yyyy", { locale: es })}
-              </span>
-            </div>
+            {cycle.dueDate && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Vencimiento</span>
+                <span className="tabular-nums">
+                  {format(parseISO(cycle.dueDate), "d MMM yyyy", { locale: es })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Attachments */}
+          <div className="space-y-2">
+            <AttachmentSlot
+              label="Resumen (PDF/imagen)"
+              pendingFile={pendingResumen}
+              existingAttachment={existingResumen}
+              onSelect={(f) => setPendingResumen(f)}
+              onClearPending={() => setPendingResumen(null)}
+              onDeleted={() => setExistingResumen(null)}
+              disabled={isDisabled}
+            />
+            <AttachmentSlot
+              label="Comprobante de pago"
+              pendingFile={pendingComprobante}
+              existingAttachment={existingComprobante}
+              onSelect={(f) => setPendingComprobante(f)}
+              onClearPending={() => setPendingComprobante(null)}
+              onDeleted={() => setExistingComprobante(null)}
+              disabled={isDisabled}
+            />
           </div>
         </div>
 
@@ -249,17 +439,17 @@ function RegisterPaymentDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={mutation.isPending}
-            className="flex-1"
+            disabled={isDisabled}
+            className="flex-1 cursor-pointer"
           >
             Cancelar
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="flex-1 press-effect"
+            disabled={isDisabled}
+            className="flex-1 press-effect cursor-pointer"
           >
-            {mutation.isPending ? "Guardando…" : "Registrar pago"}
+            {isDisabled ? "Guardando…" : "Registrar pago"}
           </Button>
         </div>
       </DialogContent>
@@ -267,81 +457,9 @@ function RegisterPaymentDialog({
   )
 }
 
-// ── Card visual ────────────────────────────────────────────────────────────────
+// ── Card block ─────────────────────────────────────────────────────────────────
 
-function CreditCardVisual({
-  account,
-  cycleTotal,
-  nextClose,
-  nextDue,
-}: {
-  account: Account
-  cycleTotal: number
-  nextClose: Date
-  nextDue: Date
-}) {
-  const cardColor = account.color ?? "#65a30d"
-
-  return (
-    <div
-      className="relative rounded-2xl p-5 overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${cardColor}dd, ${cardColor}88)`,
-      }}
-    >
-      {/* Decorative circle */}
-      <div
-        className="absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-20"
-        style={{ background: "white" }}
-        aria-hidden
-      />
-      <div
-        className="absolute -right-4 top-8 h-20 w-20 rounded-full opacity-10"
-        style={{ background: "white" }}
-        aria-hidden
-      />
-
-      <div className="relative space-y-4">
-        {/* Card name + brand */}
-        <div className="flex items-center justify-between">
-          <p className="text-white/80 text-sm font-medium">{account.name}</p>
-          <CreditCard className="h-6 w-6 text-white/60" />
-        </div>
-
-        {/* Total amount */}
-        <div>
-          <p className="text-white/60 text-xs font-medium mb-0.5">Resumen en curso</p>
-          <p
-            className="text-white text-3xl font-bold tabular-nums leading-none"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {formatCurrency(cycleTotal, account.currency)}
-          </p>
-        </div>
-
-        {/* Dates */}
-        <div className="flex gap-4">
-          <div>
-            <p className="text-white/60 text-[10px] font-medium uppercase tracking-wider">Próximo cierre</p>
-            <p className="text-white text-xs font-semibold tabular-nums">
-              {format(nextClose, "d MMM", { locale: es })}
-            </p>
-          </div>
-          <div>
-            <p className="text-white/60 text-[10px] font-medium uppercase tracking-wider">Vencimiento</p>
-            <p className="text-white text-xs font-semibold tabular-nums">
-              {format(nextDue, "d MMM", { locale: es })}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Card detail section ────────────────────────────────────────────────────────
-
-function CardSection({
+function CardBlock({
   account,
   allAccounts,
   categories,
@@ -350,213 +468,298 @@ function CardSection({
   allAccounts: Account[]
   categories: Category[]
 }) {
-  const [paymentOpen, setPaymentOpen] = useState(false)
+  const { open: openQuickAdd } = useQuickAdd()
 
-  const closingDay = account.closing_day ?? 1
-  const dueDay = account.due_day ?? 10
-
-  const today = new Date()
-  const nextClose = nextCloseDate(closingDay, today)
-  const nextDue = computeDueDate(nextClose, dueDay, closingDay)
-  const { cycleStart, cycleEnd } = currentCycleRange(closingDay, today)
-
+  // Key starts with "movements" so invalidating MOVEMENTS_KEY in QuickAddProvider
+  // (after creating/editing a movement) also refreshes this query automatically.
   const { data: movements = [] } = useQuery({
-    queryKey: ["card_movements", account.id],
+    queryKey: ["movements", "card", account.id],
     queryFn: () => fetchMovementsForCard(account.id),
   })
 
-  const categoryMap = new Map(categories.map((c) => [c.id, c]))
-
-  // Movements in the current cycle
-  const cycleMovements = movements.filter((m) =>
-    isInCycle(m.date, cycleStart, cycleEnd)
-  )
-
-  // Total from non-future movements + projected cuotas
-  const cycleTotal = cycleMovements.reduce((sum, m) => {
-    const amt = m.converted_amount ?? m.amount
-    return sum + amt
-  }, 0)
-
-  // Cuota movements in this cycle
-  const cuotaMovements = cycleMovements.filter((m) => m.installment_purchase_id !== null)
-
-  // Regular (non-cuota) expense movements
-  const regularMovements = cycleMovements.filter((m) => m.installment_purchase_id === null)
-
-  // Fetch existing statement for this cycle
-  const cycleCloseStr = toDateString(nextClose)
   const { data: statements = [] } = useQuery({
     queryKey: [...CARD_STATEMENTS_KEY, account.id],
     queryFn: () => fetchStatements(account.id),
   })
-  const existingStatement = statements.find((s) => s.close_date === cycleCloseStr)
-  const isPaid = existingStatement?.status === "pagado"
 
-  // "A pagar": closed statement or last closed cycle
-  const pendingStatements = statements.filter((s) => s.status === "pendiente")
-  const { amount: payAmount, dueDate: payDueDateStr } = nextCardPayment(
-    account.id,
-    account,
-    pendingStatements,
-    movements
+  const cycles = useMemo(
+    () => listCardCycles(account.id, account, movements, statements),
+    [account, movements, statements]
   )
-  const payDueDate = payDueDateStr ? parseISO(payDueDateStr) : null
-  const today0 = startOfDay(today)
-  const payIsOverdue = payDueDate != null && isBefore(payDueDate, today0)
-  const payIsDueToday =
-    payDueDate != null && !payIsOverdue && toDateString(payDueDate) === toDateString(today0)
+
+  // Default to current open cycle = last element
+  const defaultIndex = cycles.length > 0 ? cycles.length - 1 : 0
+  const [selectedIndex, setSelectedIndex] = useState(defaultIndex)
+
+  // Keep selectedIndex clamped if cycles list changes length
+  const safeIndex = Math.min(selectedIndex, Math.max(0, cycles.length - 1))
+
+  const cycle = cycles[safeIndex]
+
+  const [paymentOpen, setPaymentOpen] = useState(false)
+
+  const categoryMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  )
+
+  const handlePrev = useCallback(() => setSelectedIndex((i) => Math.max(0, i - 1)), [])
+  const handleNext = useCallback(
+    () => setSelectedIndex((i) => Math.min(cycles.length - 1, i + 1)),
+    [cycles.length]
+  )
+
+  const handleAddExpense = useCallback(() => {
+    if (!cycle) return
+    // Preset account + a date within the cycle (use cycleEnd as the representative date)
+    const presetDate = toDateString(cycle.cycleEnd)
+    openQuickAdd("movement", "expense", {
+      account_id: account.id,
+      date: presetDate,
+    })
+  }, [cycle, account.id, openQuickAdd])
+
+  if (!cycle) return null
+
+  const isPaid = cycle.statement?.status === "pagado"
+  const today = startOfDay(new Date())
+
+  // "A pagar" block for the selected cycle
+  const dueDate = cycle.dueDate ? parseISO(cycle.dueDate) : null
+  const isOverdue = !isPaid && dueDate != null && isBefore(dueDate, today)
+  const isDueToday = !isPaid && !isOverdue && dueDate != null && toDateString(dueDate) === toDateString(today)
+
+  // Split movements
+  const cuotaMovements = cycle.movements.filter((m) => (m as Movement).installment_purchase_id !== null)
+  const regularMovements = cycle.movements.filter((m) => (m as Movement).installment_purchase_id === null)
+
+  const displayTotal = isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total
 
   return (
-    <div className="space-y-5">
-      {/* Card visual (Resumen en curso) */}
-      <CreditCardVisual
-        account={account}
-        cycleTotal={cycleTotal}
-        nextClose={nextClose}
-        nextDue={nextDue}
-      />
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm">
+      {/* Card visual */}
+      <div className="p-4 pb-0">
+        <CreditCardVisual account={account} cycle={cycle} />
+      </div>
 
-      {/* A pagar — closed statement */}
-      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          A pagar
-        </p>
-        <div className="flex items-end justify-between gap-2">
-          <p
-            className={cn(
-              "text-2xl font-bold tabular-nums leading-none",
-              payIsOverdue ? "text-destructive" : "text-foreground"
-            )}
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {formatCurrency(payAmount, account.currency)}
+      {/* Cycle navigation */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <button
+          type="button"
+          onClick={handlePrev}
+          disabled={safeIndex === 0}
+          aria-label="Resumen anterior"
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold",
+            "transition-colors duration-150 cursor-pointer press-effect",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none",
+            "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+          )}
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          Anterior
+        </button>
+
+        <div className="text-center">
+          <p className="text-xs font-semibold text-foreground tabular-nums">
+            {format(cycle.cycleEnd, "MMMM yyyy", { locale: es })}
           </p>
-          {payDueDate != null && (
+          <p className="text-[10px] text-muted-foreground tabular-nums">
+            {safeIndex + 1} / {cycles.length}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleNext}
+          disabled={safeIndex === cycles.length - 1}
+          aria-label="Resumen siguiente"
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold",
+            "transition-colors duration-150 cursor-pointer press-effect",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none",
+            "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+          )}
+        >
+          Siguiente
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 pb-4 space-y-4">
+        {/* A pagar block */}
+        <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-1">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">A pagar</p>
+          <div className="flex items-end justify-between gap-2">
             <p
               className={cn(
-                "text-xs font-semibold tabular-nums pb-0.5",
-                payIsOverdue
-                  ? "text-destructive"
-                  : payIsDueToday
-                  ? "text-amber-500"
-                  : "text-muted-foreground"
+                "text-2xl font-bold tabular-nums leading-none",
+                isOverdue ? "text-destructive" : "text-foreground"
               )}
+              style={{ fontFamily: "var(--font-display)" }}
             >
-              {payIsOverdue
-                ? "Vencido"
-                : payIsDueToday
-                ? "Vence hoy"
-                : `Vence ${format(payDueDate, "d MMM", { locale: es })}`}
+              {formatCurrency(displayTotal, account.currency)}
             </p>
+            {isPaid && cycle.statement?.paid_date && (
+              <p className="text-xs font-semibold text-success pb-0.5">
+                Pagado {format(parseISO(cycle.statement.paid_date), "d MMM", { locale: es })}
+              </p>
+            )}
+            {!isPaid && dueDate != null && (
+              <p
+                className={cn(
+                  "text-xs font-semibold tabular-nums pb-0.5",
+                  isOverdue
+                    ? "text-destructive"
+                    : isDueToday
+                    ? "text-amber-500"
+                    : "text-muted-foreground"
+                )}
+              >
+                {isOverdue
+                  ? "Vencido"
+                  : isDueToday
+                  ? "Vence hoy"
+                  : `Vence ${format(dueDate, "d MMM", { locale: es })}`}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Cuotas this cycle */}
+        {cuotaMovements.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Cuotas que caen en este resumen
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {cuotaMovements.map((m) => {
+                const mv = m as Movement
+                const cat = mv.category_id ? categoryMap.get(mv.category_id) : undefined
+                return (
+                  <Link
+                    key={mv.id}
+                    href={`/app/cuotas/${mv.installment_purchase_id}`}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
+                      "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                      "transition-colors duration-150 cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      mv.is_future && "opacity-70 italic"
+                    )}
+                  >
+                    <span className="tabular-nums">
+                      Cuota {mv.installment_number}/{mv.installment_total}
+                    </span>
+                    {cat && <span>· {cat.name}</span>}
+                    <span className="tabular-nums font-bold">
+                      {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Regular expenses */}
+        {regularMovements.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Gastos del resumen
+              </p>
+              <Link
+                href={`/app/movimientos?account=${account.id}`}
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Ver todos
+              </Link>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+              {regularMovements.slice(0, 8).map((m) => {
+                const mv = m as Movement
+                const cat = mv.category_id ? categoryMap.get(mv.category_id) : undefined
+                return (
+                  <div key={mv.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                      <ShoppingBag className="h-3.5 w-3.5 text-destructive" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {cat?.name ?? "Sin categoría"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground tabular-nums">
+                        {format(parseISO(mv.date), "d MMM", { locale: es })}
+                        {mv.note ? ` · ${mv.note}` : ""}
+                      </p>
+                    </div>
+                    <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
+                      − {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {regularMovements.length === 0 && cuotaMovements.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-3">
+            Sin gastos en este resumen.
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-1">
+          {isPaid ? (
+            <div className="flex-1 flex items-center gap-2 justify-center py-2.5 rounded-xl bg-success/10 border border-success/20">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <p className="text-sm font-semibold text-success">
+                Pago registrado
+                {cycle.statement?.paid_amount != null
+                  ? ` — ${formatCurrency(cycle.statement.paid_amount, account.currency)}`
+                  : ""}
+              </p>
+              {/* Allow viewing/editing attachments on paid cycle */}
+              <button
+                type="button"
+                onClick={() => setPaymentOpen(true)}
+                className="ml-1 text-[10px] text-success/70 hover:text-success underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              >
+                Ver adjuntos
+              </button>
+            </div>
+          ) : (
+            <>
+              <Button
+                onClick={() => setPaymentOpen(true)}
+                className="flex-1 press-effect font-semibold h-10 cursor-pointer"
+              >
+                Registrar pago
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleAddExpense}
+                className="flex items-center gap-1.5 h-10 px-3 press-effect cursor-pointer"
+                aria-label="Agregar gasto a este resumen"
+              >
+                <Plus className="h-4 w-4" />
+                Gasto
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Cuotas this month */}
-      {cuotaMovements.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-            Cuotas que caen este mes
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {cuotaMovements.map((m) => {
-              const cat = m.category_id ? categoryMap.get(m.category_id) : undefined
-              return (
-                <Link
-                  key={m.id}
-                  href={`/app/cuotas/${m.installment_purchase_id}`}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold",
-                    "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-                    "transition-colors duration-150 cursor-pointer",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    m.is_future && "opacity-70 italic"
-                  )}
-                >
-                  <span className="tabular-nums">
-                    Cuota {m.installment_number}/{m.installment_total}
-                  </span>
-                  {cat && <span>· {cat.name}</span>}
-                  <span className="tabular-nums font-bold">
-                    {formatCurrency(m.converted_amount ?? m.amount, account.currency)}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Gastos del ciclo */}
-      {regularMovements.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Gastos del ciclo
-            </p>
-            <Link
-              href={`/app/movimientos?account=${account.id}`}
-              className="text-xs text-primary hover:underline font-medium"
-            >
-              Ver todos
-            </Link>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-            {regularMovements.slice(0, 8).map((m) => {
-              const cat = m.category_id ? categoryMap.get(m.category_id) : undefined
-              return (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                    <ShoppingBag className="h-3.5 w-3.5 text-destructive" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {cat?.name ?? "Sin categoría"}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground tabular-nums">
-                      {format(parseISO(m.date), "d MMM", { locale: es })}
-                      {m.note ? ` · ${m.note}` : ""}
-                    </p>
-                  </div>
-                  <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
-                    − {formatCurrency(m.converted_amount ?? m.amount, account.currency)}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Register payment CTA */}
-      <div className="pt-1">
-        {isPaid ? (
-          <div className="flex items-center gap-2 justify-center py-3 rounded-xl bg-success/10 border border-success/20">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <p className="text-sm font-semibold text-success">
-              Pago registrado —{" "}
-              {existingStatement?.paid_amount !== null && existingStatement?.paid_amount !== undefined
-                ? formatCurrency(existingStatement.paid_amount, account.currency)
-                : ""}
-            </p>
-          </div>
-        ) : (
-          <Button
-            onClick={() => setPaymentOpen(true)}
-            className="w-full press-effect font-semibold h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/20"
-          >
-            Registrar pago
-          </Button>
-        )}
-      </div>
-
+      {/* Payment dialog */}
       {paymentOpen && (
         <RegisterPaymentDialog
           account={account}
-          cycleClose={nextClose}
-          cycleDue={nextDue}
-          cycleTotal={cycleTotal}
+          cycle={cycle}
           allAccounts={allAccounts}
           open={paymentOpen}
           onOpenChange={setPaymentOpen}
@@ -568,15 +771,17 @@ function CardSection({
 
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 
-function CardSectionSkeleton() {
+function CardBlockSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm p-4 space-y-4">
       <Skeleton className="h-40 rounded-2xl" />
-      <div className="space-y-2">
-        {[...Array(3)].map((_, i) => (
-          <Skeleton key={i} className="h-14 rounded-xl" />
-        ))}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-7 w-20 rounded-lg" />
+        <Skeleton className="h-4 w-24 rounded" />
+        <Skeleton className="h-7 w-20 rounded-lg" />
       </div>
+      <Skeleton className="h-16 rounded-xl" />
+      <Skeleton className="h-10 rounded-xl" />
     </div>
   )
 }
@@ -599,16 +804,8 @@ export function CardsList() {
     queryFn: fetchCategories,
   })
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-
-  // Auto-select first card
-  const displayCard =
-    selectedId !== null
-      ? cards?.find((c) => c.id === selectedId) ?? cards?.[0]
-      : cards?.[0]
-
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <h1
@@ -625,7 +822,12 @@ export function CardsList() {
       </div>
 
       {/* Loading */}
-      {loadingCards && <CardSectionSkeleton />}
+      {loadingCards && (
+        <div className="space-y-4">
+          <CardBlockSkeleton />
+          <CardBlockSkeleton />
+        </div>
+      )}
 
       {/* Empty state */}
       {!loadingCards && (!cards || cards.length === 0) && (
@@ -634,10 +836,7 @@ export function CardsList() {
             <CreditCard className="h-8 w-8 text-primary" />
           </div>
           <div className="space-y-1.5">
-            <h2
-              className="text-xl"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+            <h2 className="text-xl" style={{ fontFamily: "var(--font-display)" }}>
               No tenés tarjetas de crédito
             </h2>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
@@ -648,7 +847,7 @@ export function CardsList() {
             href="/app/cuentas"
             className={cn(
               "inline-flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-semibold",
-              "bg-primary text-primary-foreground shadow-sm shadow-primary/20 press-effect",
+              "bg-primary text-primary-foreground shadow-sm shadow-primary/20 press-effect cursor-pointer",
               "hover:bg-primary/90 transition-all duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             )}
@@ -659,37 +858,18 @@ export function CardsList() {
         </div>
       )}
 
-      {/* Card selector tabs (if multiple cards) */}
-      {!loadingCards && cards && cards.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+      {/* Vertical list of card blocks */}
+      {!loadingCards && cards && cards.length > 0 && (
+        <div className="space-y-4">
           {cards.map((card) => (
-            <button
+            <CardBlock
               key={card.id}
-              type="button"
-              onClick={() => setSelectedId(card.id)}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0",
-                "transition-all duration-150 press-effect cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                displayCard?.id === card.id
-                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              )}
-            >
-              <CreditCard className="h-3 w-3" />
-              {card.name}
-            </button>
+              account={card}
+              allAccounts={allAccounts}
+              categories={categories}
+            />
           ))}
         </div>
-      )}
-
-      {/* Selected card detail */}
-      {!loadingCards && displayCard && (
-        <CardSection
-          account={displayCard}
-          allAccounts={allAccounts}
-          categories={categories}
-        />
       )}
     </div>
   )

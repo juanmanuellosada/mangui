@@ -632,6 +632,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["attachment_kind"]
           mime_type: string | null
           movement_id: string | null
+          statement_id: string | null
           transfer_id: string | null
           updated_at: string
           user_id: string
@@ -645,6 +646,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["attachment_kind"]
           mime_type?: string | null
           movement_id?: string | null
+          statement_id?: string | null
           transfer_id?: string | null
           updated_at?: string
           user_id: string
@@ -658,6 +660,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["attachment_kind"]
           mime_type?: string | null
           movement_id?: string | null
+          statement_id?: string | null
           transfer_id?: string | null
           updated_at?: string
           user_id?: string
@@ -668,6 +671,13 @@ export type Database = {
             columns: ["movement_id"]
             isOneToOne: false
             referencedRelation: "movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movement_attachments_statement_id_fkey"
+            columns: ["statement_id"]
+            isOneToOne: false
+            referencedRelation: "card_statements"
             referencedColumns: ["id"]
           },
           {
@@ -1293,7 +1303,7 @@ export type Database = {
       }
     }
     Enums: {
-      attachment_kind: "factura" | "recibo" | "comprobante"
+      attachment_kind: "factura" | "recibo" | "comprobante" | "resumen"
       account_type:
         | "caja_ahorro"
         | "cuenta_corriente"
@@ -1466,7 +1476,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      attachment_kind: ["factura", "recibo", "comprobante"],
+      attachment_kind: ["factura", "recibo", "comprobante", "resumen"],
       account_type: [
         "caja_ahorro",
         "cuenta_corriente",

@@ -44,8 +44,13 @@ export type QuickAddMode = "movement" | "transfer" | "ai"
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
+export interface QuickAddPreset {
+  account_id?: string
+  date?: string
+}
+
 interface QuickAddContextValue {
-  open: (mode?: QuickAddMode, defaultType?: "income" | "expense") => void
+  open: (mode?: QuickAddMode, defaultType?: "income" | "expense", preset?: QuickAddPreset) => void
 }
 
 const QuickAddContext = React.createContext<QuickAddContextValue | null>(null)
@@ -167,6 +172,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [mode, setMode] = React.useState<QuickAddMode>("movement")
   const [defaultType, setDefaultType] = React.useState<"income" | "expense">("expense")
+  const [preset, setPreset] = React.useState<QuickAddPreset | undefined>(undefined)
   const queryClient = useQueryClient()
 
   const { data: accounts = [] } = useQuery({
@@ -179,12 +185,13 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     queryFn: fetchCategories,
   })
 
-  const open = React.useCallback((m: QuickAddMode = "movement", type: "income" | "expense" = "expense") => {
+  const open = React.useCallback((m: QuickAddMode = "movement", type: "income" | "expense" = "expense", p?: QuickAddPreset) => {
     // Both "movement" and "transfer" are served by the same MovementForm sheet.
     // Map "transfer" to "movement" mode so the sheet opens with the 3-way toggle,
     // but store the intended initial mode so MovementForm starts on the transfer tab.
     setMode(m === "transfer" ? "movement" : m)
     setDefaultType(type)
+    setPreset(p)
     setIsOpen(true)
   }, [])
 
@@ -193,9 +200,9 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [openedAsTransfer, setOpenedAsTransfer] = React.useState(false)
 
   const openWithTransferTracking = React.useCallback(
-    (m: QuickAddMode = "movement", type: "income" | "expense" = "expense") => {
+    (m: QuickAddMode = "movement", type: "income" | "expense" = "expense", p?: QuickAddPreset) => {
       setOpenedAsTransfer(m === "transfer")
-      open(m, type)
+      open(m, type, p)
     },
     [open]
   )
@@ -380,7 +387,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         <MovementForm
           accounts={accounts}
           categories={categories}
-          defaultValues={{ type: defaultType }}
+          defaultValues={{ type: defaultType, ...preset }}
           onSubmit={async (v, pending) => {
             await movementMutation.mutateAsync({ values: v, pending })
           }}
