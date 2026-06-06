@@ -155,3 +155,17 @@ El detalle de una compra en cuotas SHALL abrirse como modal (`MangoSheet`) desde
 
 - **WHEN** una cuota cae en un resumen ya pagado
 - **THEN** no ofrece controles de mover y ningún desplazamiento puede llevar otra cuota a ese resumen pagado
+
+### Requirement: Editar la compra en cuotas
+
+Desde el modal de detalle de cuotas el usuario SHALL poder editar la compra completa: descripción, categoría, monto total, cuenta (tarjeta) y tipo de dólar (cuando aplique). Al guardar, el sistema SHALL recalcular las cuotas NO pagadas (distribuyendo el monto total restante entre ellas, con la última absorbiendo el redondeo) y actualizar su categoría/cuenta/tipo de dólar; las cuotas ya pagadas NO SHALL modificarse. La cantidad de cuotas NO se edita en este flujo.
+
+#### Scenario: Editar y recalcular cuotas no pagadas
+
+- **WHEN** el usuario edita el monto total o la categoría de una compra en cuotas y guarda
+- **THEN** las cuotas no pagadas se recalculan/actualizan y las pagadas quedan igual, manteniendo el total coherente
+
+#### Scenario: Acceso a editar desde el detalle
+
+- **WHEN** el usuario abre el modal de detalle de cuotas
+- **THEN** dispone de una acción "Editar compra" que abre el formulario de edición

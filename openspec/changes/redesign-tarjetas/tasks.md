@@ -69,3 +69,10 @@
 - [x] 11.1 Postergar (+1/−1 mes) pide confirmación antes de aplicar, indicando cuántas cuotas se moverán y hacia dónde.
 - [x] 11.2 Al tocar una fila de gasto regular (no cuota) en "Gastos del resumen", abrir el modal de edición del movimiento (reusar `EditMovementDialog`/patrón de `movements-list.tsx`), con editar y borrar.
 - [x] 11.3 Build/typecheck.
+
+## 12. Editar la compra en cuotas
+
+- [x] 12.1 En el modal de detalle (`InstallmentDetailBody`), agregar acción "Editar compra" que abre un form (`MangoSheet`) con descripción, categoría, monto total, cuenta (tarjeta) y tipo de dólar. Reusar inputs canónicos (`MoneyInput`, `MangoSelect`). Mirar la creación de cuotas en `movement-form.tsx` para replicar el cálculo de montos/converted.
+- [x] 12.2 Al guardar: actualizar `installment_purchases` (description, category_id, total_amount, account_id, dollar_type, currency). Recalcular SOLO las cuotas no pagadas: distribuir (total − suma de cuotas pagadas) entre las no pagadas (última absorbe redondeo) y actualizar amount/category_id/account_id/dollar_type/converted_amount. No tocar las cuotas pagadas. No cambiar la cantidad de cuotas ni las fechas.
+- [x] 12.3 Determinar cuotas pagadas con la misma lógica de resumen pagado (`isDateInPaidCycle`). Invalidar queries para recalcular resúmenes.
+- [x] 12.4 Build/typecheck.

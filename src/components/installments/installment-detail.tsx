@@ -15,8 +15,14 @@ import {
   Circle,
   ChevronLeft,
   ChevronRight,
+  Pencil,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { MoneyInput } from "@/components/ui/money-input"
+import { MangoSelect } from "@/components/ui/mango-select"
+import { MangoSheet } from "@/components/ui/mango-sheet"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
 import { MangoSheet as ConfirmSheet } from "@/components/ui/mango-sheet"
@@ -33,14 +39,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { INSTALLMENTS_KEY } from "@/lib/installments"
-import { MOVEMENTS_KEY, BALANCES_KEY, ACCOUNTS_KEY } from "@/lib/movements"
+import { INSTALLMENTS_KEY, computeInstallmentAmounts } from "@/lib/installments"
+import { MOVEMENTS_KEY, BALANCES_KEY, ACCOUNTS_KEY, DOLLAR_TYPE_LABELS, type DollarType } from "@/lib/movements"
 import { isInCycle, listCardCycles, type CardCycle } from "@/lib/cards"
 import { isFutureDate } from "@/lib/date-utils"
 import { addMonths, parseISO } from "date-fns"
 import type { Tables } from "@/lib/database.types"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 
 type InstallmentPurchase = Tables<"installment_purchases">
 type Movement = Tables<"movements">
@@ -111,6 +119,27 @@ async function fetchStatementsForAccount(accountId: string): Promise<CardStateme
     .from("card_statements")
     .select("*")
     .eq("account_id", accountId)
+  if (error) throw error
+  return data
+}
+
+async function fetchAllCreditCardAccounts(): Promise<Account[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("*")
+    .eq("type", "tarjeta_credito")
+    .order("name")
+  if (error) throw error
+  return data
+}
+
+async function fetchAllCategories(): Promise<Category[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("categories")
+    .select("*")
+    .order("name")
   if (error) throw error
   return data
 }
@@ -553,6 +582,342 @@ function PostponeControls({
   )
 }
 
+// ── EditPurchaseSheet ──────────────────────────────────────────────────────────
+
+interface EditPurchaseSheetProps {
+  purchase: InstallmentPurchase
+  movements: Movement[]
+  cycles: CardCycle[]
+  /** Pre-loaded credit-card accounts. When absent, fetched internally. */
+  availableAccounts?: Account[]
+  /** Pre-loaded categories. When absent, fetched internally. */
+  availableCategories?: Category[]
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}
+
+function EditPurchaseSheet({
+  purchase,
+  movements,
+  cycles,
+  availableAccounts,
+  availableCategories,
+  open,
+  onOpenChange,
+}: EditPurchaseSheetProps) {
+  const queryClient = useQueryClient()
+
+  // Form state — prefill from purchase
+  const [description, setDescription] = useState(purchase.description)
+  const [categoryId, setCategoryId] = useState<string | null>(purchase.category_id)
+  const [totalAmount, setTotalAmount] = useState(purchase.total_amount)
+  const [accountId, setAccountId] = useState(purchase.account_id)
+  const [dollarType, setDollarType] = useState<DollarType | null>(
+    (purchase.dollar_type as DollarType | null) ?? null
+  )
+  const [convertedTotal, setConvertedTotal] = useState<number | null>(null)
+
+  // Internal fetches — only when parent didn't provide
+  const { data: fetchedAccounts = [] } = useQuery({
+    queryKey: ["credit_card_accounts_for_edit"],
+    queryFn: fetchAllCreditCardAccounts,
+    enabled: !availableAccounts,
+    staleTime: 60_000,
+  })
+  const { data: fetchedCategories = [] } = useQuery({
+    queryKey: ["categories_for_edit"],
+    queryFn: fetchAllCategories,
+    enabled: !availableCategories,
+    staleTime: 60_000,
+  })
+
+  const creditCardAccounts = availableAccounts
+    ? availableAccounts.filter((a) => a.type === "tarjeta_credito")
+    : fetchedAccounts
+  const allCategories = availableCategories ?? fetchedCategories
+  const expenseCategories = allCategories.filter((c) => c.type === "expense")
+
+  // Determine cross-currency: purchase.currency is the expense currency; the selected account's currency is the account currency
+  const selectedAccount = creditCardAccounts.find((a) => a.id === accountId)
+  const accountCurrency = selectedAccount?.currency ?? "ARS"
+  const purchaseCurrency = purchase.currency as "ARS" | "USD"
+  const isCrossCurrency = purchaseCurrency !== accountCurrency
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const supabase = createClient()
+
+      // 1. Update installment_purchases row
+      const { error: purchaseErr } = await supabase
+        .from("installment_purchases")
+        .update({
+          description,
+          category_id: categoryId,
+          total_amount: totalAmount,
+          account_id: accountId,
+          dollar_type: isCrossCurrency ? dollarType : null,
+          currency: purchaseCurrency,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", purchase.id)
+      if (purchaseErr) throw purchaseErr
+
+      // 2. Determine paid vs unpaid cuotas
+      const paidMovements = movements.filter((m) => isDateInPaidCycle(m.date, cycles))
+      const unpaidMovements = movements
+        .filter((m) => !isDateInPaidCycle(m.date, cycles))
+        .sort((a, b) => (a.installment_number ?? 0) - (b.installment_number ?? 0))
+
+      if (unpaidMovements.length === 0) {
+        // No unpaid cuotas — nothing to recompute (guard against divide-by-zero)
+        return
+      }
+
+      // 3. Compute remaining = new total − sum of paid cuota amounts
+      const paidSum = paidMovements.reduce((acc, m) => acc + m.amount, 0)
+      const remaining = Math.round((totalAmount - paidSum) * 100) / 100
+
+      // Distribute remaining across unpaid cuotas (last one absorbs rounding)
+      const unpaidCount = unpaidMovements.length
+      const { perAmount, lastAmount } = computeInstallmentAmounts(remaining, unpaidCount)
+
+      // Compute converted_total pro-rata (for cross-currency)
+      // If user provided convertedTotal use it; otherwise null
+      let perConverted: number | null = null
+      let lastConverted: number | null = null
+      if (isCrossCurrency && convertedTotal !== null && convertedTotal > 0) {
+        const paidConvertedSum = paidMovements.reduce(
+          (acc, m) => acc + (m.converted_amount ?? 0),
+          0
+        )
+        const remainingConverted = Math.round((convertedTotal - paidConvertedSum) * 100) / 100
+        const { perAmount: perC, lastAmount: lastC } = computeInstallmentAmounts(
+          remainingConverted,
+          unpaidCount
+        )
+        perConverted = perC
+        lastConverted = lastC
+      }
+
+      // 4. Update each unpaid movement
+      for (let i = 0; i < unpaidMovements.length; i++) {
+        const m = unpaidMovements[i]
+        const isLast = i === unpaidMovements.length - 1
+        const newAmount = isLast ? lastAmount : perAmount
+        const newConverted = isCrossCurrency
+          ? isLast
+            ? lastConverted
+            : perConverted
+          : null
+
+        const { error: mvErr } = await supabase
+          .from("movements")
+          .update({
+            amount: newAmount,
+            category_id: categoryId,
+            account_id: accountId,
+            dollar_type: isCrossCurrency ? dollarType : null,
+            converted_amount: newConverted,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", m.id)
+        if (mvErr) throw mvErr
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
+      queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      queryClient.invalidateQueries({ queryKey: ["installment_purchase", purchase.id] })
+      queryClient.invalidateQueries({ queryKey: ["installment_movements", purchase.id] })
+      queryClient.invalidateQueries({ queryKey: ["movements", "card"] })
+      toast.success("Compra actualizada")
+      onOpenChange(false)
+    },
+    onError: (err: Error) => {
+      toast.error("Error al guardar", { description: err.message })
+    },
+  })
+
+  function handleSave() {
+    if (!description.trim()) {
+      toast.error("La descripción no puede estar vacía")
+      return
+    }
+    if (totalAmount <= 0) {
+      toast.error("El monto debe ser mayor a 0")
+      return
+    }
+    saveMutation.mutate()
+  }
+
+  return (
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editar compra"
+      footer={
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saveMutation.isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={saveMutation.isPending}
+            className="press-effect"
+          >
+            {saveMutation.isPending ? "Guardando…" : "Guardar cambios"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-5">
+        {/* Descripción */}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Descripción</Label>
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ej: notebook, heladera…"
+            maxLength={200}
+          />
+        </div>
+
+        {/* Monto total */}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Monto total</Label>
+          <MoneyInput
+            step="0.01"
+            min="0.01"
+            placeholder="0"
+            currency={purchaseCurrency}
+            className="text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60"
+            wrapperClassName="w-full"
+            value={totalAmount || ""}
+            onChange={(e) =>
+              setTotalAmount(e.target.value ? parseFloat(e.target.value) : 0)
+            }
+          />
+        </div>
+
+        {/* Cuenta (solo tarjetas de crédito) */}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Cuenta / tarjeta</Label>
+          <MangoSelect
+            value={accountId}
+            onChange={(v) => v && setAccountId(v)}
+            options={creditCardAccounts.map((a) => ({
+              value: a.id,
+              label: a.name,
+              leading: <AccountIconChip icon={a.icon} />,
+            }))}
+            placeholder="Tarjeta"
+            showSearch
+          />
+        </div>
+
+        {/* Categoría */}
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
+          <MangoSelect
+            value={categoryId ?? "none"}
+            onChange={(v) => setCategoryId(v === "none" ? null : v)}
+            options={[
+              { value: "none", label: "Sin categoría" },
+              ...expenseCategories.map((c) => ({
+                value: c.id,
+                label: c.name,
+                leading: c.icon ? (
+                  <CategoryIconChip icon={c.icon} />
+                ) : undefined,
+              })),
+            ]}
+            placeholder="Categoría"
+            showSearch
+          />
+        </div>
+
+        {/* Tipo de dólar — solo cuando cross-currency */}
+        {isCrossCurrency && (
+          <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              La cuenta está en <strong className="text-foreground">{accountCurrency}</strong> pero
+              la compra es en <strong className="text-foreground">{purchaseCurrency}</strong> —
+              seleccioná el tipo de cambio:
+            </p>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground font-medium">Tipo de dólar</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.entries(DOLLAR_TYPE_LABELS) as [DollarType, string][]).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setDollarType(key)}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-semibold border transition-all duration-150 cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      dollarType === key
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border/60 text-muted-foreground hover:border-primary/50"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground font-medium">
+                Monto total en {accountCurrency} (opcional)
+              </Label>
+              <MoneyInput
+                step="0.01"
+                placeholder="0,00"
+                currency={accountCurrency as "ARS" | "USD"}
+                className="tabular-nums w-full"
+                value={convertedTotal ?? ""}
+                onChange={(e) =>
+                  setConvertedTotal(e.target.value ? parseFloat(e.target.value) : null)
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Si lo dejás vacío, converted_amount de las cuotas no pagadas quedará en null.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Info about what will be recalculated */}
+        {(() => {
+          const paidCount = movements.filter((m) => isDateInPaidCycle(m.date, cycles)).length
+          const unpaidCount = movements.length - paidCount
+          if (unpaidCount === 0) {
+            return (
+              <p className="text-xs text-muted-foreground rounded-xl bg-muted/40 px-3 py-2">
+                Todas las cuotas ya están pagadas — solo se actualizarán los datos de la compra.
+              </p>
+            )
+          }
+          return (
+            <p className="text-xs text-muted-foreground rounded-xl bg-muted/40 px-3 py-2">
+              Se recalcularán {unpaidCount} cuota{unpaidCount !== 1 ? "s" : ""} no pagada
+              {unpaidCount !== 1 ? "s" : ""}
+              {paidCount > 0 ? ` (${paidCount} pagada${paidCount !== 1 ? "s" : ""} no se tocarán)` : ""}.
+            </p>
+          )
+        })()}
+      </div>
+    </MangoSheet>
+  )
+}
+
 // ── InstallmentDetailBody ──────────────────────────────────────────────────────
 // Shared body used both in the full-page route and in the modal from cards-list.
 
@@ -564,15 +929,28 @@ export interface InstallmentDetailBodyProps {
    */
   cardAccount?: Account
   cardStatements?: CardStatement[]
+  /**
+   * All accounts (used in the "Editar compra" form for account selection).
+   * When absent, accounts are fetched internally (credit cards only).
+   */
+  accounts?: Account[]
+  /**
+   * All categories (used in the "Editar compra" form).
+   * When absent, categories are fetched internally.
+   */
+  categories?: Category[]
 }
 
 export function InstallmentDetailBody({
   purchaseId,
   cardAccount,
   cardStatements,
+  accounts,
+  categories,
 }: InstallmentDetailBodyProps) {
   const [deletePurchaseOpen, setDeletePurchaseOpen] = useState(false)
   const [deletingCuota, setDeletingCuota] = useState<Movement | null>(null)
+  const [editPurchaseOpen, setEditPurchaseOpen] = useState(false)
   const ms = useMultiSelect()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkPending, setBulkPending] = useState(false)
@@ -743,6 +1121,16 @@ export function InstallmentDetailBody({
         </div>
       )}
 
+      {/* Edit purchase action */}
+      <Button
+        variant="outline"
+        onClick={() => setEditPurchaseOpen(true)}
+        className="w-full press-effect flex items-center gap-2"
+      >
+        <Pencil className="h-4 w-4" />
+        Editar compra
+      </Button>
+
       {/* Danger zone */}
       <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-3">
         <div className="flex items-center gap-2">
@@ -774,6 +1162,19 @@ export function InstallmentDetailBody({
           movement={deletingCuota}
           open={!!deletingCuota}
           onOpenChange={(v) => { if (!v) setDeletingCuota(null) }}
+        />
+      )}
+
+      {/* Edit purchase sheet */}
+      {editPurchaseOpen && movements && (
+        <EditPurchaseSheet
+          purchase={purchase}
+          movements={movements}
+          cycles={cycles}
+          availableAccounts={accounts}
+          availableCategories={categories}
+          open={editPurchaseOpen}
+          onOpenChange={setEditPurchaseOpen}
         />
       )}
 

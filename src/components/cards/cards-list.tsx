@@ -989,6 +989,8 @@ function CardBlock({
             purchaseId={cuotaDetailId}
             cardAccount={account}
             cardStatements={statements}
+            accounts={allAccounts}
+            categories={categories}
           />
         )}
       </MangoSheet>
