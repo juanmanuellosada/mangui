@@ -305,25 +305,44 @@ function GoalFilterBar({
 
   const secondaryFilters = (
     <div className="space-y-4">
-      {/* Estado | Ordenar | Moneda — primera fila */}
+      {/* Estado + Tipo | Ordenar | Moneda — primera fila */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Estado</Label>
-          <div role="group" aria-label="Filtrar por estado" className="flex items-center gap-1">
-            {(["todas", "activas", "completadas"] as const).map((v) => {
-              const label = v === "todas" ? "Todas" : v === "activas" ? "Activas" : "Completadas"
-              return (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Estado</Label>
+            <div role="group" aria-label="Filtrar por estado" className="flex items-center gap-1">
+              {(["todas", "activas", "completadas"] as const).map((v) => {
+                const label = v === "todas" ? "Todas" : v === "activas" ? "Activas" : "Completadas"
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => onChange({ ...filters, estado: v })}
+                    aria-pressed={filters.estado === v}
+                    className={pillClass(filters.estado === v)}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tipo</Label>
+            <div role="group" aria-label="Filtrar por tipo" className="flex items-center gap-1">
+              {(["todas", "income", "saving", "reduction"] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
-                  onClick={() => onChange({ ...filters, estado: v })}
-                  aria-pressed={filters.estado === v}
-                  className={pillClass(filters.estado === v)}
+                  onClick={() => onChange({ ...filters, tipo: v })}
+                  aria-pressed={filters.tipo === v}
+                  className={pillClass(filters.tipo === v)}
                 >
-                  {label}
+                  {TIPO_LABELS[v]}
                 </button>
-              )
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
@@ -353,26 +372,6 @@ function GoalFilterBar({
                 </button>
               )
             })}
-          </div>
-        </div>
-      </div>
-
-      {/* Tipo + Categorías + Cuentas */}
-      <div className="flex flex-wrap gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Tipo</Label>
-          <div role="group" aria-label="Filtrar por tipo" className="flex items-center gap-1">
-            {(["todas", "income", "saving", "reduction"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => onChange({ ...filters, tipo: v })}
-                aria-pressed={filters.tipo === v}
-                className={pillClass(filters.tipo === v)}
-              >
-                {TIPO_LABELS[v]}
-              </button>
-            ))}
           </div>
         </div>
       </div>
