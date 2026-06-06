@@ -298,7 +298,7 @@ function RuleFilterBar({
     )
 
   const secondaryFilters = (
-    <div className="space-y-4">
+    <div className="flex items-center justify-between gap-3 flex-wrap">
       <div className="space-y-1.5">
         <Label className="text-xs">Estado</Label>
         <div role="group" aria-label="Filtrar por estado" className="flex items-center gap-1">
