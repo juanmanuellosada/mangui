@@ -34,4 +34,4 @@
 ## 6. Verificación
 
 - [x] 6.1 `tsc --noEmit` + `next build` sin errores.
-- [ ] 6.2 QA: consultas (saldos, gastos por categoría, pagos futuros), crear movimiento por chat con confirmación, límite diario, y verificación de aislamiento (las tools solo devuelven datos del usuario).
+- [x] 6.2 QA validado por el usuario (consultas, crear movimiento con confirmación, límite, aislamiento por usuario).

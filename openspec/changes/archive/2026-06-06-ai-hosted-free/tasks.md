@@ -25,4 +25,4 @@
 ## 5. Verificación y ops
 
 - [x] 5.1 `tsc --noEmit` + `next build` sin errores. Grep: sin referencias a `no_key`, `getDecryptedApiKey`, `saveAiSettings`, `api_key_encrypted` en app code.
-- [ ] 5.2 Migración a prod (tras aprobación) y setear `GOOGLE_GENERATIVE_AI_API_KEY` en Vercel (paso del usuario). QA: interpretar un movimiento end-to-end y ver el contador subir.
+- [x] 5.2 Migración `0031` aplicada a prod; `GOOGLE_GENERATIVE_AI_API_KEY` cargada en Vercel por el usuario. Validado en uso.
