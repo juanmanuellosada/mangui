@@ -1088,13 +1088,27 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
         </div>
       </div>
 
-      {/* Date range */}
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label className="text-xs">Fecha</Label>
-        <DateRangeFilter
-          value={filter.date}
-          onChange={(date: DateRangeValue) => onChange({ ...filter, date })}
-        />
+      {/* Date range + Grouping (same row) */}
+      <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-end gap-3">
+        <div className="space-y-1.5 flex-1 min-w-0">
+          <Label className="text-xs">Fecha</Label>
+          <DateRangeFilter
+            value={filter.date}
+            onChange={(date: DateRangeValue) => onChange({ ...filter, date })}
+          />
+        </div>
+        <div className="space-y-1.5 w-44 shrink-0">
+          <Label className="text-xs flex items-center gap-1">
+            <LayoutList className="h-3 w-3" aria-hidden />
+            Agrupar
+          </Label>
+          <MangoSelect
+            value={groupBy}
+            onChange={(v) => onGroupByChange(v as GroupBy)}
+            options={GROUP_BY_OPTIONS}
+            aria-label="Agrupar movimientos"
+          />
+        </div>
       </div>
 
       {/* Accounts */}
@@ -1124,19 +1138,6 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
         />
       </div>
 
-      {/* Grouping */}
-      <div className="space-y-1.5">
-        <Label className="text-xs flex items-center gap-1">
-          <LayoutList className="h-3 w-3" aria-hidden />
-          Agrupar
-        </Label>
-        <MangoSelect
-          value={groupBy}
-          onChange={(v) => onGroupByChange(v as GroupBy)}
-          options={GROUP_BY_OPTIONS}
-          aria-label="Agrupar movimientos"
-        />
-      </div>
     </div>
   )
 
