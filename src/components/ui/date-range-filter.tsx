@@ -230,7 +230,7 @@ const DAY_PICKER_CLASSNAMES = {
 export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props) {
   const [open, setOpen] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
-  const [pos, setPos] = React.useState({ top: 0, left: 0, placeAbove: false })
+  const [pos, setPos] = React.useState({ top: 0, left: 0, placeAbove: false, flipH: false })
   const [posReady, setPosReady] = React.useState(false)
   const [revealed, setRevealed] = React.useState(false)
 
@@ -247,13 +247,31 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
   const updatePos = React.useCallback(() => {
     if (!triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
+    const MARGIN = 8
+
+    // ── Vertical flip ──
     const popoverHeight = 480
     const spaceBelow = window.innerHeight - rect.bottom
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight
+
+    // ── Horizontal flip ──
+    const popoverWidth = popoverRef.current?.offsetWidth ?? 0
+    const viewportWidth = window.innerWidth
+    let left = rect.left
+    let flipH = false
+    if (popoverWidth > 0 && rect.left + popoverWidth > viewportWidth - MARGIN) {
+      // Not enough room to the right — anchor right edge to trigger's right edge
+      left = rect.right - popoverWidth
+      flipH = true
+    }
+    // Clamp so it never escapes either side
+    left = Math.max(MARGIN, Math.min(left, viewportWidth - popoverWidth - MARGIN))
+
     setPos({
       top: placeAbove ? rect.top - 8 : rect.bottom + 8,
-      left: rect.left,
+      left,
       placeAbove,
+      flipH,
     })
   }, [])
 
@@ -422,7 +440,7 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
             width: "max-content",
             maxWidth: "min(640px, calc(100vw - 2rem))",
             transform: pos.placeAbove ? "translateY(-100%)" : undefined,
-            transformOrigin: pos.placeAbove ? "bottom left" : "top left",
+            transformOrigin: `${pos.placeAbove ? "bottom" : "top"} ${pos.flipH ? "right" : "left"}`,
           }}
         >
           {/* Two-column layout: LEFT controls + RIGHT calendar */}
