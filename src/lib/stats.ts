@@ -76,6 +76,7 @@ export interface CategoryDistributionItem {
   name: string
   total: number
   percent: number
+  icon?: string | null
 }
 
 /**
@@ -85,11 +86,11 @@ export interface CategoryDistributionItem {
 export function categoryDistribution(
   movements: Movement[],
   type: "income" | "expense",
-  categories: { id: string; name: string }[],
+  categories: { id: string; name: string; icon?: string | null }[],
   currency?: Currency
 ): CategoryDistributionItem[] {
-  const catMap = new Map(categories.map((c) => [c.id, c.name]))
-  const totals = new Map<string, { id: string; name: string; total: number }>()
+  const catMap = new Map(categories.map((c) => [c.id, c]))
+  const totals = new Map<string, { id: string; name: string; icon?: string | null; total: number }>()
 
   let grandTotal = 0
   for (const m of movements) {
@@ -97,12 +98,14 @@ export function categoryDistribution(
     const amt = effectiveAmount(m, currency)
     grandTotal += amt
     const key = m.category_id ?? "__none__"
-    const name = m.category_id ? (catMap.get(m.category_id) ?? "Sin categoría") : "Sin categoría"
+    const cat = m.category_id ? catMap.get(m.category_id) : undefined
+    const name = cat?.name ?? "Sin categoría"
+    const icon = cat?.icon ?? null
     const existing = totals.get(key)
     if (existing) {
       existing.total += amt
     } else {
-      totals.set(key, { id: key === "__none__" ? "" : key, name, total: amt })
+      totals.set(key, { id: key === "__none__" ? "" : key, name, icon, total: amt })
     }
   }
 
@@ -111,6 +114,7 @@ export function categoryDistribution(
     .map((item) => ({
       categoryId: item.id,
       name: item.name,
+      icon: item.icon,
       total: item.total,
       percent: grandTotal > 0 ? (item.total / grandTotal) * 100 : 0,
     }))
@@ -188,6 +192,7 @@ export function weekdayPattern(movements: Movement[], currency?: Currency): Week
 
 export interface CategoryComparison {
   name: string
+  icon?: string | null
   a: number
   b: number
   deltaAbs: number
@@ -210,10 +215,10 @@ export interface PeriodComparison {
 export function periodComparison(
   movsA: Movement[],
   movsB: Movement[],
-  categories: { id: string; name: string }[],
+  categories: { id: string; name: string; icon?: string | null }[],
   currency?: Currency
 ): PeriodComparison {
-  const catMap = new Map(categories.map((c) => [c.id, c.name]))
+  const catMap = new Map(categories.map((c) => [c.id, c]))
 
   function buildTotals(movs: Movement[]) {
     const map = new Map<string, number>()
@@ -238,9 +243,12 @@ export function periodComparison(
   for (const key of allKeys) {
     const a = mapA.get(key) ?? 0
     const b = mapB.get(key) ?? 0
-    const name = key === "__none__" ? "Sin categoría" : (catMap.get(key) ?? "Sin categoría")
+    const cat = key !== "__none__" ? catMap.get(key) : undefined
+    const name = cat?.name ?? "Sin categoría"
+    const icon = cat?.icon ?? null
     categories_list.push({
       name,
+      icon,
       a,
       b,
       deltaAbs: a - b,

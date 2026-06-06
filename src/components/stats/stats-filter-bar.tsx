@@ -372,17 +372,19 @@ export function StatsFilterBar({
           />
         )}
 
-        {/* Type segmented control */}
-        <SegmentedControl
-          value={filter.type}
-          onChange={(type) => onChange({ ...filter, type: type as FilterState["type"] })}
-          options={[
-            { value: "all", label: "Todos" },
-            { value: "income", label: "Ingresos" },
-            { value: "expense", label: "Gastos" },
-          ]}
-          aria-label="Tipo de movimiento"
-        />
+        {/* Type segmented control — hidden in comparar tab */}
+        {!isCompare && (
+          <SegmentedControl
+            value={filter.type}
+            onChange={(type) => onChange({ ...filter, type: type as FilterState["type"] })}
+            options={[
+              { value: "all", label: "Todos" },
+              { value: "income", label: "Ingresos" },
+              { value: "expense", label: "Gastos" },
+            ]}
+            aria-label="Tipo de movimiento"
+          />
+        )}
 
         {/* Spacer pushes Vistas to the right */}
         <div className="flex-1" />

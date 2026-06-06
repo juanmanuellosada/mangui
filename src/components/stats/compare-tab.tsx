@@ -22,6 +22,7 @@ import {
   filterMovements,
   periodComparison,
 } from "@/lib/stats"
+import { renderCategoryIcon } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
 import Link from "next/link"
 
@@ -94,7 +95,7 @@ export function CompareTab({ movements, categories, currency = "ARS", period1, p
     dateTo: period1.to ?? undefined,
     categoryIds: sharedFilter.categoryIds.length > 0 ? sharedFilter.categoryIds : undefined,
     accountIds: sharedFilter.accountIds.length > 0 ? sharedFilter.accountIds : undefined,
-    type: sharedFilter.type,
+    type: "all" as const,
     currency: currency !== "ARS" ? (currency as "USD") : undefined,
   }), [period1, sharedFilter, currency])
 
@@ -103,7 +104,7 @@ export function CompareTab({ movements, categories, currency = "ARS", period1, p
     dateTo: period2.to ?? undefined,
     categoryIds: sharedFilter.categoryIds.length > 0 ? sharedFilter.categoryIds : undefined,
     accountIds: sharedFilter.accountIds.length > 0 ? sharedFilter.accountIds : undefined,
-    type: sharedFilter.type,
+    type: "all" as const,
     currency: currency !== "ARS" ? (currency as "USD") : undefined,
   }), [period2, sharedFilter, currency])
 
@@ -237,7 +238,8 @@ export function CompareTab({ movements, categories, currency = "ARS", period1, p
                 href={`/app/movimientos?type=expense`}
                 className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-muted/50 transition-colors group cursor-pointer"
               >
-                <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {cat.icon ? renderCategoryIcon(cat.icon, { className: "text-sm flex-shrink-0" }) : null}
                   <p className="text-xs font-medium truncate">{cat.name}</p>
                 </div>
                 <div className="text-right min-w-0">

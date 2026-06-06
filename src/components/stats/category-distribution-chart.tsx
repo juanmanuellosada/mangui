@@ -52,8 +52,10 @@ export function CategoryDistributionChart({ items, type, currency = "ARS" }: Cat
 
     top.forEach((item, idx) => {
       rows.push({ name: item.name, value: Math.round(item.total), categoryId: item.categoryId })
+      const emoji = item.icon || null
       cfg[item.name] = {
         label: item.name,
+        ...(emoji ? { icon: () => <span className="text-sm leading-none select-none">{emoji}</span> } : {}),
         colors: {
           light: [COLORS_LIGHT[idx % COLORS_LIGHT.length]],
           dark: [COLORS_DARK[idx % COLORS_DARK.length]],
