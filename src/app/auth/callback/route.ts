@@ -30,6 +30,33 @@ export async function GET(request: NextRequest) {
     if (exchangeError) {
       return NextResponse.redirect(`${origin}/login?error=oauth`);
     }
+
+    // Best-effort: copy the Google profile photo into profiles.avatar_url
+    // (only when the row has no avatar yet, so user-uploaded photos are never overwritten).
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const googleAvatar = (
+        user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture
+      ) as string | undefined;
+
+      if (user && googleAvatar) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("id", user.id)
+          .single();
+
+        if (profile && !profile.avatar_url) {
+          await supabase
+            .from("profiles")
+            .update({ avatar_url: googleAvatar })
+            .eq("id", user.id);
+        }
+      }
+    } catch (avatarErr) {
+      console.error("[auth/callback] avatar sync failed:", avatarErr);
+    }
+
     return NextResponse.redirect(`${origin}${next}`);
   }
 
