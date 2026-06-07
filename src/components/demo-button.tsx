@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signInAsDemo } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -12,7 +11,6 @@ interface DemoButtonProps {
 }
 
 export function DemoButton({ label = "Ver demo", className }: DemoButtonProps) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleClick() {
@@ -25,13 +23,12 @@ export function DemoButton({ label = "Ver demo", className }: DemoButtonProps) {
           access_token: res.access_token,
           refresh_token: res.refresh_token,
         });
-        router.push("/inicio");
-        router.refresh();
+        window.location.assign("/inicio");
       } else {
-        router.push("/login?demo=error");
+        window.location.assign("/login?demo=error");
       }
     } catch {
-      router.push("/login?demo=error");
+      window.location.assign("/login?demo=error");
     } finally {
       setLoading(false);
     }
