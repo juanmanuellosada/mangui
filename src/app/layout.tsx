@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   ),
   title: {
     default: "mangui — Finanzas personales en pesos y dólares",
-    template: "%s | mangui",
+    template: "%s | Mangui 🥭",
   },
   description:
     "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Multimoneda, cuotas, presupuestos y más — hecho para Argentina.",
