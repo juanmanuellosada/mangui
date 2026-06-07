@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { ManguitoFab } from "@/components/manguito-fab";
 import { QuickAddProvider } from "@/components/quick-add-provider";
 import { DemoBanner } from "@/components/demo-banner";
 
@@ -61,6 +62,9 @@ export default async function AppLayout({
 
         {/* Mobile bottom nav */}
         <AppBottomNav />
+
+        {/* Manguito AI chat bubble — mobile only, above bottom nav */}
+        <ManguitoFab />
       </div>
     </QuickAddProvider>
   );
