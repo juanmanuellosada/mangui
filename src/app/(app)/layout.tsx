@@ -24,12 +24,22 @@ export default async function AppLayout({
     redirect("/login");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name, avatar_url")
+    .eq("id", user.id)
+    .single();
+
   const name =
+    profile?.name ??
     (user.user_metadata?.full_name as string | undefined) ??
     user.email?.split("@")[0] ??
     "Usuario";
   const email = user.email ?? "";
-  const avatarUrl = (user.user_metadata?.avatar_url as string | undefined) ?? null;
+  const avatarUrl =
+    profile?.avatar_url ??
+    (user.user_metadata?.avatar_url as string | undefined) ??
+    null;
 
   return (
     <QuickAddProvider>
