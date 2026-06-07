@@ -46,6 +46,7 @@ import {
 import { MOVEMENTS_KEY, ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import { renderCategoryIcon } from "@/lib/categories"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -550,6 +551,7 @@ function GoalCard({
   selectionMode,
   isSelected,
   onToggleSelect,
+  isDemo,
 }: {
   goal: Goal
   scope: GoalScope
@@ -560,6 +562,7 @@ function GoalCard({
   selectionMode?: boolean
   isSelected?: boolean
   onToggleSelect?: (id: string) => void
+  isDemo?: boolean
 }) {
   const progress = computeGoalProgress(goal, movements, scope)
   const isCompleted = goal.status === "completed"
@@ -679,8 +682,9 @@ function GoalCard({
               variant="ghost"
               size="icon-sm"
               onClick={(e) => { e.stopPropagation(); onEdit(goal) }}
-              title="Editar"
+              title={isDemo ? "No disponible en el modo demo" : "Editar"}
               className="press-effect cursor-pointer flex-shrink-0"
+              disabled={isDemo}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -726,10 +730,12 @@ function CreateGoalDialog({
   categories,
   accounts,
   movements,
+  isDemo,
 }: {
   categories: Category[]
   accounts: Account[]
   movements: Movement[]
+  isDemo?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -759,6 +765,8 @@ function CreateGoalDialog({
         onClick={() => setOpen(true)}
         size="sm"
         className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+        disabled={isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
       >
         <PlusCircle className="h-4 w-4 shrink-0" />
         <span className="hidden sm:inline">Nueva meta</span>
@@ -838,6 +846,7 @@ function EditGoalDialog({
   movements,
   open,
   onOpenChange,
+  isDemo,
 }: {
   goal: Goal
   categories: Category[]
@@ -845,6 +854,7 @@ function EditGoalDialog({
   movements: Movement[]
   open: boolean
   onOpenChange: (v: boolean) => void
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -909,7 +919,8 @@ function EditGoalDialog({
             <Button
               variant="destructive"
               onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
+              disabled={deleteMutation.isPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect cursor-pointer"
             >
               {deleteMutation.isPending ? "Eliminando…" : "Eliminar"}
@@ -959,6 +970,7 @@ function EditGoalDialog({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function GoalsList() {
+  const isDemo = useIsDemo()
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [filters, setFilters] = useState<GoalFilters>(DEFAULT_FILTERS)
   const ms = useMultiSelect()
@@ -1162,7 +1174,7 @@ export function GoalsList() {
             <SelectButton onClick={ms.enter} />
           )}
           {!ms.selectionMode && (
-            <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} />
+            <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} />
           )}
         </div>
       </div>
@@ -1214,7 +1226,7 @@ export function GoalsList() {
               Definí un objetivo de ahorro, ingreso o reducción para hacer seguimiento de tu progreso.
             </p>
           </div>
-          <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} />
+          <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} />
         </div>
       )}
 
@@ -1251,6 +1263,7 @@ export function GoalsList() {
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(goal.id)}
               onToggleSelect={ms.toggle}
+              isDemo={isDemo}
             />
           ))}
         </div>
@@ -1265,6 +1278,7 @@ export function GoalsList() {
           movements={movements}
           open={!!editingGoal}
           onOpenChange={(v) => { if (!v) setEditingGoal(null) }}
+          isDemo={isDemo}
         />
       )}
 
@@ -1294,7 +1308,8 @@ export function GoalsList() {
             <Button
               variant="destructive"
               onClick={handleBulkDelete}
-              disabled={bulkPending}
+              disabled={bulkPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect"
             >
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}

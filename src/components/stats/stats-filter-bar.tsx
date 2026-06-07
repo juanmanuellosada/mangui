@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { CurrencySegmented } from "@/components/ui/currency-segmented"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { getPreset } from "@/lib/date-ranges"
@@ -197,6 +198,7 @@ export function StatsFilterBar({
   onRestoreSharedFilter,
 }: StatsFilterBarProps) {
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState("")
 
@@ -342,9 +344,11 @@ export function StatsFilterBar({
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    deleteMutation.mutate(view.id)
+                    if (!isDemo) deleteMutation.mutate(view.id)
                   }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={isDemo}
+                  title={isDemo ? "No disponible en el modo demo" : `Eliminar vista ${view.name}`}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label={`Eliminar vista ${view.name}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -352,7 +356,12 @@ export function StatsFilterBar({
               </div>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)} className="gap-2">
+            <DropdownMenuItem
+              onSelect={() => { if (!isDemo) setSaveDialogOpen(true) }}
+              disabled={isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
+              className="gap-2"
+            >
               <Plus className="h-3.5 w-3.5" />
               {isCompare ? "Guardar períodos actuales" : "Guardar filtros actuales"}
             </DropdownMenuItem>
@@ -468,7 +477,8 @@ export function StatsFilterBar({
             </Button>
             <Button
               size="sm"
-              disabled={!saveName.trim() || createMutation.isPending}
+              disabled={!saveName.trim() || createMutation.isPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               onClick={() => createMutation.mutate({ name: saveName.trim(), payload: buildSavePayload() })}
             >
               Guardar

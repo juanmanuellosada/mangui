@@ -42,6 +42,7 @@ import { fetchAllMovements } from "@/lib/movements"
 import { nextCardPayment, currentCycleSummary } from "@/lib/cards"
 import { format, parseISO, isBefore, isEqual, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
+import { useIsDemo } from "@/lib/use-is-demo"
 
 type CardStatement = Tables<"card_statements">
 
@@ -111,7 +112,7 @@ function AccountCardSkeleton() {
 }
 
 // ── Create dialog ─────────────────────────────────────────────
-function CreateAccountDialog({ userId }: { userId?: string }) {
+function CreateAccountDialog({ userId, isDemo }: { userId?: string; isDemo?: boolean }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -157,7 +158,12 @@ function CreateAccountDialog({ userId }: { userId?: string }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2 font-semibold press-effect">
+      <Button
+        onClick={() => setOpen(true)}
+        className="gap-2 font-semibold press-effect"
+        disabled={isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
+      >
         <Plus className="h-4 w-4" />
         Nueva cuenta
       </Button>
@@ -179,7 +185,7 @@ function CreateAccountDialog({ userId }: { userId?: string }) {
 }
 
 // ── Edit dialog ───────────────────────────────────────────────
-function EditAccountDialog({ account, userId }: { account: Account; userId?: string }) {
+function EditAccountDialog({ account, userId, isDemo }: { account: Account; userId?: string; isDemo?: boolean }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -250,9 +256,10 @@ function EditAccountDialog({ account, userId }: { account: Account; userId?: str
       <Button
         variant="ghost"
         size="icon-sm"
-        title="Editar cuenta"
+        title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"}
         className="press-effect cursor-pointer"
         onClick={() => setOpen(true)}
+        disabled={isDemo}
       >
         <Pencil className="h-3.5 w-3.5" />
       </Button>
@@ -275,7 +282,7 @@ function EditAccountDialog({ account, userId }: { account: Account; userId?: str
 }
 
 // ── Delete dialog ─────────────────────────────────────────────
-function DeleteAccountDialog({ account }: { account: Account }) {
+function DeleteAccountDialog({ account, isDemo }: { account: Account; isDemo?: boolean }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
@@ -319,7 +326,7 @@ function DeleteAccountDialog({ account }: { account: Account }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={
-        <Button variant="ghost" size="icon-sm" title="Eliminar cuenta" className="press-effect cursor-pointer">
+        <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" disabled={isDemo}>
           <Trash2 className="h-3.5 w-3.5 text-destructive" />
         </Button>
       } />
@@ -380,6 +387,7 @@ function AccountCard({
   selectionMode,
   isSelected,
   onToggle,
+  isDemo,
 }: {
   account: Account
   balance: AccountBalance | undefined
@@ -388,6 +396,7 @@ function AccountCard({
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  isDemo?: boolean
 }) {
   const currentBalance = balance?.current_balance ?? account.initial_balance
   const isCreditCard = account.type === "tarjeta_credito"
@@ -536,8 +545,8 @@ function AccountCard({
       {/* Actions — hidden in selection mode */}
       {!selectionMode && (
         <div className="flex gap-0.5 flex-shrink-0">
-          <EditAccountDialog account={account} userId={userId} />
-          <DeleteAccountDialog account={account} />
+          <EditAccountDialog account={account} userId={userId} isDemo={isDemo} />
+          <DeleteAccountDialog account={account} isDemo={isDemo} />
         </div>
       )}
     </div>
@@ -823,6 +832,8 @@ interface AccountsListProps {
 
 // ── Main component ─────────────────────────────────────────────
 export function AccountsList({ rateType, manualRate, rates }: AccountsListProps) {
+  const isDemo = useIsDemo()
+
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
     queryKey: ACCOUNTS_KEY,
     queryFn: fetchAccounts,
@@ -1002,7 +1013,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
           {!loadingAccounts && accounts && accounts.length > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          {!ms.selectionMode && <CreateAccountDialog userId={userId} />}
+          {!ms.selectionMode && <CreateAccountDialog userId={userId} isDemo={isDemo} />}
         </div>
       </div>
 
@@ -1047,7 +1058,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
               Agregá tu primera cuenta bancaria, billetera o efectivo para empezar.
             </p>
           </div>
-          <CreateAccountDialog userId={userId} />
+          <CreateAccountDialog userId={userId} isDemo={isDemo} />
         </div>
       )}
 
@@ -1086,6 +1097,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(account.id)}
               onToggle={ms.toggle}
+              isDemo={isDemo}
             />
           ))}
         </div>
@@ -1111,6 +1123,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
                     selectionMode={ms.selectionMode}
                     isSelected={ms.isSelected(account.id)}
                     onToggle={ms.toggle}
+                    isDemo={isDemo}
                   />
                 ))}
               </div>
@@ -1134,6 +1147,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
                     selectionMode={ms.selectionMode}
                     isSelected={ms.isSelected(account.id)}
                     onToggle={ms.toggle}
+                    isDemo={isDemo}
                   />
                 ))}
               </div>
@@ -1171,7 +1185,8 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
             <Button
               variant="destructive"
               onClick={handleBulkDelete}
-              disabled={bulkPending}
+              disabled={bulkPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect"
             >
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}

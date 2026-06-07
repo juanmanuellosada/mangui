@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import type { Account } from "@/lib/accounts"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -106,6 +107,7 @@ function RecurringRow({
   selectionMode,
   isSelected,
   onToggle,
+  isDemo,
 }: {
   rec: RecurringTransaction
   accounts: Account[]
@@ -113,6 +115,7 @@ function RecurringRow({
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
 
@@ -221,13 +224,14 @@ function RecurringRow({
           className="flex-shrink-0"
           onClick={(e) => {
             e.stopPropagation()
+            if (isDemo) return
             const newStatus = rec.status === "active" ? "paused" : "active"
             statusMutation.mutate(newStatus)
           }}
         >
           <Switch
             checked={rec.status === "active"}
-            disabled={statusMutation.isPending}
+            disabled={statusMutation.isPending || isDemo}
             aria-label={rec.status === "active" ? "Pausar recurrente" : "Activar recurrente"}
           />
         </div>
@@ -716,6 +720,7 @@ function normalizeStr(s: string): string {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function RecurringList() {
+  const isDemo = useIsDemo()
   const [filter, setFilter] = useState<RecurringFilter>(defaultRecurringFilter)
   const [editingRec, setEditingRec] = useState<RecurringTransaction | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -818,12 +823,13 @@ export function RecurringList() {
   }
 
   const openCreate = () => {
+    if (isDemo) return
     setEditingRec(null)
     setDialogOpen(true)
   }
 
   const openEdit = (r: RecurringTransaction) => {
-    if (ms.selectionMode) return
+    if (ms.selectionMode || isDemo) return
     setEditingRec(r)
     setDialogOpen(true)
   }
@@ -847,6 +853,8 @@ export function RecurringList() {
               onClick={openCreate}
               size="sm"
               className="gap-1.5 press-effect font-semibold shadow-sm shadow-primary/20"
+              disabled={isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
             >
               <PlusCircle className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Nueva recurrente</span>
@@ -902,7 +910,7 @@ export function RecurringList() {
             </p>
           </div>
           {recurring.length === 0 && (
-            <Button onClick={openCreate} className="press-effect gap-2">
+            <Button onClick={openCreate} className="press-effect gap-2" disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined}>
               <PlusCircle className="h-4 w-4" />
               Nueva recurrente
             </Button>
@@ -922,6 +930,7 @@ export function RecurringList() {
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(r.id)}
               onToggle={ms.toggle}
+              isDemo={isDemo}
             />
           ))}
         </div>
@@ -962,7 +971,7 @@ export function RecurringList() {
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending || isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect">
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
             </Button>
           </div>

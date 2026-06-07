@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import type { Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
 import {
@@ -44,6 +45,7 @@ export type OccurrenceWithRec = RecurringOccurrence & {
 interface PendingInboxProps {
   occurrences: OccurrenceWithRec[]
   accounts: Account[]
+  isDemo?: boolean
 }
 
 // ── Confirm occurrence ─────────────────────────────────────────────────────────
@@ -213,9 +215,11 @@ function EditOccurrenceDialog({
 function OccurrenceCard({
   occ,
   accounts,
+  isDemo,
 }: {
   occ: OccurrenceWithRec
   accounts: Account[]
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
@@ -306,30 +310,30 @@ function OccurrenceCard({
           <Button
             size="icon-sm"
             variant="ghost"
-            title="Editar monto y confirmar"
+            title={isDemo ? "No disponible en el modo demo" : "Editar monto y confirmar"}
             className="press-effect cursor-pointer"
             onClick={() => setEditOpen(true)}
-            disabled={isLoading}
+            disabled={isLoading || isDemo}
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             size="icon-sm"
             variant="ghost"
-            title="Saltar"
+            title={isDemo ? "No disponible en el modo demo" : "Saltar"}
             className="press-effect cursor-pointer"
             onClick={() => skipMutation.mutate()}
-            disabled={isLoading}
+            disabled={isLoading || isDemo}
           >
             <SkipForward className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
           <Button
             size="icon-sm"
             variant="ghost"
-            title="Confirmar"
+            title={isDemo ? "No disponible en el modo demo" : "Confirmar"}
             className="press-effect cursor-pointer"
             onClick={() => confirmMutation.mutate()}
-            disabled={isLoading}
+            disabled={isLoading || isDemo}
           >
             <CheckCircle2 className="h-3.5 w-3.5 text-success" />
           </Button>
@@ -352,6 +356,8 @@ export function PendingInbox({
   occurrences,
   accounts,
 }: PendingInboxProps) {
+  const isDemo = useIsDemo()
+
   if (occurrences.length === 0) return null
 
   return (
@@ -369,7 +375,7 @@ export function PendingInbox({
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
         {occurrences.map((occ) => (
           <div key={occ.id} className="px-4">
-            <OccurrenceCard occ={occ} accounts={accounts} />
+            <OccurrenceCard occ={occ} accounts={accounts} isDemo={isDemo} />
           </div>
         ))}
       </div>

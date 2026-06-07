@@ -46,6 +46,7 @@ import {
 import { MOVEMENTS_KEY, ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import { renderCategoryIcon } from "@/lib/categories"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -510,6 +511,7 @@ function BudgetCard({
   selectionMode,
   isSelected,
   onToggleSelect,
+  isDemo,
 }: {
   budget: Budget
   movements: Movement[]
@@ -521,6 +523,7 @@ function BudgetCard({
   selectionMode?: boolean
   isSelected?: boolean
   onToggleSelect?: (id: string) => void
+  isDemo?: boolean
 }) {
   const progress = computeBudgetProgress(budget, movements)
   const scope = scopeLabel(budget, { categories, accounts })
@@ -597,18 +600,21 @@ function BudgetCard({
         {/* Actions — hidden in selection mode */}
         {!selectionMode && (
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <Switch
-              checked={!isPaused}
-              onCheckedChange={() => onToggleStatus(budget)}
-              disabled={isTogglingStatus}
-              aria-label={isPaused ? "Reanudar presupuesto" : "Pausar presupuesto"}
-            />
+            <span title={isDemo ? "No disponible en el modo demo" : undefined}>
+              <Switch
+                checked={!isPaused}
+                onCheckedChange={() => onToggleStatus(budget)}
+                disabled={isTogglingStatus || isDemo}
+                aria-label={isPaused ? "Reanudar presupuesto" : "Pausar presupuesto"}
+              />
+            </span>
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={(e) => { e.stopPropagation(); onEdit(budget) }}
-              title="Editar"
+              title={isDemo ? "No disponible en el modo demo" : "Editar"}
               className="press-effect cursor-pointer"
+              disabled={isDemo}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -683,10 +689,12 @@ function CreateBudgetDialog({
   categories,
   accounts,
   movements,
+  isDemo,
 }: {
   categories: Category[]
   accounts: Account[]
   movements: Movement[]
+  isDemo?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -734,6 +742,8 @@ function CreateBudgetDialog({
         onClick={() => setOpen(true)}
         size="sm"
         className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+        disabled={isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
       >
         <PlusCircle className="h-4 w-4 shrink-0" />
         <span className="hidden sm:inline">Nuevo presupuesto</span>
@@ -770,6 +780,7 @@ function EditBudgetDialog({
   movements,
   open,
   onOpenChange,
+  isDemo,
 }: {
   budget: Budget
   categories: Category[]
@@ -777,6 +788,7 @@ function EditBudgetDialog({
   movements: Movement[]
   open: boolean
   onOpenChange: (v: boolean) => void
+  isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
 
@@ -853,7 +865,8 @@ function EditBudgetDialog({
             <Button
               variant="destructive"
               onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
+              disabled={deleteMutation.isPending || isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="press-effect cursor-pointer"
             >
               {deleteMutation.isPending ? "Eliminando…" : "Eliminar"}
@@ -913,6 +926,7 @@ function SummaryBar({ budgets, movements }: { budgets: Budget[]; movements: Move
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function BudgetsList() {
+  const isDemo = useIsDemo()
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
   const ms = useMultiSelect()
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -1079,7 +1093,7 @@ export function BudgetsList() {
           {!loadingBudgets && budgets.length > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          {!ms.selectionMode && <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} />}
+          {!ms.selectionMode && <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} />}
         </div>
       </div>
 
@@ -1130,7 +1144,7 @@ export function BudgetsList() {
               Creá un presupuesto para controlar cuánto gastás en cada categoría.
             </p>
           </div>
-          <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} />
+          <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} />
         </div>
       )}
 
@@ -1168,6 +1182,7 @@ export function BudgetsList() {
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(budget.id)}
               onToggleSelect={ms.toggle}
+              isDemo={isDemo}
             />
           ))}
         </div>
@@ -1182,6 +1197,7 @@ export function BudgetsList() {
           movements={movements}
           open={!!editingBudget}
           onOpenChange={(v) => { if (!v) setEditingBudget(null) }}
+          isDemo={isDemo}
         />
       )}
 
@@ -1206,7 +1222,7 @@ export function BudgetsList() {
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending || isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect">
               {bulkPending ? "Eliminando…" : `Eliminar (${ms.count})`}
             </Button>
           </div>
