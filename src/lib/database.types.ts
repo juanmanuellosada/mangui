@@ -915,7 +915,13 @@ export type Database = {
           email: string | null
           id: string
           is_demo: boolean
+          mp_preapproval_id: string | null
+          mp_subscription_status: string | null
           name: string | null
+          payment_exempt: boolean
+          payment_exempt_reason: string | null
+          plan: string
+          subscription_status_changed_at: string | null
           updated_at: string
         }
         Insert: {
@@ -925,7 +931,13 @@ export type Database = {
           email?: string | null
           id: string
           is_demo?: boolean
+          mp_preapproval_id?: string | null
+          mp_subscription_status?: string | null
           name?: string | null
+          payment_exempt?: boolean
+          payment_exempt_reason?: string | null
+          plan?: string
+          subscription_status_changed_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -935,7 +947,13 @@ export type Database = {
           email?: string | null
           id?: string
           is_demo?: boolean
+          mp_preapproval_id?: string | null
+          mp_subscription_status?: string | null
           name?: string | null
+          payment_exempt?: boolean
+          payment_exempt_reason?: string | null
+          plan?: string
+          subscription_status_changed_at?: string | null
           updated_at?: string
         }
         Relationships: []

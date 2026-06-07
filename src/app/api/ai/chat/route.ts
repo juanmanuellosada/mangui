@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { isPremium, FREE } from "@/lib/plans"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import {
   streamText,
@@ -21,7 +22,6 @@ import {
 
 // Argentina timezone offset for "today"
 const AR_TZ = "America/Argentina/Buenos_Aires"
-const DAILY_LIMIT = 30
 const MODEL_ID = "gemini-2.5-flash"
 
 function getTodayAR(): string {
@@ -83,13 +83,18 @@ export async function POST(req: NextRequest) {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("ai_unlimited")
+    .select("ai_unlimited, plan, payment_exempt, mp_subscription_status")
     .eq("id", user.id)
     .maybeSingle()
 
-  const isUnlimited = profile?.ai_unlimited === true
+  const premiumByPlan = isPremium({
+    payment_exempt: profile?.payment_exempt ?? null,
+    mp_subscription_status: profile?.mp_subscription_status ?? null,
+  })
+  const isUnlimited = premiumByPlan || profile?.ai_unlimited === true
+  const dailyLimit = isUnlimited ? Infinity : FREE.aiPerDay
 
-  if (!isUnlimited) {
+  if (dailyLimit !== Infinity) {
     const todayStart = `${getTodayAR()}T00:00:00.000Z`
     const { count, error: countError } = await admin
       .from("ai_usage")
@@ -104,7 +109,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if ((count ?? 0) >= DAILY_LIMIT) {
+    if ((count ?? 0) >= dailyLimit) {
       return NextResponse.json(
         {
           error: "rate_limited",

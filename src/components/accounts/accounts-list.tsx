@@ -43,6 +43,7 @@ import { nextCardPayment, currentCycleSummary } from "@/lib/cards"
 import { format, parseISO, isBefore, isEqual, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { usePlan } from "@/lib/use-plan"
 
 type CardStatement = Tables<"card_statements">
 
@@ -112,15 +113,30 @@ function AccountCardSkeleton() {
 }
 
 // ── Create dialog ─────────────────────────────────────────────
-function CreateAccountDialog({ userId, isDemo }: { userId?: string; isDemo?: boolean }) {
+function CreateAccountDialog({
+  userId,
+  isDemo,
+  atLimit,
+}: {
+  userId?: string
+  isDemo?: boolean
+  atLimit?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+
+  const isDisabled = isDemo || atLimit
 
   const mutation = useMutation({
     mutationFn: async (values: AccountFormValues) => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
+
+      // Client-side plan guard (belt-and-suspenders)
+      if (atLimit) {
+        throw new Error("Alcanzaste el límite del plan Free. Mejorá a Premium para crear más.")
+      }
 
       const { data, error } = await supabase
         .from("accounts")
@@ -158,15 +174,24 @@ function CreateAccountDialog({ userId, isDemo }: { userId?: string; isDemo?: boo
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        className="gap-2 font-semibold press-effect"
-        disabled={isDemo}
-        title={isDemo ? "No disponible en el modo demo" : undefined}
-      >
-        <Plus className="h-4 w-4" />
-        Nueva cuenta
-      </Button>
+      {atLimit ? (
+        <Link
+          href="/ajustes#plan"
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
+        >
+          Mejorá a Premium
+        </Link>
+      ) : (
+        <Button
+          onClick={() => setOpen(true)}
+          className="gap-2 font-semibold press-effect"
+          disabled={isDisabled}
+          title={isDemo ? "No disponible en el modo demo" : undefined}
+        >
+          <Plus className="h-4 w-4" />
+          Nueva cuenta
+        </Button>
+      )}
       <MangoSheet
         open={open}
         onOpenChange={setOpen}
@@ -833,6 +858,7 @@ interface AccountsListProps {
 // ── Main component ─────────────────────────────────────────────
 export function AccountsList({ rateType, manualRate, rates }: AccountsListProps) {
   const isDemo = useIsDemo()
+  const { isPremium: userIsPremium, limits } = usePlan()
 
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
     queryKey: ACCOUNTS_KEY,
@@ -927,6 +953,8 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
   }, [accounts, statements, allMovements, rateType, rates, manualRate])
 
   const filtersActive = isFiltersActive(filters)
+  const accountLimit = limits.accounts
+  const atLimit = !userIsPremium && (accounts?.length ?? 0) >= accountLimit
 
   async function handleBulkDelete() {
     setBulkPending(true)
@@ -1013,7 +1041,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
           {!loadingAccounts && accounts && accounts.length > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          {!ms.selectionMode && <CreateAccountDialog userId={userId} isDemo={isDemo} />}
+          {!ms.selectionMode && <CreateAccountDialog userId={userId} isDemo={isDemo} atLimit={atLimit} />}
         </div>
       </div>
 
@@ -1058,7 +1086,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
               Agregá tu primera cuenta bancaria, billetera o efectivo para empezar.
             </p>
           </div>
-          <CreateAccountDialog userId={userId} isDemo={isDemo} />
+          <CreateAccountDialog userId={userId} isDemo={isDemo} atLimit={atLimit} />
         </div>
       )}
 

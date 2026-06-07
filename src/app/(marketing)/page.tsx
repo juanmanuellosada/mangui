@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Zap,
   BarChart3,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -84,6 +86,12 @@ export default async function LandingPage() {
               className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
             >
               Manguito IA
+            </Link>
+            <Link
+              href="#precios"
+              className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
+            >
+              Precios
             </Link>
           </nav>
 
@@ -939,6 +947,140 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* ══ PRECIOS ══════════════════════════════════════════ */}
+        <section id="precios" className="py-24 md:py-32 bg-muted/25">
+          <div className="container mx-auto px-5 max-w-6xl">
+            <div className="mb-14 max-w-lg">
+              <h2
+                className="text-foreground leading-tight tracking-tight text-wrap-balance"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(1.7rem,4vw,2.5rem)",
+                  letterSpacing: "-0.025em",
+                }}
+              >
+                Simple y sin sorpresas.
+              </h2>
+              <p className="text-sm text-muted-foreground mt-4 leading-relaxed max-w-[42ch]">
+                Empezá gratis. Mejorá cuando quieras. Cancelás cuando quieras.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+              {/* Free card */}
+              <div className="rounded-2xl border border-border/60 bg-card p-7 flex flex-col gap-6">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Free</p>
+                  <p
+                    className="text-4xl font-bold text-foreground tabular-nums"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    $0
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">para siempre</p>
+                </div>
+
+                <ul className="space-y-2.5 flex-1">
+                  {[
+                    "1 cuenta",
+                    "1 presupuesto",
+                    "1 meta",
+                    "3 recurrentes",
+                    "IA hasta 10 consultas/día",
+                    "Movimientos ilimitados",
+                    "Cuotas y transferencias",
+                    "Estadísticas",
+                    "Multimoneda (ARS + USD)",
+                  ].map((feat) => (
+                    <li key={feat} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      {feat}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/register"
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "w-full font-semibold press-effect h-11 text-sm"
+                  )}
+                >
+                  Crear cuenta gratis
+                </Link>
+              </div>
+
+              {/* Premium card */}
+              <div className="relative rounded-2xl border-2 border-primary/40 bg-card p-7 flex flex-col gap-6 shadow-lg shadow-primary/8">
+                {/* Recommended badge */}
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary-foreground bg-primary px-3 py-1 rounded-full shadow-sm">
+                    <Sparkles className="h-3 w-3" aria-hidden="true" />
+                    Recomendado
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-2">Premium</p>
+                  <p
+                    className="text-4xl font-bold text-foreground tabular-nums"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    {new Intl.NumberFormat("es-AR", {
+                      style: "currency",
+                      currency: "ARS",
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(9999)}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">por mes · vía MercadoPago</p>
+                </div>
+
+                <ul className="space-y-2.5 flex-1">
+                  {[
+                    "Todo lo de Free, más:",
+                    "Cuentas ilimitadas",
+                    "Presupuestos ilimitados",
+                    "Metas ilimitadas",
+                    "Recurrentes ilimitados",
+                    "Reglas automáticas",
+                    "Adjuntos en movimientos",
+                    "Export CSV",
+                    "IA sin límite diario",
+                  ].map((feat, i) => (
+                    <li key={feat} className="flex items-start gap-2.5 text-sm">
+                      {i === 0 ? (
+                        <span className="text-muted-foreground font-medium">{feat}</span>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
+                          <span className="text-foreground">{feat}</span>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="space-y-2">
+                  <Link
+                    href="/register"
+                    className={cn(
+                      buttonVariants(),
+                      "w-full font-semibold press-effect h-11 text-sm gap-2 shadow-md shadow-primary/25"
+                    )}
+                  >
+                    Empezar
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Cancelás cuando quieras
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ══ FINAL CTA (dark) ════════════════════════════════ */}
         <section className="bg-[oklch(0.12_0.025_185)] relative overflow-hidden">
           <div className="absolute inset-0 -z-0 overflow-hidden" aria-hidden="true">
@@ -1015,6 +1157,14 @@ export default async function LandingPage() {
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
                     Funciones
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="#precios"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  >
+                    Precios
                   </Link>
                 </li>
                 <li>

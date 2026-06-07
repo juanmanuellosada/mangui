@@ -35,6 +35,8 @@ import {
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { usePlan } from "@/lib/use-plan"
+import Link from "next/link"
 import {
   RULES_KEY,
   RULE_CONDITIONS_KEY,
@@ -444,6 +446,9 @@ function RuleFilterBar({
 export function RulesList() {
   const queryClient = useQueryClient()
   const isDemo = useIsDemo()
+  const { isPremium: userIsPremium } = usePlan()
+  // Rules are premium-only (FREE limit = 0)
+  const isPremiumFeature = !userIsPremium
 
   const [filters, setFilters] = useState<RuleFilters>(DEFAULT_FILTERS)
   const [showForm, setShowForm] = useState(false)
@@ -548,6 +553,10 @@ export function RulesList() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
+
+      if (!ruleId && isPremiumFeature) {
+        throw new Error("Las reglas automáticas son una función Premium. Mejorá tu plan para crearlas.")
+      }
 
       if (ruleId) {
         const { error } = await supabase.from("auto_rules").update({
@@ -680,20 +689,29 @@ export function RulesList() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {!isLoading && rules.length > 0 && !ms.selectionMode && !isDemo && (
+          {!isLoading && rules.length > 0 && !ms.selectionMode && !isDemo && !isPremiumFeature && (
             <SelectButton onClick={ms.enter} />
           )}
           {!ms.selectionMode && (
-            <Button
-              onClick={() => openNewForm()}
-              size="sm"
-              disabled={isDemo}
-              title={isDemo ? "No disponible en el modo demo" : undefined}
-              className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
-            >
-              <PlusCircle className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Nueva regla</span>
-            </Button>
+            isPremiumFeature ? (
+              <Link
+                href="/ajustes#plan"
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
+              >
+                Función Premium
+              </Link>
+            ) : (
+              <Button
+                onClick={() => openNewForm()}
+                size="sm"
+                disabled={isDemo}
+                title={isDemo ? "No disponible en el modo demo" : undefined}
+                className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+              >
+                <PlusCircle className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Nueva regla</span>
+              </Button>
+            )
           )}
         </div>
       </div>
@@ -746,10 +764,19 @@ export function RulesList() {
                 Cre&#225; tu primera regla para que mangui categorice movimientos autom&#225;ticamente.
               </p>
             </div>
-            <Button type="button" onClick={() => openNewForm()} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="mt-1 h-9 text-sm">
-              <PlusCircle className="h-4 w-4 mr-1.5" />
-              Nueva regla
-            </Button>
+            {isPremiumFeature ? (
+              <Link
+                href="/ajustes#plan"
+                className="mt-1 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
+              >
+                Función Premium
+              </Link>
+            ) : (
+              <Button type="button" onClick={() => openNewForm()} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="mt-1 h-9 text-sm">
+                <PlusCircle className="h-4 w-4 mr-1.5" />
+                Nueva regla
+              </Button>
+            )}
           </div>
         ) : (
           displayRules.map((rule) => (

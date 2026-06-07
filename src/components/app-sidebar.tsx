@@ -6,12 +6,14 @@ import { usePathname } from "next/navigation";
 import {
   PlusCircle,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
 import { PRIMARY_NAV, FOOTER_NAV } from "@/lib/nav-sections";
+import { usePlan } from "@/lib/use-plan";
 
 const navItems = PRIMARY_NAV;
 
@@ -37,6 +39,7 @@ function getInitials(name: string): string {
 export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
   const pathname = usePathname();
   const quickAdd = useQuickAdd();
+  const { isPremium: userIsPremium, isLoading: planLoading } = usePlan();
 
   return (
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar z-30 shadow-sm">
@@ -92,6 +95,24 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
 
       {/* Divider */}
       <div className="mx-4 h-px bg-sidebar-border" />
+
+      {/* Premium CTA — shown only for free users */}
+      {!planLoading && !userIsPremium && (
+        <div className="px-4 pt-3">
+          <Link
+            href="/ajustes#plan"
+            className={cn(
+              "flex items-center gap-2 w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 press-effect",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "bg-gradient-to-r from-primary/15 to-accent/10 border border-primary/20",
+              "text-primary hover:from-primary/20 hover:to-accent/15 hover:border-primary/35"
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+            <span>Mejorá a Premium</span>
+          </Link>
+        </div>
+      )}
 
       {/* Footer: settings + user + logout */}
       <div className="p-3 space-y-0.5 pb-4">

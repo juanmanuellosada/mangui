@@ -33,6 +33,8 @@ import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { usePlan } from "@/lib/use-plan"
+import Link from "next/link"
 import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
 
 type Category = Tables<"categories">
@@ -142,6 +144,7 @@ export function MovementForm({
 }: MovementFormProps) {
   const today = new Date().toISOString().split("T")[0]
   const isDemo = useIsDemo()
+  const { isPremium: userIsPremium } = usePlan()
 
   // 3-way mode state (only relevant when initialMode is provided)
   const [mode, setMode] = useState<MovementMode>(initialMode ?? (defaultValues?.type ?? "expense"))
@@ -793,36 +796,52 @@ export function MovementForm({
           {/* 4.2 — Attachment slots by movement type */}
           {type === "expense" && (
             <div className="space-y-3">
-              <AttachmentSlot
-                label="Factura o ticket"
-                pendingFile={pendingFactura}
-                existingAttachment={existingFactura}
-                onSelect={setPendingFactura}
-                onClearPending={() => setPendingFactura(null)}
-                onDeleted={onAttachmentDeleted}
-                disabled={isLoading || isDemo}
-              />
-              <AttachmentSlot
-                label="Recibo / comprobante de pago"
-                pendingFile={pendingRecibo}
-                existingAttachment={existingRecibo}
-                onSelect={setPendingRecibo}
-                onClearPending={() => setPendingRecibo(null)}
-                onDeleted={onAttachmentDeleted}
-                disabled={isLoading || isDemo}
-              />
+              {userIsPremium ? (
+                <>
+                  <AttachmentSlot
+                    label="Factura o ticket"
+                    pendingFile={pendingFactura}
+                    existingAttachment={existingFactura}
+                    onSelect={setPendingFactura}
+                    onClearPending={() => setPendingFactura(null)}
+                    onDeleted={onAttachmentDeleted}
+                    disabled={isLoading || isDemo}
+                  />
+                  <AttachmentSlot
+                    label="Recibo / comprobante de pago"
+                    pendingFile={pendingRecibo}
+                    existingAttachment={existingRecibo}
+                    onSelect={setPendingRecibo}
+                    onClearPending={() => setPendingRecibo(null)}
+                    onDeleted={onAttachmentDeleted}
+                    disabled={isLoading || isDemo}
+                  />
+                </>
+              ) : (
+                <div className="flex items-center justify-between rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+                  <span>Adjuntos</span>
+                  <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">Premium</Link>
+                </div>
+              )}
             </div>
           )}
           {type === "income" && (
-            <AttachmentSlot
-              label="Comprobante"
-              pendingFile={pendingComprobante}
-              existingAttachment={existingComprobante}
-              onSelect={setPendingComprobante}
-              onClearPending={() => setPendingComprobante(null)}
-              onDeleted={onAttachmentDeleted}
-              disabled={isLoading || isDemo}
-            />
+            userIsPremium ? (
+              <AttachmentSlot
+                label="Comprobante"
+                pendingFile={pendingComprobante}
+                existingAttachment={existingComprobante}
+                onSelect={setPendingComprobante}
+                onClearPending={() => setPendingComprobante(null)}
+                onDeleted={onAttachmentDeleted}
+                disabled={isLoading || isDemo}
+              />
+            ) : (
+              <div className="flex items-center justify-between rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+                <span>Adjuntos</span>
+                <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">Premium</Link>
+              </div>
+            )
           )}
 
           {/* Submit */}

@@ -47,6 +47,8 @@ import { MOVEMENTS_KEY, ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { usePlan } from "@/lib/use-plan"
+import Link from "next/link"
 import { renderCategoryIcon } from "@/lib/categories"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -731,20 +733,27 @@ function CreateGoalDialog({
   accounts,
   movements,
   isDemo,
+  atLimit,
 }: {
   categories: Category[]
   accounts: Account[]
   movements: Movement[]
   isDemo?: boolean
+  atLimit?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+
+  const isDisabled = isDemo || atLimit
 
   const mutation = useMutation({
     mutationFn: async (values: GoalFormValues) => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
+      if (atLimit) {
+        throw new Error("Alcanzaste el límite del plan Free. Mejorá a Premium para crear más.")
+      }
       return saveGoal(values, undefined, user.id)
     },
     onSuccess: () => {
@@ -761,16 +770,25 @@ function CreateGoalDialog({
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        size="sm"
-        className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
-        disabled={isDemo}
-        title={isDemo ? "No disponible en el modo demo" : undefined}
-      >
-        <PlusCircle className="h-4 w-4 shrink-0" />
-        <span className="hidden sm:inline">Nueva meta</span>
-      </Button>
+      {atLimit ? (
+        <Link
+          href="/ajustes#plan"
+          className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
+        >
+          Mejorá a Premium
+        </Link>
+      ) : (
+        <Button
+          onClick={() => setOpen(true)}
+          size="sm"
+          className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
+          disabled={isDisabled}
+          title={isDemo ? "No disponible en el modo demo" : undefined}
+        >
+          <PlusCircle className="h-4 w-4 shrink-0" />
+          <span className="hidden sm:inline">Nueva meta</span>
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
@@ -971,6 +989,7 @@ function EditGoalDialog({
 
 export function GoalsList() {
   const isDemo = useIsDemo()
+  const { isPremium: userIsPremium, limits } = usePlan()
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [filters, setFilters] = useState<GoalFilters>(DEFAULT_FILTERS)
   const ms = useMultiSelect()
@@ -1141,6 +1160,7 @@ export function GoalsList() {
 
   const displayGoals = isFiltered ? filteredGoals : goals
   const goalIds = displayGoals.map((g) => g.id)
+  const atLimit = !userIsPremium && goals.length >= limits.goals
 
   async function handleBulkDelete() {
     setBulkPending(true)
@@ -1174,7 +1194,7 @@ export function GoalsList() {
             <SelectButton onClick={ms.enter} />
           )}
           {!ms.selectionMode && (
-            <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} />
+            <CreateGoalDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} atLimit={atLimit} />
           )}
         </div>
       </div>
