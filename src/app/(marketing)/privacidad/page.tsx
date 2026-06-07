@@ -45,7 +45,7 @@ export default function PrivacidadPage() {
               cómo la protegemos.
             </p>
             <p>
-              Los datos que ingresás en mangui — movimientos, cuentas, metas y
+              Los datos que ingresás en Mangui 🥭 — movimientos, cuentas, metas y
               presupuestos — son tuyos. No los vendemos ni compartimos con
               terceros con fines publicitarios. Se almacenan de forma encriptada
               y solo se procesan para brindarte el servicio.

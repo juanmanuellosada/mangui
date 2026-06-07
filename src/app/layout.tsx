@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://mangui.com.ar"
   ),
   title: {
-    default: "mangui — Finanzas personales en pesos y dólares",
+    default: "Mangui 🥭 — Finanzas personales en pesos y dólares",
     template: "%s | Mangui 🥭",
   },
   description:
@@ -53,24 +53,24 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_AR",
     url: "https://mangui.com.ar",
-    siteName: "mangui",
-    title: "mangui — Finanzas personales en pesos y dólares",
+    siteName: "Mangui 🥭",
+    title: "Mangui 🥭 — Finanzas personales en pesos y dólares",
     description:
-      "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Multimoneda, cuotas, presupuestos y más — hecho para Argentina.",
+      "Controlá tus gastos, ingresos y ahorros en ARS y USD con Mangui 🥭. Multimoneda, cuotas, presupuestos y más — hecho para Argentina.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "mangui — Finanzas personales para Argentina",
+        alt: "Mangui 🥭 — Finanzas personales para Argentina",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "mangui — Finanzas personales en pesos y dólares",
+    title: "Mangui 🥭 — Finanzas personales en pesos y dólares",
     description:
-      "Controlá tus gastos, ingresos y ahorros en ARS y USD con mangui. Hecho para Argentina.",
+      "Controlá tus gastos, ingresos y ahorros en ARS y USD con Mangui 🥭. Hecho para Argentina.",
     images: ["/og-image.png"],
   },
 };
