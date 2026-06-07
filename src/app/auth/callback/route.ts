@@ -35,9 +35,12 @@ export async function GET(request: NextRequest) {
     // (only when the row has no avatar yet, so user-uploaded photos are never overwritten).
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const googleAvatar = (
-        user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture
-      ) as string | undefined;
+      const googleIdentity = user?.identities?.find((i) => i.provider === "google");
+      const googleAvatar =
+        (googleIdentity?.identity_data?.avatar_url as string | undefined) ??
+        (googleIdentity?.identity_data?.picture as string | undefined) ??
+        (user?.user_metadata?.avatar_url as string | undefined) ??
+        (user?.user_metadata?.picture as string | undefined);
 
       if (user && googleAvatar) {
         const { data: profile } = await supabase

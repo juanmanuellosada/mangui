@@ -595,13 +595,18 @@ interface AuthMethods {
 
 async function fetchAuthMethods(): Promise<AuthMethods> {
   const supabase = createClient()
+
+  // Refresh session first so the JWT reflects any recently-linked providers.
+  await supabase.auth.refreshSession().catch(() => {})
+
+  // getUserIdentities() hits the server and always returns the authoritative list,
+  // unlike app_metadata.providers which can be stale right after linking.
+  const { data: idData } = await supabase.auth.getUserIdentities()
+  const providers: string[] = idData?.identities?.map((i) => i.provider) ?? []
+
+  // Still need getUser() to know if the session is valid at all.
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { hasGoogle: false, hasPassword: false }
-
-  // Prefer app_metadata.providers (most reliable); fall back to identities list
-  const providers: string[] =
-    (user.app_metadata?.providers as string[] | undefined) ??
-    (user.identities ?? []).map((id) => id.provider)
 
   return {
     hasGoogle: providers.includes("google"),
