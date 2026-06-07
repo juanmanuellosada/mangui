@@ -87,10 +87,22 @@ export async function createSubscriptionPreapproval(
     }
 
     return { ok: true, initPoint };
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Error al crear la suscripción en MercadoPago.';
-    console.error('[mercadopago/createSubscriptionPreapproval] error', { err });
-    return { ok: false, error: message };
+  } catch (err: unknown) {
+    const e = err as Record<string, unknown> & { cause?: unknown; message?: string; status?: unknown };
+    // MP SDK v3 puts API errors in various shapes — try them all.
+    let detail: string | undefined;
+    if (Array.isArray(e?.cause) && e.cause.length) {
+      const c = e.cause[0] as Record<string, unknown>;
+      detail = (c?.description as string) ?? (c?.message as string) ?? JSON.stringify(c);
+    }
+    detail = detail
+      ?? (typeof e?.message === 'string' ? e.message : undefined)
+      ?? (e?.cause && typeof (e.cause as Record<string, unknown>).message === 'string'
+          ? ((e.cause as Record<string, unknown>).message as string)
+          : undefined)
+      ?? (() => { try { return JSON.stringify(e).slice(0, 300); } catch { return String(e); } })();
+    const status = e?.status ?? (e?.cause as Record<string, unknown>)?.status;
+    console.error('[mercadopago/createSubscriptionPreapproval] error', { status, detail, err });
+    return { ok: false, error: `MP: ${detail}${status ? ` (status ${status})` : ''}` };
   }
 }
