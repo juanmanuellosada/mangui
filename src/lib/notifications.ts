@@ -6,7 +6,7 @@ import type { Database } from "@/lib/database.types"
 type AdminClient = SupabaseClient<Database>
 
 /** Configure web-push once at module load */
-const vapidSubject = process.env.VAPID_SUBJECT ?? "mailto:admin@mangui.app"
+const vapidSubject = process.env.VAPID_SUBJECT ?? "mailto:admin@mangui.com.ar"
 const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""
 const vapidPrivate = process.env.VAPID_PRIVATE_KEY ?? ""
 

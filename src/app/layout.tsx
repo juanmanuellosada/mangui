@@ -32,7 +32,7 @@ const iaWriterQuattro = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://mangui.app"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://mangui.com.ar"
   ),
   title: {
     default: "mangui — Finanzas personales en pesos y dólares",
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "es_AR",
-    url: "https://mangui.app",
+    url: "https://mangui.com.ar",
     siteName: "mangui",
     title: "mangui — Finanzas personales en pesos y dólares",
     description:

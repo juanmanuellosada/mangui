@@ -53,7 +53,7 @@ export default function TerminosPage() {
             <p>
               Estamos trabajando en la versión completa de estos términos. Si
               tenés preguntas en el mientras tanto, podés escribirnos a
-              hola@mangui.app y te respondemos a la brevedad.
+              hola@mangui.com.ar y te respondemos a la brevedad.
             </p>
           </div>
 

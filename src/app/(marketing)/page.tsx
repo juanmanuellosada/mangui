@@ -197,7 +197,7 @@ export default async function LandingPage() {
                         <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.75_0.18_80)]" />
                         <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.72_0.2_140)]" />
                         <div className="ml-3 flex-1 h-4 rounded-sm bg-white/5 max-w-[200px] flex items-center px-2">
-                          <span className="text-[9px] text-white/25 font-mono">mangui.app/inicio</span>
+                          <span className="text-[9px] text-white/25 font-mono">mangui.com.ar/inicio</span>
                         </div>
                       </div>
 
@@ -849,7 +849,7 @@ export default async function LandingPage() {
                       <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.75_0.18_80)]" />
                       <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.72_0.2_140)]" />
                       <div className="ml-3 h-4 rounded-sm bg-white/4 w-32 flex items-center px-2">
-                        <span className="text-[9px] text-white/20 font-mono">mangui.app/inicio</span>
+                        <span className="text-[9px] text-white/20 font-mono">mangui.com.ar/inicio</span>
                       </div>
                     </div>
 
