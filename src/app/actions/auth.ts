@@ -13,12 +13,11 @@ export async function signInAsDemo(): Promise<
   | { ok: true; access_token: string; refresh_token: string }
   | { ok: false }
 > {
-  const email = process.env.DEMO_EMAIL;
-  const password = process.env.DEMO_PASSWORD;
-
-  if (!email || !password) {
-    return { ok: false };
-  }
+  // Intentional public read-only demo credentials — not a secret.
+  // The demo account is RLS-enforced read-only; "Ver demo" exposes these
+  // to every visitor anyway. Hardcoding avoids stale env-var failures.
+  const email = "demo.mangui@gmail.com";
+  const password = "demo123";
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
