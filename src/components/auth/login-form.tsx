@@ -34,7 +34,11 @@ function getAuthErrorMessage(code: string): string {
   }
 }
 
-export function LoginForm() {
+interface LoginFormProps {
+  oauthError?: boolean;
+}
+
+export function LoginForm({ oauthError }: LoginFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -70,13 +74,11 @@ export function LoginForm() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/inicio`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/inicio`,
       },
     });
     if (error) {
-      toast.error(
-        "No se pudo iniciar sesión con Google. El proveedor aún no está configurado."
-      );
+      toast.error("No se pudo iniciar sesión con Google, probá de nuevo.");
     }
   }
 
@@ -93,6 +95,12 @@ export function LoginForm() {
           Ingresá tu email para continuar
         </p>
       </div>
+
+      {oauthError && (
+        <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2" role="alert">
+          No se pudo iniciar sesión con Google, probá de nuevo.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
         {/* Email */}
