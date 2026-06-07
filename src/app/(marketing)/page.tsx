@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { FloatingIcons } from "@/components/marketing/floating-icons";
 import { BrandLockup } from "@/components/brand-lockup";
 import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar";
 import { PricingToggle } from "@/app/(marketing)/pricing-toggle";
@@ -123,6 +124,11 @@ export default async function LandingPage() {
             <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[110px] translate-x-1/3 -translate-y-1/3" />
             <div className="absolute bottom-0 left-0 w-[440px] h-[440px] rounded-full bg-accent/8 blur-[80px] -translate-x-1/4 translate-y-1/4" />
             <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] rounded-full bg-primary/4 blur-[60px] -translate-x-1/2 -translate-y-1/2" />
+          </div>
+
+          {/* Floating fintech icons — decorative background layer */}
+          <div className="absolute inset-0 -z-10" aria-hidden="true">
+            <FloatingIcons />
           </div>
 
           <div className="container mx-auto px-5 max-w-6xl">
