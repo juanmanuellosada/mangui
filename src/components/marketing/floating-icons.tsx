@@ -1,73 +1,233 @@
+"use client";
+
 /**
  * FloatingIcons — decorative background layer for the landing HERO.
  *
- * Pure CSS drift animation (no JS / rAF).
- * GPU-friendly: only `transform` is animated.
- * Respects `prefers-reduced-motion` (icons stay static).
- * Mobile-light: half the icons are hidden on xs screens.
- * All icons are aria-hidden and pointer-events-none.
+ * rAF bounce physics: each tile has position + velocity and bounces off
+ * the container edges. GPU-friendly — only `transform` is animated,
+ * `will-change: transform` on each element.
+ *
+ * Accessibility / perf:
+ *  - prefers-reduced-motion → static scattered render, no rAF.
+ *  - cancelAnimationFrame on unmount.
+ *  - Pauses on document.hidden (visibilitychange) to save CPU.
+ *  - Resize observer keeps bounds fresh without layout thrash.
+ *
+ * Visual design:
+ *  - Each icon is a 44px square rounded-xl tile with translucent dark
+ *    background + hairline border. Logo is object-contain + padded.
+ *  - Tile opacity ~0.22 — visible but behind hero content (z-0).
+ *  - Mobile-light: icons with mobile:false are hidden on xs screens.
  */
 
-// Each icon entry: filename (without .svg), position (top%, left%),
-// size (px), animation duration (s), animation delay (s), mobile visibility.
+import { useEffect, useRef } from "react";
+
+// Tile size (px) — all icons share the same square dimension.
+const TILE = 44;
+
+// Speed range (px per frame at 60fps). Cashe uses 0.8; we use 1.0–1.6.
+const SPEED_MIN = 1.0;
+const SPEED_MAX = 1.6;
+
 const ICONS: Array<{
   file: string;
-  top: number;   // percentage
-  left: number;  // percentage
-  size: number;  // px (24–34 range)
-  dur: number;   // seconds
-  delay: number; // seconds
-  mobile: boolean; // false = hidden on small screens
+  // Initial scatter position as % of container (used for static fallback too)
+  top: number;
+  left: number;
+  mobile: boolean; // false = hidden on xs screens
 }> = [
-  { file: "mercadopago",    top:  8, left:  4,  size: 32, dur: 14, delay: 0,    mobile: true  },
-  { file: "uala",           top: 15, left: 88,  size: 28, dur: 18, delay: 1.5,  mobile: true  },
-  { file: "brubank",        top: 72, left:  7,  size: 26, dur: 16, delay: 3,    mobile: false },
-  { file: "lemon",          top: 82, left: 92,  size: 30, dur: 12, delay: 0.8,  mobile: true  },
-  { file: "naranja-x",      top: 35, left:  2,  size: 24, dur: 20, delay: 5,    mobile: false },
-  { file: "modo",           top: 55, left: 95,  size: 28, dur: 15, delay: 2.2,  mobile: true  },
-  { file: "cocos",          top: 90, left: 45,  size: 26, dur: 17, delay: 4,    mobile: false },
-  { file: "banco-galicia",  top: 22, left: 78,  size: 30, dur: 13, delay: 1,    mobile: true  },
-  { file: "banco-nacion",   top: 60, left: 18,  size: 28, dur: 19, delay: 6,    mobile: false },
-  { file: "banco-bbva",     top:  5, left: 55,  size: 26, dur: 22, delay: 3.5,  mobile: false },
-  { file: "banco-santander",top: 45, left: 90,  size: 24, dur: 16, delay: 7,    mobile: false },
-  { file: "prex",           top: 78, left: 62,  size: 28, dur: 11, delay: 2,    mobile: true  },
-  { file: "belo",           top: 28, left: 12,  size: 26, dur: 21, delay: 4.5,  mobile: false },
-  { file: "buenbit",        top: 68, left: 80,  size: 24, dur: 18, delay: 0.5,  mobile: false },
-  { file: "banco-provincia",top: 12, left: 32,  size: 30, dur: 14, delay: 8,    mobile: false },
-  { file: "banco-ciudad",   top: 50, left: 50,  size: 24, dur: 20, delay: 9,    mobile: false },
+  { file: "mercadopago",     top:  8, left:  4,  mobile: true  },
+  { file: "uala",            top: 15, left: 88,  mobile: true  },
+  { file: "brubank",         top: 72, left:  7,  mobile: false },
+  { file: "lemon",           top: 82, left: 92,  mobile: true  },
+  { file: "naranja-x",       top: 35, left:  2,  mobile: false },
+  { file: "modo",            top: 55, left: 95,  mobile: true  },
+  { file: "cocos",           top: 90, left: 45,  mobile: false },
+  { file: "banco-galicia",   top: 22, left: 78,  mobile: true  },
+  { file: "banco-nacion",    top: 60, left: 18,  mobile: false },
+  { file: "banco-bbva",      top:  5, left: 55,  mobile: false },
+  { file: "banco-santander", top: 45, left: 90,  mobile: false },
+  { file: "prex",            top: 78, left: 62,  mobile: true  },
+  { file: "belo",            top: 28, left: 12,  mobile: false },
+  { file: "buenbit",         top: 68, left: 80,  mobile: false },
+  { file: "banco-provincia", top: 12, left: 32,  mobile: false },
+  { file: "banco-ciudad",    top: 50, left: 50,  mobile: false },
 ];
 
+function randomSpeed(): number {
+  return SPEED_MIN + Math.random() * (SPEED_MAX - SPEED_MIN);
+}
+
 export function FloatingIcons() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tilesRef = useRef<(HTMLDivElement | null)[]>([]);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Respect reduced-motion: render static, never start rAF.
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // --- State per tile (position + velocity) ---
+    let bounds = container.getBoundingClientRect();
+
+    const states = ICONS.map((icon) => {
+      // Clamp initial position inside bounds
+      const x = Math.max(
+        0,
+        Math.min(
+          (icon.left / 100) * bounds.width - TILE / 2,
+          bounds.width - TILE
+        )
+      );
+      const y = Math.max(
+        0,
+        Math.min(
+          (icon.top / 100) * bounds.height - TILE / 2,
+          bounds.height - TILE
+        )
+      );
+      // Random direction, guaranteed non-zero on both axes
+      const angle = Math.random() * Math.PI * 2;
+      const speed = randomSpeed();
+      return {
+        x,
+        y,
+        vx: Math.cos(angle) * speed || speed, // avoid vx=0
+        vy: Math.sin(angle) * speed || speed,
+      };
+    });
+
+    // --- Animation loop ---
+    const animate = () => {
+      const w = bounds.width;
+      const h = bounds.height;
+
+      states.forEach((s, i) => {
+        const el = tilesRef.current[i];
+        if (!el) return;
+
+        s.x += s.vx;
+        s.y += s.vy;
+
+        // Bounce off edges
+        if (s.x <= 0) {
+          s.x = 0;
+          s.vx = Math.abs(s.vx);
+        } else if (s.x >= w - TILE) {
+          s.x = w - TILE;
+          s.vx = -Math.abs(s.vx);
+        }
+        if (s.y <= 0) {
+          s.y = 0;
+          s.vy = Math.abs(s.vy);
+        } else if (s.y >= h - TILE) {
+          s.y = h - TILE;
+          s.vy = -Math.abs(s.vy);
+        }
+
+        el.style.transform = `translate(${s.x}px, ${s.y}px)`;
+      });
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    // Set initial transform before first frame to avoid flash
+    states.forEach((s, i) => {
+      const el = tilesRef.current[i];
+      if (el) el.style.transform = `translate(${s.x}px, ${s.y}px)`;
+    });
+
+    rafRef.current = requestAnimationFrame(animate);
+
+    // --- Pause on hidden tab ---
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+      } else {
+        // Refresh bounds in case window was resized while hidden
+        bounds = container.getBoundingClientRect();
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // --- Keep bounds fresh on resize ---
+    const ro = new ResizeObserver(() => {
+      bounds = container.getBoundingClientRect();
+      // Clamp tiles that are now out of new bounds
+      states.forEach((s) => {
+        s.x = Math.min(s.x, bounds.width - TILE);
+        s.y = Math.min(s.y, bounds.height - TILE);
+      });
+    });
+    ro.observe(container);
+
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      ro.disconnect();
+    };
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       className="absolute inset-0 overflow-hidden pointer-events-none select-none"
       aria-hidden="true"
     >
-      {ICONS.map(({ file, top, left, size, dur, delay, mobile }) => (
-        <img
+      {ICONS.map(({ file, top, left, mobile }, index) => (
+        <div
           key={file}
-          src={`/icons/ar/bancos-billeteras/${file}.svg`}
-          alt=""
-          width={size}
-          height={size}
+          ref={(el) => {
+            tilesRef.current[index] = el;
+          }}
           className={[
-            "absolute rounded-lg",
-            "opacity-[0.09]",
-            "grayscale-[30%] brightness-110",
-            "animate-float-drift",
+            // Position: absolute at top-left; rAF drives transform.
+            // Static fallback (reduced-motion): stays at percentage position.
+            "absolute top-0 left-0",
+            // Hide on mobile if not mobile-visible
             mobile ? "" : "hidden sm:block",
           ]
             .filter(Boolean)
             .join(" ")}
           style={{
-            top: `${top}%`,
-            left: `${left}%`,
-            width: size,
-            height: size,
-            animationDuration: `${dur}s`,
-            animationDelay: `${delay}s`,
+            // Static fallback position for reduced-motion users.
+            // rAF will overwrite transform immediately on motion-ok.
+            transform: `translate(${left}%, ${top}%)`,
+            width: TILE,
+            height: TILE,
+            willChange: "transform",
+            // Tile visual: translucent dark square with hairline border
+            borderRadius: "0.75rem", // rounded-xl
+            background: "rgba(255, 255, 255, 0.06)",
+            border: "1px solid rgba(255, 255, 255, 0.10)",
+            opacity: 0.22,
+            // Tile is behind hero content
+            zIndex: 0,
           }}
-        />
+        >
+          {/* Logo centered with padding inside the tile */}
+          <img
+            src={`/icons/ar/bancos-billeteras/${file}.svg`}
+            alt=""
+            width={TILE - 14}
+            height={TILE - 14}
+            className="absolute inset-0 m-auto block object-contain"
+            style={{
+              width: TILE - 14,
+              height: TILE - 14,
+            }}
+          />
+        </div>
       ))}
     </div>
   );
