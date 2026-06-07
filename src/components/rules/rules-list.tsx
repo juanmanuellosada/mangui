@@ -34,6 +34,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import {
   RULES_KEY,
   RULE_CONDITIONS_KEY,
@@ -101,12 +102,13 @@ interface RuleCardProps {
   selectionMode?: boolean
   isSelected?: boolean
   onToggleSelect?: (id: string) => void
+  isDemo?: boolean
 }
 
 function RuleCard({
   rule, conditions, categories, accounts,
   onEdit, onDelete, onToggleActive, isToggling,
-  selectionMode, isSelected, onToggleSelect,
+  selectionMode, isSelected, onToggleSelect, isDemo,
 }: RuleCardProps) {
   const summary = ruleSummary(rule, conditions, { categories, accounts })
   const cat = categories.find((c) => c.id === rule.action_category_id)
@@ -152,11 +154,11 @@ function RuleCard({
 
       {!selectionMode && (
         <div className="flex items-center gap-2 shrink-0">
-          <Switch checked={rule.is_active} onCheckedChange={onToggleActive} disabled={isToggling} aria-label={rule.is_active ? "Desactivar regla" : "Activar regla"} />
+          <Switch checked={rule.is_active} onCheckedChange={onToggleActive} disabled={isToggling || isDemo} aria-label={rule.is_active ? "Desactivar regla" : "Activar regla"} />
           <button type="button" onClick={onEdit} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Editar regla">
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button type="button" onClick={onDelete} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Eliminar regla">
+          <button type="button" onClick={onDelete} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground disabled:hover:bg-transparent" aria-label="Eliminar regla">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -441,6 +443,7 @@ function RuleFilterBar({
 
 export function RulesList() {
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
 
   const [filters, setFilters] = useState<RuleFilters>(DEFAULT_FILTERS)
   const [showForm, setShowForm] = useState(false)
@@ -677,13 +680,15 @@ export function RulesList() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {!isLoading && rules.length > 0 && !ms.selectionMode && (
+          {!isLoading && rules.length > 0 && !ms.selectionMode && !isDemo && (
             <SelectButton onClick={ms.enter} />
           )}
           {!ms.selectionMode && (
             <Button
               onClick={() => openNewForm()}
               size="sm"
+              disabled={isDemo}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
               className="gap-1.5 press-effect cursor-pointer font-semibold shadow-sm shadow-primary/20"
             >
               <PlusCircle className="h-4 w-4 shrink-0" />
@@ -741,7 +746,7 @@ export function RulesList() {
                 Cre&#225; tu primera regla para que mangui categorice movimientos autom&#225;ticamente.
               </p>
             </div>
-            <Button type="button" onClick={() => openNewForm()} className="mt-1 h-9 text-sm">
+            <Button type="button" onClick={() => openNewForm()} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="mt-1 h-9 text-sm">
               <PlusCircle className="h-4 w-4 mr-1.5" />
               Nueva regla
             </Button>
@@ -761,6 +766,7 @@ export function RulesList() {
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(rule.id)}
               onToggleSelect={ms.toggle}
+              isDemo={isDemo}
             />
           ))
         )}
@@ -843,7 +849,7 @@ export function RulesList() {
         footer={
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={bulkPending}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending} className="press-effect">
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending || isDemo} className="press-effect">
               {bulkPending ? "Eliminando..." : `Eliminar (${ms.count})`}
             </Button>
           </div>

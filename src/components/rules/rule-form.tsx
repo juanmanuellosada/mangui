@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import {
   operatorsForField,
   FIELD_LABELS,
@@ -348,6 +349,7 @@ export function RuleForm({
   const [priority, setPriority] = useState<number>(initialValues?.priority ?? 10)
   const [isActive, setIsActive] = useState<boolean>(initialValues?.is_active ?? true)
   const [formError, setFormError] = useState<string | null>(null)
+  const isDemo = useIsDemo()
 
   function addCondition() {
     setConditions((prev) => [...prev, defaultCondition()])
@@ -527,7 +529,8 @@ export function RuleForm({
       <Button
         type="submit"
         className="w-full press-effect font-semibold h-11"
-        disabled={isLoading}
+        disabled={isLoading || isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
       >
         {isLoading ? "Guardando…" : submitLabel}
       </Button>

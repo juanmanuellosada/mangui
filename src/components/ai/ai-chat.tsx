@@ -674,42 +674,56 @@ export function AiChat({ initialUsed, initialUnlimited }: AiChatProps) {
 
       {/* Input bar */}
       <div className="flex-shrink-0 pt-3 border-t border-border/60 pb-safe">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Escribí tu pregunta…"
-            rows={1}
-            disabled={isStreaming || rateLimited}
-            className={cn(
-              "flex-1 resize-none rounded-xl border border-border/60 bg-background px-3.5 py-2.5 text-sm",
-              "placeholder:text-muted-foreground leading-relaxed",
-              "focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30",
-              "transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed",
-              "min-h-[40px] max-h-[120px]"
-            )}
-            aria-label="Mensaje para el asistente"
-          />
-          <Button
-            type="button"
-            size="icon"
-            onClick={() => handleSend(input)}
-            disabled={!input.trim() || isStreaming || rateLimited}
-            className="h-10 w-10 rounded-xl flex-shrink-0 press-effect"
-            aria-label="Enviar"
-          >
-            {isStreaming ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-2 text-center">
-          La IA sugiere; vos confirmás antes de guardar.
-        </p>
+        {isDemo ? (
+          <div className="rounded-xl bg-muted/50 border border-border/60 px-4 py-3 text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Manguito no está disponible en el modo demo.{" "}
+              <a href="/register" className="text-primary font-medium hover:underline">
+                Crear cuenta
+              </a>{" "}
+              para chatear.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribí tu pregunta…"
+                rows={1}
+                disabled={isStreaming || rateLimited}
+                className={cn(
+                  "flex-1 resize-none rounded-xl border border-border/60 bg-background px-3.5 py-2.5 text-sm",
+                  "placeholder:text-muted-foreground leading-relaxed",
+                  "focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/30",
+                  "transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed",
+                  "min-h-[40px] max-h-[120px]"
+                )}
+                aria-label="Mensaje para el asistente"
+              />
+              <Button
+                type="button"
+                size="icon"
+                onClick={() => handleSend(input)}
+                disabled={!input.trim() || isStreaming || rateLimited}
+                className="h-10 w-10 rounded-xl flex-shrink-0 press-effect"
+                aria-label="Enviar"
+              >
+                {isStreaming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2 text-center">
+              La IA sugiere; vos confirmás antes de guardar.
+            </p>
+          </>
+        )}
       </div>
     </div>
   )

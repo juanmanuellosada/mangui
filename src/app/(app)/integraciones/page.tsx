@@ -21,6 +21,7 @@ import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/client"
+import { useIsDemo } from "@/lib/use-is-demo"
 import {
   getPushStatus,
   subscribeToPush,
@@ -245,6 +246,7 @@ function PermissionBadge({ status }: { status: PushStatus | null }) {
 
 export default function IntegracionesPage() {
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
   const { canInstall, isInstalled, triggerInstall } = useInstallPrompt()
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null)
   const [pushLoading, setPushLoading] = useState(false)
@@ -420,7 +422,7 @@ export default function IntegracionesPage() {
             <Switch
               checked={isSubscribed && (prefs?.push_enabled ?? false)}
               onCheckedChange={handlePushToggle}
-              disabled={pushLoading || isDenied || isUnsupported}
+              disabled={pushLoading || isDenied || isUnsupported || isDemo}
               aria-label="Activar notificaciones push"
             />
           )}
@@ -445,7 +447,7 @@ export default function IntegracionesPage() {
                 }
                 updatePrefsMutation.mutate({ card_reminder_enabled: v })
               }}
-              disabled={!isSubscribed || !prefs?.push_enabled || updatePrefsMutation.isPending}
+              disabled={!isSubscribed || !prefs?.push_enabled || updatePrefsMutation.isPending || isDemo}
               aria-label="Recordatorio de tarjetas"
             />
           )}

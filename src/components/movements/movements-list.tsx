@@ -1005,9 +1005,10 @@ interface MovementsFilterBarProps {
   categories: Category[]
   groupBy: GroupBy
   onGroupByChange: (g: GroupBy) => void
+  isDemo?: boolean
 }
 
-function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, onGroupByChange }: MovementsFilterBarProps) {
+function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, onGroupByChange, isDemo }: MovementsFilterBarProps) {
   const queryClient = useQueryClient()
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState("")
@@ -1243,9 +1244,10 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    deleteMutation.mutate(view.id)
+                    if (!isDemo) deleteMutation.mutate(view.id)
                   }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={isDemo}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-destructive transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                   aria-label={`Eliminar vista ${view.name}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -1253,7 +1255,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
               </div>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setSaveDialogOpen(true)} className="gap-2">
+            <DropdownMenuItem onSelect={() => !isDemo && setSaveDialogOpen(true)} disabled={isDemo} className="gap-2">
               <Plus className="h-3.5 w-3.5" />
               Guardar filtros actuales
             </DropdownMenuItem>
@@ -1616,6 +1618,7 @@ export function MovementsList() {
         categories={categories}
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
+        isDemo={isDemo}
       />
 
       {/* Adaptive summary cards */}

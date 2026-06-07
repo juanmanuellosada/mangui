@@ -18,6 +18,7 @@ import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { createClient } from "@/lib/supabase/client"
 import { signOut } from "@/app/actions/auth"
 import { cn } from "@/lib/utils"
+import { useIsDemo } from "@/lib/use-is-demo"
 import type { Tables } from "@/lib/database.types"
 
 type Profile = Tables<"profiles">
@@ -164,6 +165,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>
 
 function ProfileSection({ profile }: { profile: Profile | null }) {
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
 
   const {
     register,
@@ -245,7 +247,8 @@ function ProfileSection({ profile }: { profile: Profile | null }) {
       <Button
         type="submit"
         className="press-effect"
-        disabled={mutation.isPending || !isDirty}
+        disabled={mutation.isPending || !isDirty || isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
       >
         {mutation.isPending ? "Guardando…" : "Guardar nombre"}
       </Button>
@@ -264,6 +267,7 @@ type PrefsFormValues = z.infer<typeof prefsSchema>
 
 function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
 
   const {
     register,
@@ -329,8 +333,15 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
 
   return (
     <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+      {/* Demo hint */}
+      {isDemo && (
+        <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+          No disponible en el modo demo
+        </p>
+      )}
+
       {/* Default currency — uses CurrencyToggle with coin icons */}
-      <div className="space-y-1.5">
+      <div className={cn("space-y-1.5", isDemo && "opacity-50 pointer-events-none")}>
         <Label>Moneda predeterminada</Label>
         <CurrencyToggle
           value={currency}
@@ -348,13 +359,20 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
               <button
                 key={key}
                 type="button"
+                disabled={isDemo}
                 onClick={() => setValue("rate_type", key, { shouldDirty: true })}
+                title={isDemo ? "No disponible en el modo demo" : undefined}
                 className={cn(
-                  "flex flex-col items-start px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 cursor-pointer press-effect",
+                  "flex flex-col items-start px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 press-effect",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  rateType === key
+                  isDemo
+                    ? "cursor-not-allowed opacity-50 bg-muted/40 border-border/40 text-muted-foreground"
+                    : "cursor-pointer",
+                  !isDemo && rateType === key
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background border-border/60 text-muted-foreground hover:border-primary/50"
+                    : !isDemo
+                      ? "bg-background border-border/60 text-muted-foreground hover:border-primary/50"
+                      : ""
                 )}
               >
                 <span>{label}</span>
@@ -362,7 +380,7 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
                   <span
                     className={cn(
                       "font-normal tabular-nums mt-0.5",
-                      rateType === key ? "text-primary-foreground/75" : "text-muted-foreground/70"
+                      rateType === key && !isDemo ? "text-primary-foreground/75" : "text-muted-foreground/70"
                     )}
                   >
                     {ratesLoading
@@ -389,6 +407,7 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
             min="1"
             placeholder="Ej: 1250"
             className="tabular-nums"
+            disabled={isDemo}
             {...register("manual_rate")}
             aria-invalid={!!errors.manual_rate}
           />
@@ -401,7 +420,8 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
       <Button
         type="submit"
         className="press-effect"
-        disabled={mutation.isPending || !isDirty}
+        disabled={mutation.isPending || !isDirty || isDemo}
+        title={isDemo ? "No disponible en el modo demo" : undefined}
       >
         {mutation.isPending ? "Guardando…" : "Guardar preferencias"}
       </Button>
@@ -421,6 +441,7 @@ function ThemeSection({ prefs }: { prefs: UserPreferences | null }) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const queryClient = useQueryClient()
+  const isDemo = useIsDemo()
 
   useEffect(() => setMounted(true), [])
 
@@ -444,6 +465,7 @@ function ThemeSection({ prefs }: { prefs: UserPreferences | null }) {
   })
 
   const handleThemeChange = (value: "light" | "dark" | "system") => {
+    if (isDemo) return
     setTheme(value)
     mutation.mutate(value)
   }
@@ -452,6 +474,11 @@ function ThemeSection({ prefs }: { prefs: UserPreferences | null }) {
 
   return (
     <div className="space-y-3">
+      {isDemo && (
+        <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+          No disponible en el modo demo
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">
         El tema se aplica de inmediato y se guarda en tu cuenta para que se mantenga al ingresar desde otro dispositivo.
       </p>
@@ -460,13 +487,20 @@ function ThemeSection({ prefs }: { prefs: UserPreferences | null }) {
           <button
             key={value}
             type="button"
+            disabled={isDemo}
             onClick={() => handleThemeChange(value)}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
             className={cn(
-              "flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all duration-150 cursor-pointer press-effect",
+              "flex flex-col items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all duration-150 press-effect",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              activeTheme === value
+              isDemo
+                ? "cursor-not-allowed opacity-50 bg-muted/40 border-border/40 text-muted-foreground"
+                : "cursor-pointer",
+              !isDemo && activeTheme === value
                 ? "bg-primary/15 border-primary/40 text-primary"
-                : "bg-muted/30 border-border/60 text-muted-foreground hover:bg-muted"
+                : !isDemo
+                  ? "bg-muted/30 border-border/60 text-muted-foreground hover:bg-muted"
+                  : ""
             )}
           >
             <Icon className="h-5 w-5" />

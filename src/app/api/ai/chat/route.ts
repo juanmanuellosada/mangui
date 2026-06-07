@@ -43,7 +43,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 })
   }
 
-  // 2. Parse body — useChat sends { messages: UIMessage[] }
+  // 2. Block demo account
+  if (user.user_metadata?.is_demo === true) {
+    return NextResponse.json(
+      { error: "demo", message: "El asistente no está disponible en el modo demo." },
+      { status: 403 }
+    )
+  }
+
+  // 3. Parse body — useChat sends { messages: UIMessage[] }
   let uiMessages: UIMessage[]
   try {
     const body = await req.json()
