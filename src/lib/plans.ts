@@ -1,4 +1,5 @@
 export const PREMIUM_PRICE_ARS = 9999;
+export const ANNUAL_PRICE_ARS = 99990;
 
 export interface PlanLimits {
   accounts: number;

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand-lockup";
 import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar";
+import { PricingToggle } from "@/app/(marketing)/pricing-toggle";
 import {
   ArrowRight,
   Download,
@@ -15,7 +16,6 @@ import {
   Zap,
   BarChart3,
   Check,
-  Sparkles,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -966,7 +966,7 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
               {/* Free card */}
               <div className="rounded-2xl border border-border/60 bg-card p-7 flex flex-col gap-6">
                 <div>
@@ -1010,73 +1010,8 @@ export default async function LandingPage() {
                 </Link>
               </div>
 
-              {/* Premium card */}
-              <div className="relative rounded-2xl border-2 border-primary/40 bg-card p-7 flex flex-col gap-6 shadow-lg shadow-primary/8">
-                {/* Recommended badge */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary-foreground bg-primary px-3 py-1 rounded-full shadow-sm">
-                    <Sparkles className="h-3 w-3" aria-hidden="true" />
-                    Recomendado
-                  </span>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-2">Premium</p>
-                  <p
-                    className="text-4xl font-bold text-foreground tabular-nums"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    {new Intl.NumberFormat("es-AR", {
-                      style: "currency",
-                      currency: "ARS",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(9999)}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">por mes · vía MercadoPago</p>
-                </div>
-
-                <ul className="space-y-2.5 flex-1">
-                  {[
-                    "Todo lo de Free, más:",
-                    "Cuentas ilimitadas",
-                    "Presupuestos ilimitados",
-                    "Metas ilimitadas",
-                    "Recurrentes ilimitados",
-                    "Reglas automáticas",
-                    "Adjuntos en movimientos",
-                    "Export CSV",
-                    "IA sin límite diario",
-                  ].map((feat, i) => (
-                    <li key={feat} className="flex items-start gap-2.5 text-sm">
-                      {i === 0 ? (
-                        <span className="text-muted-foreground font-medium">{feat}</span>
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
-                          <span className="text-foreground">{feat}</span>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="space-y-2">
-                  <Link
-                    href="/register"
-                    className={cn(
-                      buttonVariants(),
-                      "w-full font-semibold press-effect h-11 text-sm gap-2 shadow-md shadow-primary/25"
-                    )}
-                  >
-                    Empezar
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </Link>
-                  <p className="text-xs text-muted-foreground text-center">
-                    Cancelás cuando quieras
-                  </p>
-                </div>
-              </div>
+              {/* Premium card — client island with Mensual/Anual toggle */}
+              <PricingToggle />
             </div>
           </div>
         </section>

@@ -13,9 +13,9 @@ import { isPremium } from '@/lib/plans';
 // The plan is NOT set here — the webhook sets it once MP authorizes payment.
 // ---------------------------------------------------------------------------
 
-export async function subscribeToPremium(): Promise<
-  { ok: true; initPoint: string } | { ok: false; error: string }
-> {
+export async function subscribeToPremium(
+  interval: 'monthly' | 'annual' = 'monthly'
+): Promise<{ ok: true; initPoint: string } | { ok: false; error: string }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -44,6 +44,7 @@ export async function subscribeToPremium(): Promise<
   return createSubscriptionPreapproval({
     userId: user.id,
     payerEmail: user.email ?? '',
+    interval,
   });
 }
 

@@ -22,7 +22,7 @@ import { subscribeToPremium, cancelSubscription } from "@/app/actions/subscripti
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan, PLAN_KEY } from "@/lib/use-plan"
-import { PREMIUM_PRICE_ARS } from "@/lib/plans"
+import { PREMIUM_PRICE_ARS, ANNUAL_PRICE_ARS } from "@/lib/plans"
 import type { Tables } from "@/lib/database.types"
 
 type Profile = Tables<"profiles">
@@ -829,19 +829,27 @@ function PlanSection() {
 
   const [subscribing, setSubscribing] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual'>('monthly')
 
-  const priceFormatted = new Intl.NumberFormat("es-AR", {
+  const monthlyFormatted = new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(PREMIUM_PRICE_ARS)
 
+  const annualFormatted = new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(ANNUAL_PRICE_ARS)
+
   const handleSubscribe = async () => {
     if (isDemo || subscribing) return
     setSubscribing(true)
     try {
-      const result = await subscribeToPremium()
+      const result = await subscribeToPremium(selectedInterval)
       if (result.ok) {
         window.location.href = result.initPoint
       } else {
@@ -965,6 +973,37 @@ function PlanSection() {
         })}
       </div>
 
+      {/* Interval toggle */}
+      <div className="flex items-center rounded-xl border border-border/60 bg-muted/30 p-1 gap-1">
+        {(['monthly', 'annual'] as const).map((iv) => (
+          <button
+            key={iv}
+            type="button"
+            onClick={() => setSelectedInterval(iv)}
+            className={cn(
+              "flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 press-effect focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              selectedInterval === iv
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {iv === 'monthly' ? 'Mensual' : 'Anual'}
+          </button>
+        ))}
+      </div>
+
+      {/* Price display */}
+      <div className="text-center space-y-0.5">
+        {selectedInterval === 'monthly' ? (
+          <p className="text-sm font-semibold tabular-nums">{monthlyFormatted}/mes</p>
+        ) : (
+          <>
+            <p className="text-sm font-semibold tabular-nums">{annualFormatted}/año</p>
+            <p className="text-xs text-primary font-medium">2 meses gratis (≈ 17% off)</p>
+          </>
+        )}
+      </div>
+
       {isDemo && (
         <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
           No disponible en el modo demo
@@ -979,7 +1018,11 @@ function PlanSection() {
         className="w-full gap-2 font-semibold press-effect shadow-sm shadow-primary/20"
       >
         <Sparkles className="h-4 w-4" aria-hidden="true" />
-        {subscribing ? "Redirigiendo…" : `Mejorá a Premium · ${priceFormatted}/mes`}
+        {subscribing
+          ? "Redirigiendo…"
+          : selectedInterval === 'monthly'
+            ? `Mejorá a Premium · ${monthlyFormatted}/mes`
+            : `Mejorá a Premium · ${annualFormatted}/año`}
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">

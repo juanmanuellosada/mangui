@@ -1,6 +1,6 @@
 import 'server-only';
 import { MercadoPagoConfig, PreApproval, WebhookSignatureValidator } from 'mercadopago';
-import { PREMIUM_PRICE_ARS } from '@/lib/plans';
+import { PREMIUM_PRICE_ARS, ANNUAL_PRICE_ARS } from '@/lib/plans';
 
 // ---------------------------------------------------------------------------
 // Singleton client — server-only, never imported from client components
@@ -40,6 +40,7 @@ export function verifyWebhookSignature(
 export interface CreateSubscriptionPreapprovalParams {
   userId: string;
   payerEmail: string;
+  interval?: 'monthly' | 'annual';
 }
 
 export type CreateSubscriptionResult =
@@ -56,7 +57,23 @@ const APP_URL =
 export async function createSubscriptionPreapproval(
   params: CreateSubscriptionPreapprovalParams
 ): Promise<CreateSubscriptionResult> {
-  const { userId, payerEmail } = params;
+  const { userId, payerEmail, interval = 'monthly' } = params;
+
+  const isAnnual = interval === 'annual';
+  const autoRecurring = isAnnual
+    ? {
+        frequency: 12,
+        frequency_type: 'months' as const,
+        transaction_amount: ANNUAL_PRICE_ARS,
+        currency_id: 'ARS',
+      }
+    : {
+        frequency: 1,
+        frequency_type: 'months' as const,
+        transaction_amount: PREMIUM_PRICE_ARS,
+        currency_id: 'ARS',
+      };
+  const reason = isAnnual ? 'mangui Premium (anual)' : 'mangui Premium (mensual)';
 
   try {
     const response = await preApproval.create({
@@ -64,14 +81,9 @@ export async function createSubscriptionPreapproval(
         status: 'pending',
         payer_email: payerEmail,
         external_reference: userId,
-        reason: 'mangui Premium',
+        reason,
         back_url: `${APP_URL}/ajustes?sub=ok`,
-        auto_recurring: {
-          frequency: 1,
-          frequency_type: 'months',
-          transaction_amount: PREMIUM_PRICE_ARS,
-          currency_id: 'ARS',
-        },
+        auto_recurring: autoRecurring,
       },
     });
 
