@@ -25,9 +25,9 @@ import { useEffect, useRef } from "react";
 // Tile size (px) — all icons share the same square dimension.
 const TILE = 44;
 
-// Speed range (px per frame at 60fps). Cashe uses 0.8; we use 1.0–1.6.
-const SPEED_MIN = 1.0;
-const SPEED_MAX = 1.6;
+// Speed range (px per frame at 60fps). Gentle drift: ~0.4–0.8.
+const SPEED_MIN = 0.4;
+const SPEED_MAX = 0.8;
 
 const ICONS: Array<{
   file: string;
@@ -206,11 +206,14 @@ export function FloatingIcons() {
             width: TILE,
             height: TILE,
             willChange: "transform",
-            // Tile visual: translucent dark square with hairline border
+            // Tile visual: translucent rounded square.
+            // opacity is NOT set on the container — that would make the
+            // border invisible. Instead, alpha is baked into the colors.
             borderRadius: "0.75rem", // rounded-xl
-            background: "rgba(255, 255, 255, 0.06)",
-            border: "1px solid rgba(255, 255, 255, 0.10)",
-            opacity: 0.22,
+            overflow: "hidden",      // clips img to rounded corners
+            background: "rgba(255, 255, 255, 0.10)",
+            border: "1px solid rgba(255, 255, 255, 0.22)",
+            opacity: 0.55,
             // Tile is behind hero content
             zIndex: 0,
           }}
