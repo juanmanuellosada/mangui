@@ -74,7 +74,7 @@ export function RegisterForm() {
         data: {
           full_name: values.name,
         },
-        emailRedirectTo: `${window.location.origin}/inicio`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/inicio`,
       },
     });
 

@@ -55,6 +55,20 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse; // respond as anonymous visitor
   }
 
+  // Safety net: if a ?code= lands on a non-/auth path (Supabase fell back to the Site URL),
+  // redirect to /auth/callback so the code is properly exchanged before the user continues.
+  const strayCode = request.nextUrl.searchParams.get("code");
+  if (strayCode && !pathname.startsWith("/auth")) {
+    const sensibleNext =
+      pathname.startsWith("/") && !pathname.startsWith("//") && pathname !== "/"
+        ? pathname
+        : "/inicio";
+    const callbackUrl = new URL("/auth/callback", request.nextUrl.origin);
+    callbackUrl.searchParams.set("code", strayCode);
+    callbackUrl.searchParams.set("next", sensibleNext);
+    return NextResponse.redirect(callbackUrl);
+  }
+
   // Public paths — accessible without authentication
   const PUBLIC_EXACT = ["/"];
   const PUBLIC_PREFIX = ["/api", "/auth", "/login", "/register", "/forgot-password", "/reset-password", "/offline", "/privacidad", "/terminos", "/demo"];
