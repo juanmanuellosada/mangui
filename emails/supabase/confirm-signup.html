@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Confirmá tu cuenta en mangui</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <!-- Preheader (hidden) -->
+  <span style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Confirmá tu dirección de email para empezar a usar mangui.</span>
+
+  <!-- Wrapper -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f9fafb;padding:32px 0;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;background-color:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+
+          <!-- Header -->
+          <tr>
+            <td align="center" style="background-color:#ffffff;border-bottom:2px solid #84CC16;padding:24px 40px;">
+              <img src="https://www.mangui.com.ar/logo-square.png" width="36" height="36" alt="mangui" style="border-radius:10px;display:inline-block;vertical-align:middle;" />
+              <span style="color:#1a1a1a;font-size:22px;font-weight:700;letter-spacing:-0.3px;margin-left:10px;vertical-align:middle;">man<span style="color:#F97316;">gui</span></span>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:32px 40px;">
+              <h1 style="color:#1a1a1a;font-size:24px;font-weight:700;margin:0 0 16px;">¡Ya casi terminás! 🥭</h1>
+              <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+                Confirmá tu dirección de email para activar tu cuenta en <strong style="color:#F97316;">mangui</strong> y empezar a tomar el control de tus finanzas.
+              </p>
+              <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 28px;">
+                Hacé clic en el botón de abajo para confirmar tu cuenta:
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="background-color:#84CC16;border-radius:8px;color:#ffffff;display:inline-block;font-size:15px;font-weight:700;padding:12px 28px;text-decoration:none;">
+                      Confirmá tu cuenta →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="color:#9ca3af;font-size:13px;line-height:1.5;margin:24px 0 0;">
+                Si el botón no funciona, copiá y pegá este enlace en tu navegador:<br />
+                <a href="{{ .ConfirmationURL }}" style="color:#84CC16;word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+              <p style="color:#9ca3af;font-size:13px;line-height:1.5;margin:12px 0 0;">
+                Si no creaste una cuenta en mangui, podés ignorar este email con tranquilidad.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="border-top:1px solid #e5e7eb;"></td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:20px 40px;">
+              <p style="color:#9ca3af;font-size:12px;line-height:1.6;margin:0 0 4px;">
+                <strong>mangui</strong> · Hecho en Argentina 🥭
+              </p>
+              <p style="color:#9ca3af;font-size:12px;line-height:1.6;margin:0;">
+                ¿Preguntas? Escribinos a <a href="mailto:hola@mangui.com.ar" style="color:#9ca3af;text-decoration:underline;">hola@mangui.com.ar</a>
+                &nbsp;·&nbsp;
+                <a href="https://www.mangui.com.ar" style="color:#9ca3af;text-decoration:underline;">mangui.com.ar</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
