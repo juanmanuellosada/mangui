@@ -35,7 +35,6 @@ import { useIsDemo } from "@/lib/use-is-demo"
 
 type Category = Tables<"categories">
 
-const DAILY_LIMIT = 30
 
 // ── Name → id resolver ────────────────────────────────────────────────────────
 
@@ -483,7 +482,7 @@ function EmptyState({ onSend }: { onSend: (text: string) => void }) {
 
 // ── Usage badge ───────────────────────────────────────────────────────────────
 
-function UsageBadge({ used, unlimited }: { used: number; unlimited: boolean }) {
+function UsageBadge({ used, unlimited, limit }: { used: number; unlimited: boolean; limit: number }) {
   if (unlimited) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-primary font-medium tabular-nums">
@@ -492,7 +491,7 @@ function UsageBadge({ used, unlimited }: { used: number; unlimited: boolean }) {
       </span>
     )
   }
-  const remaining = DAILY_LIMIT - used
+  const remaining = limit - used
   const isNearLimit = remaining <= 5
   return (
     <span
@@ -501,7 +500,7 @@ function UsageBadge({ used, unlimited }: { used: number; unlimited: boolean }) {
         isNearLimit ? "text-destructive" : "text-muted-foreground"
       )}
     >
-      {used}/{DAILY_LIMIT} hoy
+      {used}/{limit} hoy
     </span>
   )
 }
@@ -511,9 +510,10 @@ function UsageBadge({ used, unlimited }: { used: number; unlimited: boolean }) {
 interface AiChatProps {
   initialUsed: number
   initialUnlimited: boolean
+  initialLimit: number
 }
 
-export function AiChat({ initialUsed, initialUnlimited }: AiChatProps) {
+export function AiChat({ initialUsed, initialUnlimited, initialLimit }: AiChatProps) {
   const [input, setInput] = useState("")
   const [rateLimited, setRateLimited] = useState(false)
   const [rateLimitMessage, setRateLimitMessage] = useState("")
@@ -625,7 +625,7 @@ export function AiChat({ initialUsed, initialUnlimited }: AiChatProps) {
             Asistente IA
           </h1>
         </div>
-        <UsageBadge used={initialUsed} unlimited={initialUnlimited} />
+        <UsageBadge used={initialUsed} unlimited={initialUnlimited} limit={initialLimit} />
       </div>
 
       {/* Message list */}
@@ -655,7 +655,7 @@ export function AiChat({ initialUsed, initialUnlimited }: AiChatProps) {
             <div>
               <p className="text-sm font-medium text-destructive">Límite diario alcanzado</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {rateLimitMessage || `Usaste los ${DAILY_LIMIT} mensajes de hoy. Se renueva a las 00:00 hora argentina.`}
+                {rateLimitMessage || `Usaste los ${initialLimit} mensajes de hoy. Se renueva a las 00:00 hora argentina.`}
               </p>
             </div>
           </div>

@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "mangui",
+    title: "Mangui 🥭",
   },
   formatDetection: {
     telephone: false,

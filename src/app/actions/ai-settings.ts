@@ -2,8 +2,7 @@
 
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-
-const DAILY_LIMIT = 30
+import { isPremium, FREE } from "@/lib/plans"
 
 // Argentina timezone offset for "today" — must match the route
 const AR_TZ = "America/Argentina/Buenos_Aires"
@@ -37,7 +36,11 @@ export async function getAiUsageToday(): Promise<AiUsageTodayResult> {
   }
 
   const [profileRes, usageRes] = await Promise.all([
-    admin.from("profiles").select("ai_unlimited").eq("id", user.id).maybeSingle(),
+    admin
+      .from("profiles")
+      .select("ai_unlimited, payment_exempt, mp_subscription_status")
+      .eq("id", user.id)
+      .maybeSingle(),
     admin
       .from("ai_usage")
       .select("id", { count: "exact", head: true })
@@ -52,10 +55,14 @@ export async function getAiUsageToday(): Promise<AiUsageTodayResult> {
     return { ok: false, error: usageRes.error.message }
   }
 
+  const profile = profileRes.data
+  const premium =
+    (profile ? isPremium(profile) : false) || profile?.ai_unlimited === true
+
   return {
     ok: true,
     used: usageRes.count ?? 0,
-    limit: DAILY_LIMIT,
-    unlimited: profileRes.data?.ai_unlimited === true,
+    limit: premium ? Infinity : FREE.aiPerDay,
+    unlimited: premium,
   }
 }

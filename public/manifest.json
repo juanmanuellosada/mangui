@@ -1,6 +1,6 @@
 {
-  "name": "mangui — Finanzas personales",
-  "short_name": "mangui",
+  "name": "Mangui 🥭 — Finanzas personales",
+  "short_name": "Mangui 🥭",
   "description": "Controlá tus finanzas en pesos y dólares con mangui. Multimoneda, cuotas, presupuestos y más.",
   "start_url": "/inicio",
   "display": "standalone",
