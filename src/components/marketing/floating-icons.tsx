@@ -183,6 +183,7 @@ export function FloatingIcons() {
       ref={containerRef}
       className="absolute inset-0 overflow-hidden pointer-events-none select-none"
       aria-hidden="true"
+      style={{ filter: "blur(2px)" }}
     >
       {ICONS.map(({ file, top, left, mobile }, index) => (
         <div
