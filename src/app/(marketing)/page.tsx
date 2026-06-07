@@ -100,7 +100,7 @@ export default async function LandingPage() {
               href="/login"
               className={cn(
                 buttonVariants({ variant: "ghost", size: "sm" }),
-                "hidden sm:inline-flex font-medium"
+                "inline-flex font-medium text-sm"
               )}
             >
               Ingresar
