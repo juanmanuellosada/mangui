@@ -1,10 +1,14 @@
 "use client";
 
 /**
- * FloatingIcons — decorative background layer for the landing HERO.
+ * FloatingIcons — full-viewport fixed decorative background layer.
+ *
+ * Mounted once in the marketing layout (same pattern as AuroraBackground)
+ * so the icons bounce across the entire page, not just the hero.
+ * Layer order: aurora (z-0) → floating icons (z-[2]) → page content.
  *
  * rAF bounce physics: each tile has position + velocity and bounces off
- * the container edges. GPU-friendly — only `transform` is animated,
+ * the viewport edges. GPU-friendly — only `transform` is animated,
  * `will-change: transform` on each element.
  *
  * Accessibility / perf:
@@ -16,7 +20,8 @@
  * Visual design:
  *  - Each icon is a 44px square rounded-xl tile with translucent dark
  *    background + hairline border. Logo is object-contain + padded.
- *  - Tile opacity ~0.22 — visible but behind hero content (z-0).
+ *  - Tile opacity ~0.55 — subtle ambient decoration behind all sections.
+ *  - pointer-events-none: never blocks clicks anywhere on the page.
  *  - Mobile-light: icons with mobile:false are hidden on xs screens.
  */
 
@@ -181,9 +186,9 @@ export function FloatingIcons() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 overflow-hidden pointer-events-none select-none"
+      className="fixed inset-0 overflow-hidden pointer-events-none select-none"
       aria-hidden="true"
-      style={{ filter: "blur(2px)" }}
+      style={{ filter: "blur(3px)", zIndex: 2 }}
     >
       {ICONS.map(({ file, top, left, mobile }, index) => (
         <div
@@ -214,7 +219,7 @@ export function FloatingIcons() {
             overflow: "hidden",      // clips img to rounded corners
             background: "rgba(255, 255, 255, 0.10)",
             border: "1px solid rgba(255, 255, 255, 0.22)",
-            opacity: 0.55,
+            opacity: 0.35,
             // Tile is behind hero content
             zIndex: 0,
           }}

@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { FloatingIcons } from "@/components/marketing/floating-icons";
 import { BrandLockup } from "@/components/brand-lockup";
 import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar";
 import { PricingToggle } from "@/app/(marketing)/pricing-toggle";
@@ -63,7 +62,7 @@ export default async function LandingPage() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
       {/* ══ NAV ══════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-50 border-b border-border/50 glass bg-background/85">
+      <header className="sticky top-0 z-50 border-b border-white/10 glass bg-[#1A1F1A]/80">
         <div className="container mx-auto px-5 h-16 flex items-center justify-between max-w-6xl">
           <Link
             href="/"
@@ -118,43 +117,43 @@ export default async function LandingPage() {
 
       <main className="flex-1">
         {/* ══ HERO ═════════════════════════════════════════════ */}
-        <section className="relative overflow-hidden pt-16 pb-24 md:pt-24 md:pb-36">
-          {/* Background blobs */}
-          <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
-            <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[110px] translate-x-1/3 -translate-y-1/3" />
-            <div className="absolute bottom-0 left-0 w-[440px] h-[440px] rounded-full bg-accent/8 blur-[80px] -translate-x-1/4 translate-y-1/4" />
-            <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] rounded-full bg-primary/4 blur-[60px] -translate-x-1/2 -translate-y-1/2" />
-          </div>
-
-          {/* Floating fintech icons — decorative background layer */}
-          <div className="absolute inset-0 -z-10" aria-hidden="true">
-            <FloatingIcons />
-          </div>
-
-          <div className="container mx-auto px-5 max-w-6xl">
+        {/*
+          The aurora canvas is now a fixed full-viewport backdrop mounted in the
+          marketing layout. This section is transparent so the aurora shows through.
+        */}
+        <section
+          className="relative overflow-hidden pt-16 pb-24 md:pt-24 md:pb-36"
+        >
+          <div className="container mx-auto px-5 max-w-6xl relative" style={{ zIndex: 10 }}>
             <div className="grid lg:grid-cols-[1fr_1.15fr] gap-14 lg:gap-20 items-center">
               {/* ── Left: copy ── */}
               <div className="flex flex-col gap-7 animate-fade-up">
                 <h1
-                  className="text-foreground leading-[1.08] tracking-tight text-wrap-balance"
+                  className="leading-[1.08] tracking-tight text-wrap-balance"
                   style={{
                     fontFamily: "var(--font-display)",
                     fontSize: "clamp(2.1rem,5.2vw,3.4rem)",
                     letterSpacing: "-0.03em",
+                    color: "#F0F4EE",
                   }}
                 >
                   Tu plata en pesos
                   <br />y dólares,{" "}
-                  <span style={{ color: "var(--color-primary)" }}>bajo control</span>
+                  <span style={{ color: "#84CC16" }}>bajo control</span>
                 </h1>
 
-                <p className="text-base text-muted-foreground leading-relaxed max-w-[44ch]">
+                {/* subtext — muted light tone, WCAG-AA on #1A1F1A: rgba(240,244,238,0.70) ≈ 5.8:1 */}
+                <p
+                  className="text-base leading-relaxed max-w-[44ch]"
+                  style={{ color: "rgba(240,244,238,0.70)" }}
+                >
                   Seguí el Blue, el MEP y el CCL. Controlá cuotas y resúmenes de tarjeta.
                   Entendé la inflación en tus propios números. Para argentinos, con datos reales.
                 </p>
 
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                  {/* Primary: lime bg with dark text (same default variant) */}
                   <Link
                     href="/register"
                     className={cn(
@@ -165,24 +164,22 @@ export default async function LandingPage() {
                     Crear cuenta
                     <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
+                  {/* Secondary: outline on dark */}
                   <Link
                     href="/demo"
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "lg" }),
-                      "gap-2 font-medium h-11 px-6 text-sm press-effect w-full sm:w-auto"
-                    )}
+                    className="inline-flex items-center justify-center gap-2 h-11 px-6 text-sm font-medium rounded-lg border press-effect w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors duration-150 border-white/20 text-white/80 hover:bg-white/[0.06] hover:border-white/35 hover:text-white"
                   >
                     Ver demo
                   </Link>
                 </div>
 
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-xs leading-relaxed" style={{ color: "rgba(240,244,238,0.45)" }}>
                   "Ver demo" abre una cuenta de ejemplo, solo lectura. Sin registro.
                 </p>
 
                 <Link
                   href="/register"
-                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors duration-150 w-fit group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  className="inline-flex items-center gap-1.5 text-sm w-fit group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded transition-colors duration-150 text-white/50 hover:text-[#84CC16]"
                 >
                   <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   Instalá como app — sin App Store
@@ -321,7 +318,7 @@ export default async function LandingPage() {
         </section>
 
         {/* ══ FEATURES BENTO ═══════════════════════════════════ */}
-        <section id="funciones" className="py-24 md:py-32 bg-muted/25">
+        <section id="funciones" className="py-24 md:py-32 bg-black/25 backdrop-blur-[1px]">
           <div className="container mx-auto px-5 max-w-6xl">
             <div className="mb-14 max-w-lg">
               <h2
@@ -665,12 +662,12 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ══ ARGENTINA DIFFERENTIATORS (dark) ════════════════ */}
-        <section className="bg-[oklch(0.12_0.025_185)] py-24 md:py-32">
+        {/* ══ ARGENTINA DIFFERENTIATORS ════════════════════════ */}
+        <section className="bg-black/35 backdrop-blur-[1px] py-24 md:py-32">
           <div className="container mx-auto px-5 max-w-6xl">
-            <div className="grid lg:grid-cols-[1fr_1.3fr] gap-14 lg:gap-20 items-start">
+            <div className="grid lg:grid-cols-[1fr_1.1fr] gap-14 lg:gap-20 items-center">
               {/* Left: copy */}
-              <div className="flex flex-col gap-6 lg:pt-2">
+              <div className="flex flex-col gap-6">
                 <h2
                   className="text-white leading-tight tracking-tight text-wrap-balance"
                   style={{
@@ -816,7 +813,7 @@ export default async function LandingPage() {
         </section>
 
         {/* ══ PRODUCT SHOWCASE ═════════════════════════════════ */}
-        <section className="py-24 md:py-32 bg-muted/20">
+        <section className="py-24 md:py-32">
           <div className="container mx-auto px-5 max-w-6xl">
             <div className="grid lg:grid-cols-[1fr_1.4fr] gap-14 lg:gap-20 items-center">
               {/* Left */}
@@ -846,7 +843,7 @@ export default async function LandingPage() {
                   >
                     Crear cuenta
                   </Link>
-                  <DemoCTA variant="outline-light" />
+                  <DemoCTA variant="outline-dark" />
                 </div>
               </div>
 
@@ -954,7 +951,7 @@ export default async function LandingPage() {
         </section>
 
         {/* ══ PRECIOS ══════════════════════════════════════════ */}
-        <section id="precios" className="py-24 md:py-32 bg-muted/25">
+        <section id="precios" className="py-24 md:py-32 bg-black/25 backdrop-blur-[1px]">
           <div className="container mx-auto px-5 max-w-6xl">
             <div className="mb-14 max-w-lg">
               <h2
@@ -1022,15 +1019,9 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ══ FINAL CTA (dark) ════════════════════════════════ */}
-        <section className="bg-[oklch(0.12_0.025_185)] relative overflow-hidden">
-          <div className="absolute inset-0 -z-0 overflow-hidden" aria-hidden="true">
-            <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-primary/12 blur-[72px] translate-x-1/4 -translate-y-1/4" />
-            <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full bg-accent/10 blur-[56px] -translate-x-1/4 translate-y-1/4" />
-            <div className="absolute top-1/2 left-1/2 w-48 h-48 rounded-full bg-primary/6 blur-[48px] -translate-x-1/2 -translate-y-1/2" />
-          </div>
-
-          <div className="relative z-10 container mx-auto px-5 max-w-3xl py-24 md:py-32 text-center space-y-7">
+        {/* ══ FINAL CTA ═══════════════════════════════════════ */}
+        <section className="bg-black/40 backdrop-blur-[2px]">
+          <div className="container mx-auto px-5 max-w-3xl py-24 md:py-32 text-center space-y-7">
             <h2
               className="text-white leading-tight tracking-tight text-wrap-balance"
               style={{
@@ -1069,7 +1060,7 @@ export default async function LandingPage() {
       </main>
 
       {/* ══ FOOTER ═══════════════════════════════════════════ */}
-      <footer className="border-t border-border/50 bg-card py-10">
+      <footer className="border-t border-white/10 bg-black/40 backdrop-blur-[2px] py-10">
         <div className="container mx-auto px-5 max-w-6xl">
           <div className="grid grid-cols-1 md:grid-cols-[1.8fr_1fr_1fr] gap-8">
             {/* Brand column */}
