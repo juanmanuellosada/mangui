@@ -101,7 +101,7 @@ async function fetchBalances(): Promise<AccountBalance[]> {
 
 function AccountCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card px-4 py-4 flex items-center gap-3">
+    <div className="px-4 py-3 flex items-center gap-3">
       <Skeleton className="h-11 w-11 rounded-xl flex-shrink-0" />
       <div className="flex-1 space-y-1.5">
         <Skeleton className="h-4 w-32" />
@@ -436,8 +436,8 @@ function AccountCard({
       role={selectionMode ? "checkbox" : undefined}
       aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
-        "rounded-2xl border border-border/60 bg-card px-4 py-4 flex items-center gap-3",
-        "hover:border-primary/20 hover:shadow-sm transition-all duration-150",
+        "px-4 py-3 flex items-center gap-3",
+        "hover:bg-muted/40 transition-colors duration-150",
         account.is_hidden && "opacity-60",
         selectionMode && "cursor-pointer",
         isSelected && selectedItemCn(true)
@@ -464,19 +464,27 @@ function AccountCard({
             <EyeOff className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-muted-foreground font-medium">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] text-muted-foreground font-medium flex-shrink-0">
             {ACCOUNT_TYPE_LABELS[account.type]}
           </span>
-          <span className="text-[10px] text-muted-foreground/60">·</span>
+          <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">·</span>
           <CurrencyChip currency={account.currency} size="sm" />
+          {account.account_number && (
+            <>
+              <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">·</span>
+              <span className="text-[11px] text-muted-foreground truncate min-w-0">
+                {account.account_number}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
       {/* Balance / Amount due */}
-      <div className="text-right flex-shrink-0 mr-1 max-w-[130px]">
+      <div className="flex-shrink-0 mr-1">
         {isCreditCard && cardPayment ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 justify-end">
             {/* A pagar — closed statement */}
             {(() => {
               const today = startOfDay(new Date())
@@ -495,7 +503,7 @@ function AccountCard({
                 cardPayment.amountSecondary != null &&
                 Math.abs(cardPayment.amountSecondary) >= 0.005
               return (
-                <div>
+                <div className="text-right">
                   <p className="text-[10px] text-muted-foreground leading-none mb-0.5">
                     A pagar{dueDateLabel ? ` · ${dueDateLabel}` : ""}
                   </p>
@@ -523,7 +531,7 @@ function AccountCard({
               }
               const showCurSecondary = curSec != null && Math.abs(curSec) >= 0.005
               return (
-                <div>
+                <div className="text-right">
                   <p className="text-[10px] text-muted-foreground/70 leading-none mb-0.5">
                     En curso{closeDateLabel}
                   </p>
@@ -1066,7 +1074,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
 
       {/* Loading */}
       {loadingAccounts && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
           {[...Array(3)].map((_, i) => (
             <AccountCardSkeleton key={i} />
           ))}
@@ -1118,7 +1126,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
 
       {/* Filtered list — shown when any filter/search is active */}
       {!loadingAccounts && filtersActive && filteredAccounts.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
           {filteredAccounts.map((account) => (
             <AccountCard
               key={account.id}
@@ -1144,7 +1152,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
                 Mis cuentas
               </p>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
                 {visible.map((account) => (
                   <AccountCard
                     key={account.id}
@@ -1168,7 +1176,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
                 Cuentas ocultas
               </p>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
                 {hidden.map((account) => (
                   <AccountCard
                     key={account.id}
