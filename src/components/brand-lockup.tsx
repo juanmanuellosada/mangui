@@ -26,13 +26,14 @@ interface BrandLockupProps {
  * Brand lockup: [mango mascot] [mangui wordmark] side by side.
  * Designed for dark backgrounds only.
  *
- * Proportions: mascot height = size × 1.25 (optically balanced — the mascot's
- * orange mass reads heavier than the slim wordmark, so slightly taller keeps
- * visual weight even). Gap = size × 0.35 (~10 px at size=28).
+ * Proportions: mascot height = size × 1.45 (the circular avatar has ~55%
+ * mango fill, so it needs to be slightly larger than the old floating mango
+ * to keep the mango itself optically matched to the wordmark height).
+ * Gap = size × 0.35 (~10 px at size=28).
  */
 export function BrandLockup({ size = 28, showWord: _showWord, wordClassName, className }: BrandLockupProps) {
   const wordmarkW = Math.round(size * (LOGO_INTRINSIC_W / LOGO_INTRINSIC_H));
-  const markH = Math.round(size * 1.25);
+  const markH = Math.round(size * 1.45);
   const markW = Math.round(markH * (MARK_INTRINSIC_W / MARK_INTRINSIC_H));
   const gap = Math.round(size * 0.35);
   return (
