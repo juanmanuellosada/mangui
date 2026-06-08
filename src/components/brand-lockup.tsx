@@ -52,7 +52,7 @@ export function BrandLockup({ size = 28, showWord: _showWord, wordClassName, cla
         alt="mangui"
         width={LOGO_INTRINSIC_W}
         height={LOGO_INTRINSIC_H}
-        style={{ height: size, width: wordmarkW, flexShrink: 0 }}
+        style={{ height: size, width: wordmarkW, flexShrink: 0, transform: `translateY(-${Math.round(size * 0.1)}px)` }}
         priority
       />
     </span>
