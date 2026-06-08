@@ -474,9 +474,9 @@ function AccountCard({
       </div>
 
       {/* Balance / Amount due */}
-      <div className="text-right flex-shrink-0 mr-1">
+      <div className="text-right flex-shrink-0 mr-1 max-w-[130px]">
         {isCreditCard && cardPayment ? (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             {/* A pagar — closed statement */}
             {(() => {
               const today = startOfDay(new Date())
@@ -491,23 +491,26 @@ function AccountCard({
                   dueDateLabel = `Vence ${format(due, "d/M", { locale: es })}`
                 }
               }
+              const showSecondary =
+                cardPayment.amountSecondary != null &&
+                Math.abs(cardPayment.amountSecondary) >= 0.005
               return (
                 <div>
                   <p className="text-[10px] text-muted-foreground leading-none mb-0.5">
                     A pagar{dueDateLabel ? ` · ${dueDateLabel}` : ""}
                   </p>
-                  <p className="text-sm font-bold tabular-nums text-destructive">
+                  <p className="text-sm font-bold tabular-nums text-destructive leading-tight">
                     {cardPayment.primaryIsARS
                       ? formatCurrency(-cardPayment.amount, "ARS")
                       : formatCurrency(-cardPayment.amount, "USD")}
                   </p>
-                  <p className="text-[11px] text-destructive/80 tabular-nums mt-0.5">
-                    {cardPayment.amountSecondary != null
-                      ? cardPayment.primaryIsARS
-                        ? formatCurrency(-cardPayment.amountSecondary, "USD")
-                        : formatCurrency(-cardPayment.amountSecondary, "ARS")
-                      : "—"}
-                  </p>
+                  {showSecondary && (
+                    <p className="text-[11px] text-destructive/80 tabular-nums leading-none">
+                      {cardPayment.primaryIsARS
+                        ? formatCurrency(-cardPayment.amountSecondary!, "USD")
+                        : formatCurrency(-cardPayment.amountSecondary!, "ARS")}
+                    </p>
+                  )}
                 </div>
               )
             })()}
@@ -518,23 +521,24 @@ function AccountCard({
               if (closeDate) {
                 closeDateLabel = ` · Cierra ${format(parseISO(closeDate), "d/M", { locale: es })}`
               }
+              const showCurSecondary = curSec != null && Math.abs(curSec) >= 0.005
               return (
                 <div>
                   <p className="text-[10px] text-muted-foreground/70 leading-none mb-0.5">
                     En curso{closeDateLabel}
                   </p>
-                  <p className="text-sm tabular-nums text-muted-foreground">
+                  <p className="text-sm tabular-nums text-muted-foreground leading-tight">
                     {cardPayment.primaryIsARS
                       ? formatCurrency(cur, "ARS")
                       : formatCurrency(cur, "USD")}
                   </p>
-                  <p className="text-[11px] text-muted-foreground/70 tabular-nums mt-0.5">
-                    {curSec != null
-                      ? cardPayment.primaryIsARS
-                        ? formatCurrency(curSec, "USD")
-                        : formatCurrency(curSec, "ARS")
-                      : "—"}
-                  </p>
+                  {showCurSecondary && (
+                    <p className="text-[11px] text-muted-foreground/70 tabular-nums leading-none">
+                      {cardPayment.primaryIsARS
+                        ? formatCurrency(curSec!, "USD")
+                        : formatCurrency(curSec!, "ARS")}
+                    </p>
+                  )}
                 </div>
               )
             })()}
