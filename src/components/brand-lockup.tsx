@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const LOGO_INTRINSIC_W = 655;
 const LOGO_INTRINSIC_H = 240;
 
-// logo-mark.png intrinsic size: 256x256 (square after trim)
+// mascot.png intrinsic size: 256x256 (square after trim)
 const MARK_INTRINSIC_W = 256;
 const MARK_INTRINSIC_H = 256;
 
@@ -39,7 +39,7 @@ export function BrandLockup({ size = 28, showWord: _showWord, wordClassName, cla
   return (
     <span className={cn("inline-flex items-center", wordClassName, className)} style={{ gap }}>
       <Image
-        src="/logo-mark.png"
+        src="/mascot.png"
         alt=""
         aria-hidden
         width={MARK_INTRINSIC_W}
