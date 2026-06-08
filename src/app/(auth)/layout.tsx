@@ -80,9 +80,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Right panel: form */}
       <div className="flex flex-col min-h-screen">
         {/* Mobile top logo */}
-        <div className="lg:hidden flex items-center gap-2.5 px-6 pt-6 pb-2">
+        <div className="lg:hidden flex items-center gap-2.5 px-6 pt-6 pb-4 bg-gradient-to-br from-[oklch(0.12_0.03_145)] via-[oklch(0.16_0.035_185)] to-[oklch(0.12_0.025_145)]">
           <Link href="/" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
-            <BrandLockup size={28} />
+            <BrandLockup size={28} wordClassName="text-white" />
           </Link>
         </div>
 
