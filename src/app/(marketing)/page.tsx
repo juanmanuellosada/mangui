@@ -531,7 +531,7 @@ export default async function LandingPage() {
         </section>
 
         {/* ══ MANGUITO IA ══════════════════════════════════════ */}
-        <section id="manguito" className="py-24 md:py-32">
+        <section id="manguito" className="relative z-10 py-24 md:py-32">
           <div className="container mx-auto px-5 max-w-6xl">
             <div className="grid lg:grid-cols-[1fr_1.1fr] gap-14 lg:gap-20 items-center">
               {/* Left: copy */}
@@ -813,7 +813,7 @@ export default async function LandingPage() {
         </section>
 
         {/* ══ PRODUCT SHOWCASE ═════════════════════════════════ */}
-        <section className="py-24 md:py-32">
+        <section className="relative z-10 py-24 md:py-32">
           <div className="container mx-auto px-5 max-w-6xl">
             <div className="grid lg:grid-cols-[1fr_1.4fr] gap-14 lg:gap-20 items-center">
               {/* Left */}
