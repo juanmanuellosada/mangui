@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 const LOGO_INTRINSIC_W = 655;
 const LOGO_INTRINSIC_H = 240;
 
-// logo-mark.png intrinsic size: 256x251 (near-square after trim)
+// logo-mark.png intrinsic size: 256x256 (square after trim)
 const MARK_INTRINSIC_W = 256;
-const MARK_INTRINSIC_H = 251;
+const MARK_INTRINSIC_H = 256;
 
 interface BrandLockupProps {
   /**
