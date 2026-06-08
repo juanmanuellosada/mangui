@@ -93,9 +93,11 @@ export function nextCardPayment(
     .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
 
   const dueDay = account.due_day
+  // Use the current open cycle's end date (the upcoming close) so the due date
+  // points to the next payment deadline, not the already-past closed cycle's.
   const dueDate =
     dueDay != null
-      ? toDateString(computeDueDate(closed.cycleEnd, dueDay, closingDay))
+      ? toDateString(computeDueDate(open.cycleEnd, dueDay, closingDay))
       : null
 
   return { amount: closedTotal, dueDate }
