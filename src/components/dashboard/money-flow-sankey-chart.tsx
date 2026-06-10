@@ -525,7 +525,7 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
   return (
     <>
       <div ref={wrapperRef} className="h-72 sm:h-80 md:h-96 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 320 }}>
           <Sankey
             data={result.data as SankeyData}
             node={CustomNode as unknown as Parameters<typeof Sankey>[0]["node"]}
