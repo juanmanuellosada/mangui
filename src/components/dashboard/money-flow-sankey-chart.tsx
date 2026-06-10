@@ -107,7 +107,7 @@ function truncate(str: string, max: number): string {
 
 // ─── Custom node renderer ─────────────────────────────────────────────────────
 
-function makeCustomNode(dark: boolean, foWidth: number, foHeight: number) {
+function makeCustomNode(dark: boolean, foWidth: number, foHeight: number, isMobile: boolean) {
   return function CustomNode(props: NodeProps) {
     const { x, y, width, height, index, payload } = props
     // payload is SankeyNode (from recharts) plus our custom fields
@@ -119,13 +119,19 @@ function makeCustomNode(dark: boolean, foWidth: number, foHeight: number) {
     const icon = p.icon ?? null
 
   // Determine label placement based on depth:
-  // depth === 0 → leftmost column (income) → label to the right
+  // depth === 0 → leftmost column (income)
+  //   desktop: label to the RIGHT (toward flow)
+  //   mobile:  label to the LEFT (into left margin, away from flow)
   // depth === 1 → center column (total) → label above
-  // depth === 2 → rightmost column (expense/savings/deficit) → label to the left
+  // depth === 2 → rightmost column (expense/savings/deficit)
+  //   desktop: label to the LEFT (toward flow)
+  //   mobile:  label to the RIGHT (into right margin, away from flow)
   const depth = p.depth ?? 0
 
   // Vertically center the foreignObject on the node
   const foY = y + height / 2 - foHeight / 2
+
+  const labelFontClass = isMobile ? "text-[9px]" : "text-[11px]"
 
   const labelNode = (() => {
     if (depth === 1) {
@@ -136,9 +142,9 @@ function makeCustomNode(dark: boolean, foWidth: number, foHeight: number) {
           y={y - 6}
           textAnchor="middle"
           dominantBaseline="auto"
-          fontSize={11}
+          fontSize={isMobile ? 9 : 11}
           fill="currentColor"
-          style={{ fontSize: 11 }}
+          style={{ fontSize: isMobile ? 9 : 11 }}
         >
           {name}
         </text>
@@ -146,43 +152,49 @@ function makeCustomNode(dark: boolean, foWidth: number, foHeight: number) {
     }
 
     if (depth === 0) {
-      // left column — foreignObject to the right with [icon] [name]
+      // left column
+      // desktop: label to the right (into flow side) — [icon] [name]
+      // mobile:  label to the left (into left margin) — [icon] [name] right-aligned
+      const foX = isMobile ? x - 4 - foWidth : x + width + 6
       return (
         <foreignObject
-          x={x + width + 6}
+          x={foX}
           y={foY}
           width={foWidth}
           height={foHeight}
         >
           <div
-            className="flex items-center gap-1 h-full flex-wrap content-center"
+            className={`flex items-center gap-1 h-full flex-wrap content-center ${isMobile ? "justify-end" : ""}`}
           >
             {icon && (
               <span className="flex-shrink-0 leading-none">
-                {renderCategoryIcon(icon, { className: "text-sm" })}
+                {renderCategoryIcon(icon, { className: isMobile ? "text-[10px]" : "text-sm" })}
               </span>
             )}
-            <span className="text-[11px] text-foreground leading-tight">{name}</span>
+            <span className={`${labelFontClass} text-foreground leading-tight`}>{name}</span>
           </div>
         </foreignObject>
       )
     }
 
-    // depth === 2 — right column — foreignObject ending at x - 6 with [name] [icon]
+    // depth === 2 — right column
+    // desktop: label to the left (into flow side) — [name] [icon]
+    // mobile:  label to the right (into right margin) — [name] [icon]
+    const foX = isMobile ? x + width + 4 : x - 6 - foWidth
     return (
       <foreignObject
-        x={x - 6 - foWidth}
+        x={foX}
         y={foY}
         width={foWidth}
         height={foHeight}
       >
         <div
-          className="flex items-center justify-end gap-1 h-full flex-wrap content-center"
+          className={`flex items-center gap-1 h-full flex-wrap content-center ${isMobile ? "" : "justify-end"}`}
         >
-          <span className="text-[11px] text-foreground leading-tight">{name}</span>
+          <span className={`${labelFontClass} text-foreground leading-tight`}>{name}</span>
           {icon && (
             <span className="flex-shrink-0 leading-none">
-              {renderCategoryIcon(icon, { className: "text-sm" })}
+              {renderCategoryIcon(icon, { className: isMobile ? "text-[10px]" : "text-sm" })}
             </span>
           )}
         </div>
@@ -456,13 +468,15 @@ interface MoneyFlowSankeyChartProps {
 
 function getResponsiveLayout(containerWidth: number) {
   if (containerWidth < 480) {
-    // Mobile: shrink margins and label box so the flow gets more room
-    const margin = Math.max(60, Math.round(containerWidth * 0.19))
-    const foWidth = Math.max(72, margin - 10)
-    return { margin: { top: 20, right: margin, bottom: 20, left: margin }, foWidth, foHeight: 34 }
+    // Mobile: labels go OUTWARD (into the margin), so margin must fit the label box.
+    // foWidth = ~68px; margin = foWidth + node gap (4px) + node width (12px) + small buffer (6px) ≈ 90px.
+    // This leaves flow area = containerWidth - 2*margin ≈ 375 - 180 = 195px — workable.
+    const foWidth = 68
+    const margin = foWidth + 4 + 12 + 6  // = 90
+    return { margin: { top: 20, right: margin, bottom: 28, left: margin }, foWidth, foHeight: 36, isMobile: true }
   }
-  // Desktop / tablet: original values
-  return { margin: { top: 20, right: 120, bottom: 20, left: 120 }, foWidth: 150, foHeight: 22 }
+  // Desktop / tablet: original values; labels go inward (toward flow center)
+  return { margin: { top: 20, right: 120, bottom: 20, left: 120 }, foWidth: 150, foHeight: 22, isMobile: false }
 }
 
 export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyChartProps) {
@@ -486,7 +500,7 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
     return () => observer.disconnect()
   }, [])
 
-  const { margin: sankeyMargin, foWidth, foHeight } = getResponsiveLayout(containerWidth)
+  const { margin: sankeyMargin, foWidth, foHeight, isMobile } = getResponsiveLayout(containerWidth)
 
   const result = useMemo<SankeyResult | null>(() => {
     if (!movements.length || !categories.length) return null
@@ -495,7 +509,7 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
     return r
   }, [movements, categories])
 
-  const CustomNode = useMemo(() => makeCustomNode(isDark, foWidth, foHeight), [isDark, foWidth, foHeight])
+  const CustomNode = useMemo(() => makeCustomNode(isDark, foWidth, foHeight, isMobile), [isDark, foWidth, foHeight, isMobile])
   const CustomLink = useMemo(() => makeCustomLink(isDark), [isDark])
 
   // Empty state

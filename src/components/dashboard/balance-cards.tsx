@@ -102,7 +102,7 @@ export function BalanceCards({
           <Skeleton className="h-12 w-56 bg-primary-foreground/20" />
         ) : (
           <p
-            className="text-3xl sm:text-4xl md:text-5xl font-bold tabular-nums text-primary-foreground leading-none truncate min-w-0"
+            className="text-2xl sm:text-4xl md:text-5xl font-bold tabular-nums text-primary-foreground leading-none truncate min-w-0"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {formatCurrency(grandTotal, displayCurrency)}

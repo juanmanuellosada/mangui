@@ -48,7 +48,7 @@ export default async function AppLayout({
         <AppSidebar name={name} email={email} avatarUrl={avatarUrl} />
 
         {/* Main content area */}
-        <div className="flex-1 flex flex-col min-h-screen lg:pl-64">
+        <div className="flex-1 flex flex-col min-h-screen lg:pl-64 min-w-0">
           {/* Demo read-only banner — only shown for the demo account */}
           <DemoBanner />
 
