@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useRef, useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import { formatCurrency } from "@/lib/utils"
 import { renderCategoryIcon } from "@/lib/categories"
@@ -107,10 +107,7 @@ function truncate(str: string, max: number): string {
 
 // ─── Custom node renderer ─────────────────────────────────────────────────────
 
-const FO_HEIGHT = 22
-const FO_WIDTH = 150
-
-function makeCustomNode(dark: boolean) {
+function makeCustomNode(dark: boolean, foWidth: number, foHeight: number) {
   return function CustomNode(props: NodeProps) {
     const { x, y, width, height, index, payload } = props
     // payload is SankeyNode (from recharts) plus our custom fields
@@ -128,7 +125,7 @@ function makeCustomNode(dark: boolean) {
   const depth = p.depth ?? 0
 
   // Vertically center the foreignObject on the node
-  const foY = y + height / 2 - FO_HEIGHT / 2
+  const foY = y + height / 2 - foHeight / 2
 
   const labelNode = (() => {
     if (depth === 1) {
@@ -154,18 +151,18 @@ function makeCustomNode(dark: boolean) {
         <foreignObject
           x={x + width + 6}
           y={foY}
-          width={FO_WIDTH}
-          height={FO_HEIGHT}
+          width={foWidth}
+          height={foHeight}
         >
           <div
-            className="flex items-center gap-1.5 h-full whitespace-nowrap"
+            className="flex items-center gap-1 h-full flex-wrap content-center"
           >
             {icon && (
               <span className="flex-shrink-0 leading-none">
                 {renderCategoryIcon(icon, { className: "text-sm" })}
               </span>
             )}
-            <span className="text-[11px] text-foreground leading-none">{name}</span>
+            <span className="text-[11px] text-foreground leading-tight">{name}</span>
           </div>
         </foreignObject>
       )
@@ -174,15 +171,15 @@ function makeCustomNode(dark: boolean) {
     // depth === 2 — right column — foreignObject ending at x - 6 with [name] [icon]
     return (
       <foreignObject
-        x={x - 6 - FO_WIDTH}
+        x={x - 6 - foWidth}
         y={foY}
-        width={FO_WIDTH}
-        height={FO_HEIGHT}
+        width={foWidth}
+        height={foHeight}
       >
         <div
-          className="flex items-center justify-end gap-1.5 h-full whitespace-nowrap"
+          className="flex items-center justify-end gap-1 h-full flex-wrap content-center"
         >
-          <span className="text-[11px] text-foreground leading-none">{name}</span>
+          <span className="text-[11px] text-foreground leading-tight">{name}</span>
           {icon && (
             <span className="flex-shrink-0 leading-none">
               {renderCategoryIcon(icon, { className: "text-sm" })}
@@ -455,9 +452,41 @@ interface MoneyFlowSankeyChartProps {
   categories: Category[]
 }
 
+// ─── Responsive layout helpers ────────────────────────────────────────────────
+
+function getResponsiveLayout(containerWidth: number) {
+  if (containerWidth < 480) {
+    // Mobile: shrink margins and label box so the flow gets more room
+    const margin = Math.max(60, Math.round(containerWidth * 0.19))
+    const foWidth = Math.max(72, margin - 10)
+    return { margin: { top: 20, right: margin, bottom: 20, left: margin }, foWidth, foHeight: 34 }
+  }
+  // Desktop / tablet: original values
+  return { margin: { top: 20, right: 120, bottom: 20, left: 120 }, foWidth: 150, foHeight: 22 }
+}
+
 export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyChartProps) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
+
+  // Measure the wrapper's actual pixel width so we can derive responsive values
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(9999) // start wide so SSR/first-paint uses desktop values
+
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width
+      if (width) setContainerWidth(width)
+    })
+    observer.observe(el)
+    // Capture the initial width synchronously
+    setContainerWidth(el.getBoundingClientRect().width)
+    return () => observer.disconnect()
+  }, [])
+
+  const { margin: sankeyMargin, foWidth, foHeight } = getResponsiveLayout(containerWidth)
 
   const result = useMemo<SankeyResult | null>(() => {
     if (!movements.length || !categories.length) return null
@@ -466,7 +495,7 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
     return r
   }, [movements, categories])
 
-  const CustomNode = useMemo(() => makeCustomNode(isDark), [isDark])
+  const CustomNode = useMemo(() => makeCustomNode(isDark, foWidth, foHeight), [isDark, foWidth, foHeight])
   const CustomLink = useMemo(() => makeCustomLink(isDark), [isDark])
 
   // Empty state
@@ -481,7 +510,7 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
 
   return (
     <>
-      <div className="h-72 sm:h-80 md:h-96 w-full">
+      <div ref={wrapperRef} className="h-72 sm:h-80 md:h-96 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <Sankey
             data={result.data as SankeyData}
@@ -489,7 +518,7 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
             link={CustomLink as unknown as Parameters<typeof Sankey>[0]["link"]}
             nodePadding={14}
             nodeWidth={12}
-            margin={{ top: 20, right: 120, bottom: 20, left: 120 }}
+            margin={sankeyMargin}
             sort={false}
           >
             <Tooltip content={<CustomTooltip />} />
