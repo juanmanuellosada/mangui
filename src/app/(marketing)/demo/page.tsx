@@ -35,7 +35,7 @@ export default function DemoPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[100dvh] gap-6">
       <BrandLockup size={36} />
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+      <div className="flex flex-col items-center gap-2 text-muted-foreground text-sm">
         <span
           className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin"
           aria-hidden="true"
