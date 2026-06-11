@@ -6,7 +6,8 @@ import { es } from "date-fns/locale"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { MoneyInput } from "@/components/ui/money-input"
-import { adjustSalary, availableMonths, latestMonth } from "@/lib/calculators/sueldo"
+import { adjustSalary, availableMonths, ipcMap, latestMonth } from "@/lib/calculators/sueldo"
+import { type IpcPoint } from "@/lib/calculators/ipc-data"
 import { cn, formatCurrency } from "@/lib/utils"
 
 function monthLabel(m: string): string {
@@ -14,23 +15,25 @@ function monthLabel(m: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-const months = availableMonths()
-const latest = latestMonth()
-// Default "from" = one year before latest, if present; else first month
-const oneYearBefore = latest.replace(/^(\d{4})/, (y) => String(Number(y) - 1))
-const defaultFrom = months.includes(oneYearBefore) ? oneYearBefore : months[0]
-
 const selectClass =
   "h-9 w-full min-w-0 rounded-lg border border-input bg-transparent px-3 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
 
-export function SueldoCalculator() {
+export function SueldoCalculator({ ipcData }: { ipcData: IpcPoint[] }) {
+  const months = useMemo(() => availableMonths(ipcData), [ipcData])
+  const latest = useMemo(() => latestMonth(ipcData), [ipcData])
+  const map = useMemo(() => ipcMap(ipcData), [ipcData])
+
+  // Default "from" = one year before latest, if present; else first month
+  const oneYearBefore = latest.replace(/^(\d{4})/, (y) => String(Number(y) - 1))
+  const defaultFrom = months.includes(oneYearBefore) ? oneYearBefore : months[0]
+
   const [amount, setAmount] = useState(500000)
-  const [fromMonth, setFromMonth] = useState(defaultFrom)
-  const [toMonth, setToMonth] = useState(latest)
+  const [fromMonth, setFromMonth] = useState(() => defaultFrom)
+  const [toMonth, setToMonth] = useState(() => latest)
 
   const r = useMemo(
-    () => adjustSalary(isNaN(amount) || amount === 0 ? 0 : amount, fromMonth, toMonth),
-    [amount, fromMonth, toMonth]
+    () => adjustSalary(isNaN(amount) || amount === 0 ? 0 : amount, fromMonth, toMonth, map),
+    [amount, fromMonth, toMonth, map]
   )
 
   const fromLabel = monthLabel(fromMonth)

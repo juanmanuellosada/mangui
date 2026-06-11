@@ -2,11 +2,34 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
+import { createClient as createSbClient } from "@supabase/supabase-js"
 import { SueldoCalculator } from "./calculator"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { latestMonth } from "@/lib/calculators/sueldo"
+import { IPC_DATA, type IpcPoint } from "@/lib/calculators/ipc-data"
 import { ArrowRight } from "lucide-react"
+
+export const revalidate = 86400
+
+async function fetchIpcData(): Promise<IpcPoint[]> {
+  try {
+    const sb = createSbClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    const { data, error } = await sb
+      .from("inflation_index")
+      .select("period, ipc")
+      .order("period", { ascending: true })
+    if (error || !data || data.length === 0) return IPC_DATA
+    return data
+      .map((r) => ({ period: String(r.period).slice(0, 7), ipc: Number(r.ipc) }))
+      .filter((p) => p.ipc > 0)
+  } catch {
+    return IPC_DATA
+  }
+}
 
 export const metadata: Metadata = {
   title: "Calculadora: ¿Cuánto vale tu sueldo ajustado por inflación?",
@@ -45,10 +68,10 @@ const faqSchema = {
   ],
 }
 
-const latest = latestMonth()
-const latestLabel = format(parseISO(latest + "-01"), "MMMM yyyy", { locale: es })
-
-export default function SueldoInflacionPage() {
+export default async function SueldoInflacionPage() {
+  const ipcData = await fetchIpcData()
+  const latest = latestMonth(ipcData)
+  const latestLabel = format(parseISO(latest + "-01"), "MMMM yyyy", { locale: es })
   return (
     <div className="container mx-auto px-5 max-w-3xl py-12 md:py-20">
       <div className="mb-8">
@@ -70,7 +93,7 @@ export default function SueldoInflacionPage() {
         </p>
       </div>
 
-      <SueldoCalculator />
+      <SueldoCalculator ipcData={ipcData} />
 
       {/* SEO explainer */}
       <section className="mt-14 space-y-5 border-t border-border/60 pt-10">
