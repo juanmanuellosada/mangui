@@ -4,8 +4,6 @@ import { render } from "@react-email/render";
 import { Resend } from "resend";
 import { type ReactNode } from "react";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ?? "mangui <hola@mangui.com.ar>";
 
@@ -54,6 +52,14 @@ export async function sendEmail({
   if (!resolvedHtml) {
     return { error: "Either `react` or `html` must be provided." };
   }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("[email] RESEND_API_KEY not set — skipping email");
+    return { error: "RESEND_API_KEY not configured" };
+  }
+
+  const resend = new Resend(apiKey);
 
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
