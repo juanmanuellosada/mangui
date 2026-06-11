@@ -479,6 +479,7 @@ function AccountCard({
   }
 
   return (
+    <>
     <div
       onClick={selectionMode ? handleCardClick : () => setDetailOpen(true)}
       role={selectionMode ? "checkbox" : undefined}
@@ -630,30 +631,33 @@ function AccountCard({
 
       {/* Actions — hidden in selection mode */}
       {!selectionMode && (
-        <>
-          <div className="hidden lg:flex gap-0.5 flex-shrink-0">
-            <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditOpen(true) }} disabled={isDemo}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true) }} disabled={isDemo}>
-              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-            </Button>
-          </div>
-          <EditAccountDialog account={account} userId={userId} open={editOpen} onOpenChange={setEditOpen} />
-          <DeleteAccountDialog account={account} open={deleteOpen} onOpenChange={setDeleteOpen} />
-          <AccountDetailSheet
-            account={account}
-            currentBalance={currentBalance}
-            isCreditCard={isCreditCard}
-            isDemo={isDemo}
-            open={detailOpen}
-            onOpenChange={setDetailOpen}
-            onEdit={() => { setDetailOpen(false); setEditOpen(true) }}
-            onDelete={() => { setDetailOpen(false); setDeleteOpen(true) }}
-          />
-        </>
+        <div className="hidden lg:flex gap-0.5 flex-shrink-0">
+          <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditOpen(true) }} disabled={isDemo}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true) }} disabled={isDemo}>
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
       )}
     </div>
+    {!selectionMode && (
+      <>
+        <EditAccountDialog account={account} userId={userId} open={editOpen} onOpenChange={setEditOpen} />
+        <DeleteAccountDialog account={account} open={deleteOpen} onOpenChange={setDeleteOpen} />
+        <AccountDetailSheet
+          account={account}
+          currentBalance={currentBalance}
+          isCreditCard={isCreditCard}
+          isDemo={isDemo}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          onEdit={() => { setDetailOpen(false); setEditOpen(true) }}
+          onDelete={() => { setDetailOpen(false); setDeleteOpen(true) }}
+        />
+      </>
+    )}
+    </>
   )
 }
 
