@@ -8,6 +8,7 @@ import {
   BellOff,
   CreditCard,
   Download,
+  Mail,
   Monitor,
   Repeat,
   Smartphone,
@@ -270,7 +271,7 @@ export default function IntegracionesPage() {
 
   // ── Update preferences mutation ──────────────────────────────────────────
   const updatePrefsMutation = useMutation({
-    mutationFn: async (update: Partial<Pick<UserPreferences, "push_enabled" | "card_reminder_enabled" | "notify_hour">>) => {
+    mutationFn: async (update: Partial<Pick<UserPreferences, "push_enabled" | "card_reminder_enabled" | "notify_hour" | "weekly_insights_enabled">>) => {
       const supabase = createClient()
       const {
         data: { user },
@@ -474,6 +475,25 @@ export default function IntegracionesPage() {
               }}
               disabled={!isSubscribed || !prefs?.push_enabled}
               aria-label="Transacciones recurrentes"
+            />
+          )}
+        </Row>
+
+        {/* Weekly insights email */}
+        <Row
+          icon={Mail}
+          iconClassName="bg-primary/10"
+          label="Resumen semanal"
+          description="Recibí por email un resumen con lo más importante de tus finanzas cada lunes."
+        >
+          {loadingPrefs ? (
+            <Skeleton className="h-5 w-9 rounded-full" />
+          ) : (
+            <Switch
+              checked={prefs?.weekly_insights_enabled ?? false}
+              onCheckedChange={(v) => updatePrefsMutation.mutate({ weekly_insights_enabled: v })}
+              disabled={updatePrefsMutation.isPending || isDemo}
+              aria-label="Resumen semanal por email"
             />
           )}
         </Row>
