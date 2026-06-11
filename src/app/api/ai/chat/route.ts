@@ -19,14 +19,9 @@ import {
   estadoPresupuestos,
   estadoMetas,
 } from "@/lib/ai/tools"
+import { todayAR } from "@/lib/date-utils"
 
-// Argentina timezone offset for "today"
-const AR_TZ = "America/Argentina/Buenos_Aires"
 const MODEL_ID = "gemini-2.5-flash"
-
-function getTodayAR(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: AR_TZ })
-}
 
 // Allow streaming responses up to 60 seconds
 export const maxDuration = 60
@@ -95,7 +90,7 @@ export async function POST(req: NextRequest) {
   const dailyLimit = isUnlimited ? Infinity : FREE.aiPerDay
 
   if (dailyLimit !== Infinity) {
-    const todayStart = `${getTodayAR()}T00:00:00.000Z`
+    const todayStart = `${todayAR()}T00:00:00.000Z`
     const { count, error: countError } = await admin
       .from("ai_usage")
       .select("id", { count: "exact", head: true })
@@ -129,7 +124,7 @@ export async function POST(req: NextRequest) {
   const model = google(MODEL_ID)
 
   // 7. System prompt (es-AR, scoped to this user's finances)
-  const today = getTodayAR()
+  const today = todayAR()
   const systemPrompt = `Sos Manguito, el asistente de finanzas de mangui, y asistente de finanzas personales para el usuario autenticado en la app Mangui.
 Hoy es: ${today} (zona horaria: America/Argentina/Buenos_Aires).
 

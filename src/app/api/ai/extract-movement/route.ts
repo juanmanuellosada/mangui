@@ -6,11 +6,9 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import { generateObject } from "ai"
 import { z } from "zod"
 
-const AR_TZ = "America/Argentina/Buenos_Aires"
+import { todayAR } from "@/lib/date-utils"
+
 const MODEL_ID = "gemini-2.5-flash"
-function getTodayAR(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: AR_TZ })
-}
 export const maxDuration = 30
 
 const extractSchema = z.object({
@@ -85,7 +83,7 @@ export async function POST(req: NextRequest) {
   const isUnlimited = premiumByPlan || profile?.ai_unlimited === true
   const dailyLimit = isUnlimited ? Infinity : FREE.aiPerDay
   if (dailyLimit !== Infinity) {
-    const todayStart = `${getTodayAR()}T00:00:00.000Z`
+    const todayStart = `${todayAR()}T00:00:00.000Z`
     const { count, error: countError } = await admin
       .from("ai_usage")
       .select("id", { count: "exact", head: true })
@@ -100,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   const google = createGoogleGenerativeAI({ apiKey })
   const model = google(MODEL_ID)
-  const today = getTodayAR()
+  const today = todayAR()
   const incomeCats = categories.filter((c) => c.type === "income").map((c) => c.name)
   const expenseCats = categories.filter((c) => c.type === "expense").map((c) => c.name)
 

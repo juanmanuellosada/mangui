@@ -1,5 +1,12 @@
 import { parseISO, isAfter, startOfDay } from "date-fns"
 
+export const AR_TZ = "America/Argentina/Buenos_Aires"
+
+/** Today's date in Argentina timezone as yyyy-MM-dd (works on client and server). */
+export function todayAR(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: AR_TZ })
+}
+
 /**
  * Returns true when the given ISO date string is strictly after today
  * (i.e. is_future = true). Mirrors isInstallmentFuture from installments.ts

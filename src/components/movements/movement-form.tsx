@@ -37,6 +37,7 @@ import { AiFillBar, type AiExtractResult } from "@/components/movements/ai-fill-
 import { usePlan } from "@/lib/use-plan"
 import Link from "next/link"
 import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
+import { todayAR } from "@/lib/date-utils"
 
 type Category = Tables<"categories">
 
@@ -155,7 +156,7 @@ export function MovementForm({
   onAttachmentDeleted,
   initialMode,
 }: MovementFormProps) {
-  const today = new Date().toISOString().split("T")[0]
+  const today = todayAR()
   const isDemo = useIsDemo()
   const { isPremium: userIsPremium } = usePlan()
 

@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates, type RatesMap } from "@/lib/rates/dolar"
 import { AccountIconChip, type Account } from "@/lib/accounts"
-import { isFutureDate } from "@/lib/date-utils"
+import { isFutureDate, todayAR } from "@/lib/date-utils"
 import { listTransferAttachments, type MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
@@ -102,7 +102,7 @@ export function TransferForm({
   transferId,
   onAttachmentDeleted,
 }: TransferFormProps) {
-  const today = new Date().toISOString().split("T")[0]
+  const today = todayAR()
   const isDemo = useIsDemo()
 
   // Transfers exclude credit cards from both origin and destination

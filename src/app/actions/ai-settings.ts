@@ -3,13 +3,7 @@
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isPremium, FREE } from "@/lib/plans"
-
-// Argentina timezone offset for "today" — must match the route
-const AR_TZ = "America/Argentina/Buenos_Aires"
-
-function getTodayAR(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: AR_TZ })
-}
+import { todayAR } from "@/lib/date-utils"
 
 export type AiUsageTodayResult =
   | { ok: true; used: number; limit: number; unlimited: boolean }
@@ -45,7 +39,7 @@ export async function getAiUsageToday(): Promise<AiUsageTodayResult> {
       .from("ai_usage")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
-      .gte("created_at", `${getTodayAR()}T00:00:00.000Z`),
+      .gte("created_at", `${todayAR()}T00:00:00.000Z`),
   ])
 
   if (profileRes.error) {
