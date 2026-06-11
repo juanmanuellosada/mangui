@@ -3,8 +3,9 @@
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThemeProvider } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { OfflineBanner } from "@/components/offline-banner";
@@ -38,6 +39,30 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // useState so each request gets its own QueryClient (avoids cross-request state sharing in SSR)
   const [queryClient] = useState(makeQueryClient)
   const [persister] = useState(makePersister)
+
+  useEffect(() => {
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const uid = session?.user?.id ?? null
+      if (event === "SIGNED_OUT") {
+        try { localStorage.removeItem("mangui-last-uid") } catch {}
+        queryClient.clear()
+        try { localStorage.removeItem("mangui-query-cache") } catch {}
+        return
+      }
+      if (uid) {
+        let prev: string | null = null
+        try { prev = localStorage.getItem("mangui-last-uid") } catch {}
+        if (prev && prev !== uid) {
+          // a DIFFERENT user signed in on this browser → purge the previous user's cached data
+          queryClient.clear()
+          try { localStorage.removeItem("mangui-query-cache") } catch {}
+        }
+        try { localStorage.setItem("mangui-last-uid", uid) } catch {}
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [queryClient])
 
   return (
     <ThemeProvider
