@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { latestMonth } from "@/lib/calculators/sueldo"
 import { IPC_DATA, type IpcPoint } from "@/lib/calculators/ipc-data"
 import { ArrowRight } from "lucide-react"
+import { BackToCalculadoras } from "@/components/marketing/back-to-calculadoras"
 
 export const revalidate = 86400
 
@@ -74,6 +75,9 @@ export default async function SueldoInflacionPage() {
   const latestLabel = format(parseISO(latest + "-01"), "MMMM yyyy", { locale: es })
   return (
     <div className="container mx-auto px-5 max-w-3xl py-12 md:py-20">
+      <div className="mb-6">
+        <BackToCalculadoras />
+      </div>
       <div className="mb-8">
         <h1
           className="text-foreground leading-tight tracking-tight text-wrap-balance mb-4"

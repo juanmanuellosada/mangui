@@ -4,6 +4,7 @@ import { CuotasCalculator } from "./calculator"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { ArrowRight } from "lucide-react"
+import { BackToCalculadoras } from "@/components/marketing/back-to-calculadoras"
 
 export const metadata: Metadata = {
   title: "Calculadora: Cuotas vs Contado con inflación",
@@ -45,6 +46,9 @@ const faqSchema = {
 export default function CuotasVsContadoPage() {
   return (
     <div className="container mx-auto px-5 max-w-3xl py-12 md:py-20">
+      <div className="mb-6">
+        <BackToCalculadoras />
+      </div>
       <div className="mb-8">
         <h1
           className="text-foreground leading-tight tracking-tight text-wrap-balance mb-4"

@@ -7,6 +7,7 @@ import { DOLAR_TYPES } from "@/lib/calculators/conversor"
 import { buttonVariants } from "@/components/ui/button"
 import { cn, formatCurrency } from "@/lib/utils"
 import { ArrowRight } from "lucide-react"
+import { BackToCalculadoras } from "@/components/marketing/back-to-calculadoras"
 
 export const revalidate = 1800
 
@@ -53,6 +54,9 @@ export default async function ConversorDolarPage() {
 
   return (
     <div className="container mx-auto px-5 max-w-3xl py-12 md:py-20">
+      <div className="mb-6">
+        <BackToCalculadoras />
+      </div>
       <div className="mb-8">
         <h1
           className="text-foreground leading-tight tracking-tight text-wrap-balance mb-4"
