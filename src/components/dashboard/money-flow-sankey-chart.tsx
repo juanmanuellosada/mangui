@@ -524,20 +524,23 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
 
   return (
     <>
-      <div ref={wrapperRef} className="h-72 sm:h-80 md:h-96 w-full">
-        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 320 }}>
-          <Sankey
-            data={result.data as SankeyData}
-            node={CustomNode as unknown as Parameters<typeof Sankey>[0]["node"]}
-            link={CustomLink as unknown as Parameters<typeof Sankey>[0]["link"]}
-            nodePadding={14}
-            nodeWidth={12}
-            margin={sankeyMargin}
-            sort={false}
-          >
-            <Tooltip content={<CustomTooltip />} />
-          </Sankey>
-        </ResponsiveContainer>
+      <p className="sm:hidden text-[11px] text-muted-foreground mb-1">Deslizá para ver el flujo completo →</p>
+      <div className="relative overflow-x-auto overscroll-x-contain">
+        <div ref={wrapperRef} className="h-72 sm:h-80 md:h-96 w-full min-w-[560px] sm:min-w-0">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height: 320 }}>
+            <Sankey
+              data={result.data as SankeyData}
+              node={CustomNode as unknown as Parameters<typeof Sankey>[0]["node"]}
+              link={CustomLink as unknown as Parameters<typeof Sankey>[0]["link"]}
+              nodePadding={14}
+              nodeWidth={12}
+              margin={sankeyMargin}
+              sort={false}
+            >
+              <Tooltip content={<CustomTooltip />} />
+            </Sankey>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Summary row */}
