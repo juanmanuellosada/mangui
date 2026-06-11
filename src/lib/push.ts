@@ -87,7 +87,7 @@ export async function subscribeToPush(): Promise<boolean> {
 
     const { error } = await supabase.from("push_subscriptions").upsert(
       { user_id: user.id, endpoint, p256dh, auth, user_agent: userAgent },
-      { onConflict: "endpoint" }
+      { onConflict: "user_id,endpoint" }
     )
 
     if (error) {
