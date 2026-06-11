@@ -1,6 +1,8 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
+import { parseISO, format } from "date-fns"
+import { es } from "date-fns/locale"
 import {
   BarChart3,
   TrendingUp,
@@ -23,6 +25,8 @@ import {
 } from "@/lib/stats"
 import { renderCategoryIcon } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
+import { useInflationIndex } from "@/lib/inflation/use-inflation-index"
+import { buildIpcMap, latestIpcMonth, adjustAmount } from "@/lib/inflation/adjust"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -217,6 +221,28 @@ interface CompareTabProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CompareTab({ movements, categories, currency = "ARS", period1, period2, sharedFilter }: CompareTabProps) {
+  const [realTerms, setRealTerms] = useState(false)
+
+  const { data: inflationRows = [] } = useInflationIndex()
+  const ipc = useMemo(() => buildIpcMap(inflationRows), [inflationRows])
+  const refMonth = useMemo(() => latestIpcMonth(ipc), [ipc])
+
+  const adjust = useMemo(
+    () =>
+      realTerms && refMonth
+        ? (amount: number, dateStr: string) => adjustAmount(amount, dateStr, refMonth, ipc)
+        : undefined,
+    [realTerms, refMonth, ipc]
+  )
+
+  const refMonthLabel = useMemo(
+    () =>
+      refMonth
+        ? format(parseISO(refMonth + "-01"), "MMMM yyyy", { locale: es })
+        : "",
+    [refMonth]
+  )
+
   const statsFilter1 = useMemo(() => ({
     dateFrom: period1.from ?? undefined,
     dateTo: period1.to ?? undefined,
@@ -245,8 +271,8 @@ export function CompareTab({ movements, categories, currency = "ARS", period1, p
   )
 
   const comparison = useMemo(
-    () => periodComparison(movsA, movsB, categories, currency),
-    [movsA, movsB, categories, currency]
+    () => periodComparison(movsA, movsB, categories, currency, adjust),
+    [movsA, movsB, categories, currency, adjust]
   )
 
   const { totalsA, totalsB } = comparison
@@ -318,6 +344,39 @@ export function CompareTab({ movements, categories, currency = "ARS", period1, p
 
   return (
     <div className="space-y-4">
+      {/* Nominal | Real toggle */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 p-0.5 gap-0">
+          {(["nominal", "real"] as const).map((option) => {
+            const isReal = option === "real"
+            const active = isReal ? realTerms : !realTerms
+            const disabled = isReal && refMonth === null
+            return (
+              <button
+                key={option}
+                type="button"
+                disabled={disabled}
+                onClick={() => setRealTerms(isReal)}
+                className={cn(
+                  "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                    : "text-muted-foreground hover:text-foreground",
+                  disabled && "opacity-40 cursor-not-allowed pointer-events-none"
+                )}
+              >
+                {isReal ? "Real" : "Nominal"}
+              </button>
+            )
+          })}
+        </div>
+        {realTerms && refMonthLabel && (
+          <span className="text-xs text-muted-foreground">
+            En pesos de {refMonthLabel.charAt(0).toUpperCase() + refMonthLabel.slice(1)}
+          </span>
+        )}
+      </div>
+
       {/* Natural-language summary */}
       {hasData && (
         <NaturalSummary

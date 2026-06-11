@@ -59,12 +59,13 @@ export interface SummaryTotals {
 
 /**
  * Compute income, expense, and net totals from already-filtered movements.
+ * Optional `adjust` restates each amount before summing (e.g. inflation adjustment).
  */
-export function summaryTotals(movements: Movement[], currency?: Currency): SummaryTotals {
+export function summaryTotals(movements: Movement[], currency?: Currency, adjust?: (amount: number, dateStr: string) => number): SummaryTotals {
   let income = 0
   let expense = 0
   for (const m of movements) {
-    const amt = effectiveAmount(m, currency)
+    const amt = adjust ? adjust(effectiveAmount(m, currency), m.date) : effectiveAmount(m, currency)
     if (m.type === "income") income += amt
     else expense += amt
   }
@@ -211,12 +212,14 @@ export interface PeriodComparison {
 /**
  * Compare two movement sets per-category.
  * movsA = "este período", movsB = "anterior".
+ * Optional `adjust` restates each amount before summing (e.g. inflation adjustment).
  */
 export function periodComparison(
   movsA: Movement[],
   movsB: Movement[],
   categories: { id: string; name: string; icon?: string | null }[],
-  currency?: Currency
+  currency?: Currency,
+  adjust?: (amount: number, dateStr: string) => number
 ): PeriodComparison {
   const catMap = new Map(categories.map((c) => [c.id, c]))
 
@@ -225,14 +228,14 @@ export function periodComparison(
     for (const m of movs) {
       if (m.type !== "expense") continue
       const key = m.category_id ?? "__none__"
-      const amt = effectiveAmount(m, currency)
+      const amt = adjust ? adjust(effectiveAmount(m, currency), m.date) : effectiveAmount(m, currency)
       map.set(key, (map.get(key) ?? 0) + amt)
     }
     return map
   }
 
-  const totalsA = summaryTotals(movsA, currency)
-  const totalsB = summaryTotals(movsB, currency)
+  const totalsA = summaryTotals(movsA, currency, adjust)
+  const totalsB = summaryTotals(movsB, currency, adjust)
 
   const mapA = buildTotals(movsA)
   const mapB = buildTotals(movsB)
