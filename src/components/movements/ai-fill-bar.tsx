@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { VoiceInputButton } from "@/components/ai/voice-input-button"
+import { PhotoInputButton } from "@/components/ai/photo-input-button"
 
 export interface AiExtractResult {
   type: "income" | "expense"
@@ -32,6 +33,30 @@ export function AiFillBar({
   const [loading, setLoading] = useState(false)
 
   if (isDemo) return null
+
+  async function submitImage(file: File) {
+    if (loading) return
+    setLoading(true)
+    try {
+      const form = new FormData()
+      form.append("image", file, file.name || "foto.jpg")
+      form.append("accounts", JSON.stringify(accounts.map((a) => a.name)))
+      form.append("categories", JSON.stringify(categories.map((c) => ({ name: c.name, type: c.type }))))
+      const res = await fetch("/api/ai/extract-movement", { method: "POST", body: form })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data?.message || data?.error || "No pude interpretar el ticket.")
+        return
+      }
+      const data = (await res.json()) as AiExtractResult
+      onResult(data)
+      toast.success("Ticket interpretado. Revisá los datos y elegí la cuenta.")
+    } catch {
+      toast.error("Error al conectar con la IA.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function submitAudio(wav: Blob) {
     if (loading) return
@@ -104,6 +129,7 @@ export function AiFillBar({
           className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <VoiceInputButton onAudio={submitAudio} disabled={loading} className="h-9 w-9 rounded-lg" />
+        <PhotoInputButton onPhoto={submitImage} disabled={loading} className="h-9 w-9 rounded-lg" />
         <button
           type="button"
           onClick={() => void submit()}

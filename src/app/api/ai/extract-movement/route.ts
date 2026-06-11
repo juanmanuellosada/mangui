@@ -32,10 +32,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "demo", message: "No disponible en el modo demo." }, { status: 403 })
   }
 
-  // ── Parse input: JSON (text) OR multipart/form-data (audio) ──
+  // ── Parse input: JSON (text) OR multipart/form-data (audio or image) ──
   let text = ""
-  let audioBytes: Uint8Array | null = null
-  let audioMediaType = "audio/wav"
+  let mediaBytes: Uint8Array | null = null
+  let mediaMediaType = "audio/wav"
+  let mediaKind: "audio" | "image" = "audio"
   let accountNames: string[] = []
   let categories: { name: string; type: string }[] = []
 
@@ -43,11 +44,14 @@ export async function POST(req: NextRequest) {
   try {
     if (contentType.includes("multipart/form-data")) {
       const form = await req.formData()
-      const file = form.get("audio")
-      if (!(file instanceof Blob)) return NextResponse.json({ error: "Audio faltante" }, { status: 400 })
-      if (file.size > 8 * 1024 * 1024) return NextResponse.json({ error: "Audio demasiado largo" }, { status: 413 })
-      if (file.type) audioMediaType = file.type
-      audioBytes = new Uint8Array(await file.arrayBuffer())
+      const imageFile = form.get("image")
+      const audioFile = form.get("audio")
+      const file = imageFile instanceof Blob ? imageFile : audioFile instanceof Blob ? audioFile : null
+      if (!file) return NextResponse.json({ error: "Archivo faltante" }, { status: 400 })
+      mediaKind = imageFile instanceof Blob ? "image" : "audio"
+      if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "Archivo demasiado grande" }, { status: 413 })
+      if (file.type) mediaMediaType = file.type
+      mediaBytes = new Uint8Array(await file.arrayBuffer())
       try { accountNames = JSON.parse((form.get("accounts") as string) || "[]") } catch { accountNames = [] }
       try { categories = JSON.parse((form.get("categories") as string) || "[]") } catch { categories = [] }
     } else {
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
   accountNames = accountNames.slice(0, 100)
   categories = categories.slice(0, 300)
-  if (!audioBytes && !text) return NextResponse.json({ error: "Entrada vacía" }, { status: 400 })
+  if (!mediaBytes && !text) return NextResponse.json({ error: "Entrada vacía" }, { status: 400 })
 
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
   if (!apiKey) return NextResponse.json({ error: "La IA no está disponible en este momento." }, { status: 500 })
@@ -118,7 +122,11 @@ Reglas:
 Devolvé SOLO los campos del esquema.`
 
   try {
-    const { object } = audioBytes
+    const mediaInstruction = mediaKind === "image"
+      ? `Extraé los datos de un movimiento financiero a partir de la IMAGEN adjunta (ticket/comprobante/factura). Leé el monto TOTAL, la fecha y el comercio (es-AR). Si el ticket muestra el medio de pago (VISA, MASTERCARD, DÉBITO, EFECTIVO o los últimos dígitos de una tarjeta), usalo para elegir la "cuenta" de la lista que mejor coincida; si no se ve el medio de pago, dejá "cuenta" en null.\n\n${rules}`
+      : `Extraé los datos de un movimiento financiero descripto en el AUDIO adjunto (español rioplatense, es-AR).\n\n${rules}`
+
+    const { object } = mediaBytes
       ? await generateObject({
           model,
           schema: extractSchema,
@@ -126,8 +134,8 @@ Devolvé SOLO los campos del esquema.`
             {
               role: "user",
               content: [
-                { type: "text", text: `Extraé los datos de un movimiento financiero descripto en el AUDIO adjunto (español rioplatense, es-AR).\n\n${rules}` },
-                { type: "file", data: audioBytes, mediaType: audioMediaType },
+                { type: "text", text: mediaInstruction },
+                { type: "file", data: mediaBytes, mediaType: mediaMediaType },
               ],
             },
           ],

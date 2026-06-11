@@ -33,6 +33,7 @@ import {
 } from "@/lib/movements"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { VoiceInputButton } from "@/components/ai/voice-input-button"
+import { PhotoInputButton } from "@/components/ai/photo-input-button"
 
 type Category = Tables<"categories">
 
@@ -334,15 +335,22 @@ function MessageBubble({
   const isUser = message.role === "user"
 
   if (isUser) {
-    // Find text parts
     const textParts = message.parts.filter((p) => p.type === "text")
     const text = textParts.map((p) => ("text" in p ? p.text : "")).join("")
-    if (!text) return null
-
+    const imageParts = message.parts.filter(
+      (p) => p.type === "file" && "mediaType" in p && typeof p.mediaType === "string" && p.mediaType.startsWith("image/")
+    )
+    if (!text && imageParts.length === 0) return null
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-4 py-2.5">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary text-primary-foreground px-4 py-2.5 space-y-2">
+          {imageParts.map((p, i) =>
+            "url" in p && typeof p.url === "string" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={i} src={p.url} alt="Foto adjunta" className="rounded-lg max-h-48 w-auto" />
+            ) : null
+          )}
+          {text ? <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p> : null}
         </div>
       </div>
     )
@@ -576,6 +584,31 @@ export function AiChat({ initialUsed, initialUnlimited, initialLimit }: AiChatPr
     [isStreaming, sendMessage]
   )
 
+  const handleSendPhoto = useCallback(
+    (file: File) => {
+      if (isStreaming) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        const url = typeof reader.result === "string" ? reader.result : ""
+        if (!url) return
+        setRateLimited(false)
+        setGeneralError("")
+        const caption = input.trim()
+        sendMessage({
+          role: "user",
+          parts: [
+            { type: "file", mediaType: file.type, url, filename: file.name },
+            { type: "text", text: caption || "Registrá el movimiento de este ticket." },
+          ],
+        })
+        setInput("")
+        if (textareaRef.current) textareaRef.current.style.height = "auto"
+      }
+      reader.readAsDataURL(file)
+    },
+    [isStreaming, sendMessage, input]
+  )
+
   const handleAddToolOutput = useCallback(
     (toolCallId: string, confirmed: boolean, summary?: string) => {
       if (confirmed) {
@@ -706,6 +739,7 @@ export function AiChat({ initialUsed, initialUnlimited, initialLimit }: AiChatPr
                 aria-label="Mensaje para el asistente"
               />
               <VoiceInputButton onTranscript={(t) => handleSend(t)} disabled={isStreaming || rateLimited} className="h-10 w-10" />
+              <PhotoInputButton onPhoto={handleSendPhoto} disabled={isStreaming || rateLimited} className="h-10 w-10" />
               <Button
                 type="button"
                 size="icon"
