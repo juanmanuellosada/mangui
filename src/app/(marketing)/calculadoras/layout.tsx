@@ -9,7 +9,7 @@ export default function CalculadorasLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col min-h-[100dvh]">
+    <div className="relative z-10 flex flex-col min-h-[100dvh]">
       <header className="sticky top-0 z-50 border-b border-white/10 glass bg-[#1A1F1A]/80">
         <div className="container mx-auto px-5 h-16 flex items-center justify-between max-w-6xl">
           <Link
