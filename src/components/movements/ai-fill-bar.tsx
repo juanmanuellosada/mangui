@@ -33,6 +33,30 @@ export function AiFillBar({
 
   if (isDemo) return null
 
+  async function submitAudio(wav: Blob) {
+    if (loading) return
+    setLoading(true)
+    try {
+      const form = new FormData()
+      form.append("audio", wav, "audio.wav")
+      form.append("accounts", JSON.stringify(accounts.map((a) => a.name)))
+      form.append("categories", JSON.stringify(categories.map((c) => ({ name: c.name, type: c.type }))))
+      const res = await fetch("/api/ai/extract-movement", { method: "POST", body: form })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data?.message || data?.error || "No pude interpretar el movimiento.")
+        return
+      }
+      const data = (await res.json()) as AiExtractResult
+      onResult(data)
+      toast.success("Movimiento interpretado por voz. Revisalo antes de guardar.")
+    } catch {
+      toast.error("Error al conectar con la IA.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function submit(override?: string) {
     const t = (override ?? text).trim()
     if (!t || loading) return
@@ -79,7 +103,7 @@ export function AiFillBar({
           disabled={loading}
           className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        <VoiceInputButton onTranscript={(t) => { setText(t); void submit(t) }} disabled={loading} className="h-9 w-9 rounded-lg" />
+        <VoiceInputButton onAudio={submitAudio} disabled={loading} className="h-9 w-9 rounded-lg" />
         <button
           type="button"
           onClick={() => void submit()}

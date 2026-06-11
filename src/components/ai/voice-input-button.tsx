@@ -11,10 +11,12 @@ type RecState = "idle" | "recording" | "processing"
 
 export function VoiceInputButton({
   onTranscript,
+  onAudio,
   disabled,
   className,
 }: {
-  onTranscript: (text: string) => void
+  onTranscript?: (text: string) => void
+  onAudio?: (wav: Blob) => Promise<void>
   disabled?: boolean
   className?: string
 }) {
@@ -78,6 +80,10 @@ export function VoiceInputButton({
       const audioBuf = await ctx.decodeAudioData(arrayBuf)
       void ctx.close()
       const wav = audioBufferToWav(audioBuf, 16000)
+      if (onAudio) {
+        await onAudio(wav)
+        return
+      }
       const form = new FormData()
       form.append("audio", wav, "audio.wav")
       const res = await fetch("/api/ai/transcribe", { method: "POST", body: form })
@@ -88,8 +94,8 @@ export function VoiceInputButton({
         return
       }
       const data = await res.json()
-      const text = (data?.text ?? "").trim()
-      if (text) onTranscript(text)
+      const transcript = (data?.text ?? "").trim()
+      if (transcript) onTranscript?.(transcript)
       else toast.error("No se entendió el audio. Probá de nuevo.")
     } catch {
       toast.error("Error procesando el audio.")

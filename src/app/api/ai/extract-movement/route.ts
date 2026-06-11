@@ -32,12 +32,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "demo", message: "No disponible en el modo demo." }, { status: 403 })
   }
 
-  let body: { text?: string; accounts?: string[]; categories?: { name: string; type: string }[] }
-  try { body = await req.json() } catch { return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 }) }
-  const text = (body.text ?? "").trim()
-  if (!text) return NextResponse.json({ error: "Texto vacío" }, { status: 400 })
-  const accountNames = Array.isArray(body.accounts) ? body.accounts.slice(0, 100) : []
-  const categories = Array.isArray(body.categories) ? body.categories.slice(0, 300) : []
+  // ── Parse input: JSON (text) OR multipart/form-data (audio) ──
+  let text = ""
+  let audioBytes: Uint8Array | null = null
+  let audioMediaType = "audio/wav"
+  let accountNames: string[] = []
+  let categories: { name: string; type: string }[] = []
+
+  const contentType = req.headers.get("content-type") || ""
+  try {
+    if (contentType.includes("multipart/form-data")) {
+      const form = await req.formData()
+      const file = form.get("audio")
+      if (!(file instanceof Blob)) return NextResponse.json({ error: "Audio faltante" }, { status: 400 })
+      if (file.size > 8 * 1024 * 1024) return NextResponse.json({ error: "Audio demasiado largo" }, { status: 413 })
+      if (file.type) audioMediaType = file.type
+      audioBytes = new Uint8Array(await file.arrayBuffer())
+      try { accountNames = JSON.parse((form.get("accounts") as string) || "[]") } catch { accountNames = [] }
+      try { categories = JSON.parse((form.get("categories") as string) || "[]") } catch { categories = [] }
+    } else {
+      const body = await req.json()
+      text = (body?.text ?? "").trim()
+      accountNames = Array.isArray(body?.accounts) ? body.accounts : []
+      categories = Array.isArray(body?.categories) ? body.categories : []
+    }
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
+  }
+  accountNames = accountNames.slice(0, 100)
+  categories = categories.slice(0, 300)
+  if (!audioBytes && !text) return NextResponse.json({ error: "Entrada vacía" }, { status: 400 })
 
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
   if (!apiKey) return NextResponse.json({ error: "La IA no está disponible en este momento." }, { status: 500 })
@@ -76,14 +100,7 @@ export async function POST(req: NextRequest) {
   const incomeCats = categories.filter((c) => c.type === "income").map((c) => c.name)
   const expenseCats = categories.filter((c) => c.type === "expense").map((c) => c.name)
 
-  try {
-    const { object } = await generateObject({
-      model,
-      schema: extractSchema,
-      prompt: `Extraé los datos de un movimiento financiero a partir de este texto en español rioplatense (es-AR):
-"""${text}"""
-
-Hoy es ${today} (America/Argentina/Buenos_Aires).
+  const rules = `Hoy es ${today} (America/Argentina/Buenos_Aires).
 
 Cuentas del usuario: ${accountNames.join(" | ") || "(ninguna)"}
 Categorías de GASTO: ${expenseCats.join(" | ") || "(ninguna)"}
@@ -98,10 +115,30 @@ Reglas:
 - "fecha": formato YYYY-MM-DD. Interpretá fechas relativas ("hoy", "ayer", "5 de junio") respecto de hoy. Si no se menciona, usá ${today}.
 - "nota": nota corta opcional (ej. comercio/detalle); null si no aporta.
 - "cuotas": número de cuotas si se mencionan (ej. "en 3 cuotas" → 3); si no, null.
-Devolvé SOLO los campos del esquema.`,
-    })
+Devolvé SOLO los campos del esquema.`
+
+  try {
+    const { object } = audioBytes
+      ? await generateObject({
+          model,
+          schema: extractSchema,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `Extraé los datos de un movimiento financiero descripto en el AUDIO adjunto (español rioplatense, es-AR).\n\n${rules}` },
+                { type: "file", data: audioBytes, mediaType: audioMediaType },
+              ],
+            },
+          ],
+        })
+      : await generateObject({
+          model,
+          schema: extractSchema,
+          prompt: `Extraé los datos de un movimiento financiero a partir de este texto en español rioplatense (es-AR):\n"""${text}"""\n\n${rules}`,
+        })
     return NextResponse.json(object)
   } catch {
-    return NextResponse.json({ error: "No pude interpretar el movimiento. Probá reformularlo." }, { status: 422 })
+    return NextResponse.json({ error: "No pude interpretar el movimiento. Probá de nuevo." }, { status: 422 })
   }
 }
