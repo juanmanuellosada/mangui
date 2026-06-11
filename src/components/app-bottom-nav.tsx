@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PiggyBank, ArrowLeftRight, LayoutGrid, PlusCircle } from "lucide-react";
+import { Home, PiggyBank, ArrowLeftRight, LayoutGrid, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
 import { MangoSheet } from "@/components/ui/mango-sheet";
@@ -48,14 +48,20 @@ export function AppBottomNav() {
                   type="button"
                   onClick={() => quickAdd.open()}
                   aria-label="Nuevo movimiento"
-                  className={cn(
-                    "relative flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl transition-all duration-150 min-w-0",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "text-muted-foreground hover:text-foreground"
-                  )}
+                  className="group relative flex flex-col items-center gap-0.5 px-3 min-w-0 focus-visible:outline-none cursor-pointer"
                 >
-                  <PlusCircle className="h-5 w-5 transition-transform duration-150" />
-                  <span className="text-[10px] font-medium leading-none">Nuevo</span>
+                  <span
+                    className={cn(
+                      "-mt-8 flex h-14 w-14 items-center justify-center rounded-full",
+                      "bg-primary text-primary-foreground",
+                      "shadow-lg shadow-primary/40 ring-4 ring-background",
+                      "transition-transform duration-150 group-hover:scale-105 group-active:scale-95",
+                      "group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring"
+                    )}
+                  >
+                    <Plus className="h-6 w-6" strokeWidth={2.5} aria-hidden />
+                  </span>
+                  <span className="text-[10px] font-medium leading-none text-foreground">Nuevo</span>
                 </button>
               );
             }
