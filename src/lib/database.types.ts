@@ -1342,6 +1342,7 @@ export type Database = {
           theme: Database["public"]["Enums"]["ui_theme"]
           updated_at: string
           user_id: string
+          weekly_insights_enabled: boolean
         }
         Insert: {
           card_reminder_enabled?: boolean
@@ -1355,6 +1356,7 @@ export type Database = {
           theme?: Database["public"]["Enums"]["ui_theme"]
           updated_at?: string
           user_id: string
+          weekly_insights_enabled?: boolean
         }
         Update: {
           card_reminder_enabled?: boolean
@@ -1368,6 +1370,7 @@ export type Database = {
           theme?: Database["public"]["Enums"]["ui_theme"]
           updated_at?: string
           user_id?: string
+          weekly_insights_enabled?: boolean
         }
         Relationships: []
       }
