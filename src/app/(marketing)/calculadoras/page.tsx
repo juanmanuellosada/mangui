@@ -101,6 +101,30 @@ export default function CalculadorasPage() {
             </p>
           </div>
         </Link>
+
+        {/* Live: Regla 50/30/20 */}
+        <Link
+          href="/calculadoras/regla-50-30-20"
+          className="rounded-2xl border border-border/60 bg-card p-6 hover:border-primary/30 transition-colors duration-200 flex flex-col gap-3 group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-primary bg-primary/10 rounded-full px-2.5 py-0.5">
+              Disponible
+            </span>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-150" aria-hidden="true" />
+          </div>
+          <div>
+            <h2
+              className="text-base font-bold text-foreground mb-1"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Regla 50/30/20
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Dividí tu sueldo en necesidades, gustos y ahorro — adaptado a la realidad argentina.
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* CTA */}
