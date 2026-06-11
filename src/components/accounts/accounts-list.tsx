@@ -478,6 +478,76 @@ function AccountCard({
     if (selectionMode && onToggle) onToggle(account.id)
   }
 
+  const cardAmounts = isCreditCard && cardPayment ? (
+    <>
+      {/* A pagar — closed statement */}
+      {(() => {
+        const today = startOfDay(new Date())
+        let dueDateLabel: string | null = null
+        if (cardPayment.dueDate) {
+          const due = startOfDay(parseISO(cardPayment.dueDate))
+          if (isBefore(due, today)) {
+            dueDateLabel = "Vencido"
+          } else if (isEqual(due, today)) {
+            dueDateLabel = "Vence hoy"
+          } else {
+            dueDateLabel = `Vence ${format(due, "d/M", { locale: es })}`
+          }
+        }
+        const showSecondary =
+          cardPayment.amountSecondary != null &&
+          Math.abs(cardPayment.amountSecondary) >= 0.005
+        return (
+          <div className="text-right">
+            <p className="text-[10px] text-muted-foreground leading-none mb-0.5">
+              A pagar{dueDateLabel ? ` · ${dueDateLabel}` : ""}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-destructive leading-tight">
+              {cardPayment.primaryIsARS
+                ? formatCurrency(-cardPayment.amount, "ARS")
+                : formatCurrency(-cardPayment.amount, "USD")}
+            </p>
+            {showSecondary && (
+              <p className="text-[11px] text-destructive/80 tabular-nums leading-none">
+                {cardPayment.primaryIsARS
+                  ? formatCurrency(-cardPayment.amountSecondary!, "USD")
+                  : formatCurrency(-cardPayment.amountSecondary!, "ARS")}
+              </p>
+            )}
+          </div>
+        )
+      })()}
+      {/* En curso — open cycle */}
+      {(() => {
+        const { amount: cur, amountSecondary: curSec, closeDate } = cardPayment.current
+        let closeDateLabel = ""
+        if (closeDate) {
+          closeDateLabel = ` · Cierra ${format(parseISO(closeDate), "d/M", { locale: es })}`
+        }
+        const showCurSecondary = curSec != null && Math.abs(curSec) >= 0.005
+        return (
+          <div className="text-right">
+            <p className="text-[10px] text-muted-foreground/70 leading-none mb-0.5">
+              En curso{closeDateLabel}
+            </p>
+            <p className="text-sm tabular-nums text-muted-foreground leading-tight">
+              {cardPayment.primaryIsARS
+                ? formatCurrency(cur, "ARS")
+                : formatCurrency(cur, "USD")}
+            </p>
+            {showCurSecondary && (
+              <p className="text-[11px] text-muted-foreground/70 tabular-nums leading-none">
+                {cardPayment.primaryIsARS
+                  ? formatCurrency(curSec!, "USD")
+                  : formatCurrency(curSec!, "ARS")}
+              </p>
+            )}
+          </div>
+        )
+      })()}
+    </>
+  ) : null
+
   return (
     <>
     <div
@@ -485,159 +555,105 @@ function AccountCard({
       role={selectionMode ? "checkbox" : undefined}
       aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
-        "px-4 py-3 flex items-center gap-3",
+        "px-4 py-3",
         "hover:bg-muted/40 transition-colors duration-150",
         account.is_hidden && "opacity-60",
         "cursor-pointer",
         isSelected && selectedItemCn(true)
       )}
     >
-      {/* Checkbox (selection mode) or Icon */}
-      {selectionMode ? (
-        <RowCheckbox
-          checked={!!isSelected}
-          onChange={() => onToggle?.(account.id)}
-          label={`Seleccionar ${account.name}`}
-        />
-      ) : (
-        <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60 overflow-hidden">
-          {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground", logoFill: true })}
-        </div>
-      )}
+      {/* Top row: icon/checkbox + info + balance (sm+) + chevron + actions */}
+      <div className="flex items-center gap-3">
+        {/* Checkbox (selection mode) or Icon */}
+        {selectionMode ? (
+          <RowCheckbox
+            checked={!!isSelected}
+            onChange={() => onToggle?.(account.id)}
+            label={`Seleccionar ${account.name}`}
+          />
+        ) : (
+          <div className="h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-muted/60 overflow-hidden">
+            {renderAccountIcon(account.icon, { size: "h-6 w-6", className: "text-muted-foreground", logoFill: true })}
+          </div>
+        )}
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <p className="text-sm font-semibold truncate">{account.name}</p>
-          {account.is_hidden && (
-            <EyeOff className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-          )}
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <p className="text-sm font-semibold truncate">{account.name}</p>
+            {account.is_hidden && (
+              <EyeOff className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[11px] text-muted-foreground font-medium flex-shrink-0">
+              {ACCOUNT_TYPE_LABELS[account.type]}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">·</span>
+            <CurrencyChip currency={account.currency} size="sm" />
+            {account.account_number && (
+              <>
+                <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">·</span>
+                <span className="text-[11px] text-muted-foreground truncate min-w-0">
+                  {account.account_number}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[11px] text-muted-foreground font-medium flex-shrink-0">
-            {ACCOUNT_TYPE_LABELS[account.type]}
-          </span>
-          <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">·</span>
-          <CurrencyChip currency={account.currency} size="sm" />
-          {account.account_number && (
-            <>
-              <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">·</span>
-              <span className="text-[11px] text-muted-foreground truncate min-w-0">
-                {account.account_number}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
 
-      {/* Balance / Amount due */}
-      <div className="shrink-0 mr-1">
+        {/* Balance / Amount due */}
         {isCreditCard && cardPayment ? (
-          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-1 sm:gap-x-4 justify-end">
-            {/* A pagar — closed statement */}
-            {(() => {
-              const today = startOfDay(new Date())
-              let dueDateLabel: string | null = null
-              if (cardPayment.dueDate) {
-                const due = startOfDay(parseISO(cardPayment.dueDate))
-                if (isBefore(due, today)) {
-                  dueDateLabel = "Vencido"
-                } else if (isEqual(due, today)) {
-                  dueDateLabel = "Vence hoy"
-                } else {
-                  dueDateLabel = `Vence ${format(due, "d/M", { locale: es })}`
-                }
-              }
-              const showSecondary =
-                cardPayment.amountSecondary != null &&
-                Math.abs(cardPayment.amountSecondary) >= 0.005
-              return (
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground leading-none mb-0.5">
-                    A pagar{dueDateLabel ? ` · ${dueDateLabel}` : ""}
-                  </p>
-                  <p className="text-sm font-bold tabular-nums text-destructive leading-tight">
-                    {cardPayment.primaryIsARS
-                      ? formatCurrency(-cardPayment.amount, "ARS")
-                      : formatCurrency(-cardPayment.amount, "USD")}
-                  </p>
-                  {showSecondary && (
-                    <p className="text-[11px] text-destructive/80 tabular-nums leading-none">
-                      {cardPayment.primaryIsARS
-                        ? formatCurrency(-cardPayment.amountSecondary!, "USD")
-                        : formatCurrency(-cardPayment.amountSecondary!, "ARS")}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
-            {/* En curso — open cycle */}
-            {(() => {
-              const { amount: cur, amountSecondary: curSec, closeDate } = cardPayment.current
-              let closeDateLabel = ""
-              if (closeDate) {
-                closeDateLabel = ` · Cierra ${format(parseISO(closeDate), "d/M", { locale: es })}`
-              }
-              const showCurSecondary = curSec != null && Math.abs(curSec) >= 0.005
-              return (
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground/70 leading-none mb-0.5">
-                    En curso{closeDateLabel}
-                  </p>
-                  <p className="text-sm tabular-nums text-muted-foreground leading-tight">
-                    {cardPayment.primaryIsARS
-                      ? formatCurrency(cur, "ARS")
-                      : formatCurrency(cur, "USD")}
-                  </p>
-                  {showCurSecondary && (
-                    <p className="text-[11px] text-muted-foreground/70 tabular-nums leading-none">
-                      {cardPayment.primaryIsARS
-                        ? formatCurrency(curSec!, "USD")
-                        : formatCurrency(curSec!, "ARS")}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
+          <div className="hidden sm:flex shrink-0 mr-1 flex-wrap gap-x-4 justify-end">
+            {cardAmounts}
           </div>
         ) : (
-          <p
+          <div className="shrink-0 mr-1">
+            <p
+              className={cn(
+                "text-sm font-bold tabular-nums",
+                currentBalance < 0 ? "text-destructive" : "text-foreground"
+              )}
+            >
+              {formatCurrency(currentBalance, account.currency)}
+            </p>
+          </div>
+        )}
+
+        {/* Credit card shortcut — hidden in selection mode */}
+        {!selectionMode && isCreditCard && (
+          <Link
+            href="/tarjetas"
             className={cn(
-              "text-sm font-bold tabular-nums",
-              currentBalance < 0 ? "text-destructive" : "text-foreground"
+              "flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center",
+              "text-primary hover:bg-primary/10 transition-colors duration-150",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
             )}
+            title="Ver resumen"
+            aria-label="Ver resumen de tarjeta"
+            onClick={(e) => e.stopPropagation()}
           >
-            {formatCurrency(currentBalance, account.currency)}
-          </p>
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        )}
+
+        {/* Actions — hidden in selection mode */}
+        {!selectionMode && (
+          <div className="hidden lg:flex gap-0.5 flex-shrink-0">
+            <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditOpen(true) }} disabled={isDemo}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true) }} disabled={isDemo}>
+              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Credit card shortcut — hidden in selection mode */}
-      {!selectionMode && isCreditCard && (
-        <Link
-          href="/tarjetas"
-          className={cn(
-            "flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center",
-            "text-primary hover:bg-primary/10 transition-colors duration-150",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-          )}
-          title="Ver resumen"
-          aria-label="Ver resumen de tarjeta"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Link>
-      )}
-
-      {/* Actions — hidden in selection mode */}
-      {!selectionMode && (
-        <div className="hidden lg:flex gap-0.5 flex-shrink-0">
-          <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditOpen(true) }} disabled={isDemo}>
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true) }} disabled={isDemo}>
-            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-          </Button>
+      {/* Mobile-only second row for credit card amounts */}
+      {isCreditCard && cardPayment && (
+        <div className="flex sm:hidden mt-2 pl-14 gap-3 justify-between">
+          {cardAmounts}
         </div>
       )}
     </div>
