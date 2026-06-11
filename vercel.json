@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/activate-futures",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-inflation",
+      "schedule": "0 13 16 * *"
     }
   ]
 }
