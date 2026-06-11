@@ -175,7 +175,7 @@ export function MovementForm({
       type: "expense",
       amount: 0,
       original_currency: "ARS",
-      account_id: accounts[0]?.id ?? "",
+      account_id: "",
       category_id: null,
       date: today,
       note: "",
