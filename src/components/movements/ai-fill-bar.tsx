@@ -5,6 +5,7 @@ import { Sparkles, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { VoiceInputButton } from "@/components/ai/voice-input-button"
 
 export interface AiExtractResult {
   type: "income" | "expense"
@@ -32,8 +33,8 @@ export function AiFillBar({
 
   if (isDemo) return null
 
-  async function submit() {
-    const t = text.trim()
+  async function submit(override?: string) {
+    const t = (override ?? text).trim()
     if (!t || loading) return
     setLoading(true)
     try {
@@ -78,9 +79,10 @@ export function AiFillBar({
           disabled={loading}
           className="flex-1 min-w-0 h-9 px-3 rounded-lg border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
+        <VoiceInputButton onTranscript={(t) => { setText(t); void submit(t) }} disabled={loading} className="h-9 w-9 rounded-lg" />
         <button
           type="button"
-          onClick={submit}
+          onClick={() => void submit()}
           disabled={loading || !text.trim()}
           className={cn(
             "shrink-0 inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold",

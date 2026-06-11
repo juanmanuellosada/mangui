@@ -32,6 +32,7 @@ import {
   CATEGORIES_KEY,
 } from "@/lib/movements"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { VoiceInputButton } from "@/components/ai/voice-input-button"
 
 type Category = Tables<"categories">
 
@@ -704,6 +705,7 @@ export function AiChat({ initialUsed, initialUnlimited, initialLimit }: AiChatPr
                 )}
                 aria-label="Mensaje para el asistente"
               />
+              <VoiceInputButton onTranscript={(t) => handleSend(t)} disabled={isStreaming || rateLimited} className="h-10 w-10" />
               <Button
                 type="button"
                 size="icon"
