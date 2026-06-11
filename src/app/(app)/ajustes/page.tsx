@@ -76,9 +76,16 @@ async function fetchExchangeRates(): Promise<Record<string, ExchangeRateRow>> {
   const { data, error } = await supabase
     .from("exchange_rates")
     .select("rate_type, buy, sell, fetched_at")
+    .order("fetched_at", { ascending: false })
   if (error) throw error
+  const seen = new Set<string>()
+  const latest = (data ?? []).filter((r) => {
+    if (seen.has(r.rate_type)) return false
+    seen.add(r.rate_type)
+    return true
+  })
   const map: Record<string, ExchangeRateRow> = {}
-  for (const row of data ?? []) {
+  for (const row of latest) {
     map[row.rate_type] = row as ExchangeRateRow
   }
   return map

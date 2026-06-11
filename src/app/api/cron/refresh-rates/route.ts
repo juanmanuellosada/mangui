@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { Enums } from "@/lib/database.types"
+import { todayAR } from "@/lib/date-utils"
 
 type RateType = Enums<"rate_type">
 
 /**
  * GET /api/cron/refresh-rates
  *
- * Fetches current DolarAPI rates and upserts them into exchange_rates.
+ * Fetches current DolarAPI rates and appends a daily row per rate_type into
+ * exchange_rates (one row per type per day — re-runs on the same day update
+ * the existing row via the UNIQUE(rate_type, rate_date) conflict target).
  * Protected by CRON_SECRET env var when set (passed via Authorization header
  * or `secret` query param — Vercel Cron uses Authorization: Bearer <secret>).
  */
@@ -44,17 +47,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "DolarAPI returned no data" })
   }
 
-  // --- Upsert ---
+  // --- Upsert (one row per type per day) ---
+  const rateDate = todayAR()
   const rows = entries.map(([rateType, data]) => ({
     rate_type: rateType as RateType,
     buy: data.buy,
     sell: data.sell,
     fetched_at: data.fetchedAt,
+    rate_date: rateDate,
   }))
 
   const { error } = await supabase
     .from("exchange_rates")
-    .upsert(rows, { onConflict: "rate_type" })
+    .upsert(rows, { onConflict: "rate_type,rate_date" })
 
   if (error) {
     console.error("[refresh-rates] upsert failed:", error)

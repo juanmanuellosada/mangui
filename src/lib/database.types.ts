@@ -554,6 +554,7 @@ export type Database = {
           created_at: string
           fetched_at: string
           id: string
+          rate_date: string
           rate_type: Database["public"]["Enums"]["rate_type"]
           sell: number
         }
@@ -562,6 +563,7 @@ export type Database = {
           created_at?: string
           fetched_at?: string
           id?: string
+          rate_date?: string
           rate_type: Database["public"]["Enums"]["rate_type"]
           sell: number
         }
@@ -570,6 +572,7 @@ export type Database = {
           created_at?: string
           fetched_at?: string
           id?: string
+          rate_date?: string
           rate_type?: Database["public"]["Enums"]["rate_type"]
           sell?: number
         }
