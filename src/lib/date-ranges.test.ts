@@ -143,6 +143,12 @@ describe("getPreset", () => {
       expect(r.from).toBe(`${lastYear}-01-01`)
     })
 
+    it("to is Dec 31 of last year", () => {
+      const r = getPreset("last_year")
+      const lastYear = new Date().getFullYear() - 1
+      expect(r.to).toBe(`${lastYear}-12-31`)
+    })
+
     it("from ≤ to", () => {
       const r = getPreset("last_year")
       expect(r.from! <= r.to!).toBe(true)

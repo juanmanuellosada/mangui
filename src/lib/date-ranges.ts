@@ -15,6 +15,7 @@ import {
   startOfQuarter,
   endOfQuarter,
   startOfYear,
+  endOfYear,
   subMonths,
   subQuarters,
   subYears,
@@ -96,7 +97,7 @@ function computePreset(key: PresetKey): DateRange {
       const ly = subYears(now, 1)
       return {
         from: toISO(startOfYear(ly)),
-        to: toISO(startOfYear(now)),
+        to: toISO(endOfYear(ly)),
         label: "El año pasado",
       }
     }
