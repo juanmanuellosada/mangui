@@ -181,20 +181,20 @@ export function IncomeExpenseChart() {
         if (!lastMonth) return null
         const diff = lastMonth.ingresos - lastMonth.gastos
         return (
-          <div className="flex gap-4 pt-2 text-xs border-t border-border/40">
-            <div className="flex-1 text-center">
+          <div className="flex gap-2 sm:gap-4 pt-2 text-[11px] sm:text-xs border-t border-border/40">
+            <div className="flex-1 min-w-0 text-center">
               <p className="text-muted-foreground mb-0.5">Ingresos</p>
               <p className="font-semibold tabular-nums text-success">
                 {formatCurrency(lastMonth.ingresos, "ARS")}
               </p>
             </div>
-            <div className="flex-1 text-center">
+            <div className="flex-1 min-w-0 text-center">
               <p className="text-muted-foreground mb-0.5">Gastos</p>
               <p className="font-semibold tabular-nums text-destructive">
                 {formatCurrency(lastMonth.gastos, "ARS")}
               </p>
             </div>
-            <div className="flex-1 text-center">
+            <div className="flex-1 min-w-0 text-center">
               <p className="text-muted-foreground mb-0.5">Balance</p>
               <p
                 className={`font-semibold tabular-nums ${diff >= 0 ? "text-success" : "text-destructive"}`}

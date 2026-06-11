@@ -544,20 +544,20 @@ export function MoneyFlowSankeyChart({ movements, categories }: MoneyFlowSankeyC
       </div>
 
       {/* Summary row */}
-      <div className="flex gap-4 pt-2 text-xs border-t border-border/40">
-        <div className="flex-1 text-center">
+      <div className="flex gap-2 sm:gap-4 pt-2 text-[11px] sm:text-xs border-t border-border/40">
+        <div className="flex-1 min-w-0 text-center">
           <p className="text-muted-foreground mb-0.5">Ingresos</p>
           <p className="font-semibold tabular-nums text-success">
             {formatCurrency(result.incomeTotal, "ARS")}
           </p>
         </div>
-        <div className="flex-1 text-center">
+        <div className="flex-1 min-w-0 text-center">
           <p className="text-muted-foreground mb-0.5">Gastos</p>
           <p className="font-semibold tabular-nums text-destructive">
             {formatCurrency(result.expenseTotal, "ARS")}
           </p>
         </div>
-        <div className="flex-1 text-center">
+        <div className="flex-1 min-w-0 text-center">
           <p className="text-muted-foreground mb-0.5">Balance</p>
           {(() => {
             const diff = result.incomeTotal - result.expenseTotal
