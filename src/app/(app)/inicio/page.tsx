@@ -117,7 +117,7 @@ export default async function DashboardPage() {
         <DashboardFiltersProvider>
           <DashboardGlobalFilters />
           <MoneyFlowSankey />
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-4 [&>*]:min-w-0">
             <CategoryPieChart />
             <IncomeExpenseChart />
           </div>
