@@ -169,36 +169,39 @@ function CategoryForm({
         {/* Icon picker trigger */}
         <div className="space-y-1.5">
           <Label>Ícono</Label>
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className={cn(
-              "flex items-center gap-3 w-full h-11 px-3 rounded-xl border border-input bg-background",
-              "text-sm transition-colors duration-150 cursor-pointer",
-              "hover:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            )}
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/60 border border-border/40 overflow-hidden flex-shrink-0">
-              {icon ? (
-                renderCategoryIcon(icon, { size: "h-5 w-5" })
-              ) : (
-                <Tag className="h-4 w-4 text-muted-foreground" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className={cn(
+                "flex items-center gap-3 w-full h-11 pl-3 rounded-xl border border-input bg-background",
+                "text-sm transition-colors duration-150 cursor-pointer",
+                "hover:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                icon ? "pr-10" : "pr-3"
               )}
-            </span>
-            <span className="text-muted-foreground flex-1 text-left">
-              {icon ? "Cambiar ícono" : "Elegir ícono…"}
-            </span>
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/60 border border-border/40 overflow-hidden flex-shrink-0">
+                {icon ? (
+                  renderCategoryIcon(icon, { size: "h-5 w-5" })
+                ) : (
+                  <Tag className="h-4 w-4 text-muted-foreground" />
+                )}
+              </span>
+              <span className="text-muted-foreground flex-1 text-left">
+                {icon ? "Cambiar ícono" : "Elegir ícono…"}
+              </span>
+            </button>
             {icon && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setValue("icon", "") }}
-                className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setValue("icon", "")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 aria-label="Quitar ícono"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
-          </button>
+          </div>
         </div>
 
         <div className={cn("flex gap-2", onDelete ? "flex-row items-center" : "")}>
@@ -542,9 +545,9 @@ function CreateCategorySheet({ userId, isDemo }: { userId?: string; isDemo?: boo
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2 font-semibold press-effect">
+      <Button onClick={() => setOpen(true)} className="gap-2 font-semibold press-effect" aria-label="Nueva categoría">
         <Plus className="h-4 w-4" />
-        Nueva categoría
+        <span className="hidden sm:inline">Nueva categoría</span>
       </Button>
       <MangoSheet
         open={open}
