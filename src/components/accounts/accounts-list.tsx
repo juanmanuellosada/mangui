@@ -35,6 +35,7 @@ import {
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { getConversionRate } from "@/lib/rates/dolar"
 import type { RateType, RatesMap } from "@/lib/rates/dolar"
 import type { Tables } from "@/lib/database.types"
 import { fetchAllMovements } from "@/lib/movements"
@@ -52,18 +53,6 @@ const BALANCES_KEY = ["account_balances"] as const
 const STATEMENTS_KEY = ["card_statements"] as const
 const MOVEMENTS_KEY = ["movements", "stats-all"] as const
 
-// ── Conversion helper (mirrors accounts-preview.tsx) ─────────
-function getConversionRate(
-  rateType: RateType,
-  rates: RatesMap,
-  manualRate: number | null,
-  fromCurrency: "ARS" | "USD"
-): number {
-  if (rateType === "manual") return manualRate ?? 1
-  const data = rates[rateType as keyof RatesMap]
-  if (!data) return 0
-  return fromCurrency === "ARS" ? (data.sell || 0) : (data.buy || 0)
-}
 
 // ── Data fetchers ─────────────────────────────────────────────
 async function fetchAllStatements(): Promise<CardStatement[]> {
@@ -1019,8 +1008,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
       } = currentCycleSummary(account.id, account, allMovements)
 
       if (currency === "ARS") {
-        const rate = getConversionRate(rateType, rates, manualRate, "ARS")
-        const secondaryRate = rate > 0 ? rate : null
+        const secondaryRate = getConversionRate(rateType, rates, manualRate, "ARS")
         map.set(account.id, {
           amount,
           amountSecondary: secondaryRate != null ? amount / secondaryRate : null,
@@ -1035,8 +1023,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
         })
       } else {
         // USD card: primary is USD, secondary is ARS
-        const rate = getConversionRate(rateType, rates, manualRate, "USD")
-        const secondaryRate = rate > 0 ? rate : null
+        const secondaryRate = getConversionRate(rateType, rates, manualRate, "USD")
         map.set(account.id, {
           amount,
           amountSecondary: secondaryRate != null ? amount * secondaryRate : null,

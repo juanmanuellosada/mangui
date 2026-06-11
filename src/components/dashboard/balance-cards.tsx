@@ -7,6 +7,7 @@ import { CurrencyChip } from "@/components/ui/currency-chip"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { AccountBalance } from "@/lib/accounts"
+import { getConversionRate } from "@/lib/rates/dolar"
 import type { RateType, RatesMap } from "@/lib/rates/dolar"
 
 interface BalanceCardsProps {
@@ -26,17 +27,6 @@ async function fetchBalances(): Promise<AccountBalance[]> {
   return data
 }
 
-function getConversionRate(
-  rateType: RateType,
-  rates: RatesMap,
-  manualRate: number | null,
-  fromCurrency: "ARS" | "USD"
-): number {
-  if (rateType === "manual") return manualRate ?? 1
-  const data = rates[rateType as keyof RatesMap]
-  if (!data) return 1
-  return fromCurrency === "ARS" ? (data.sell || 1) : (data.buy || 1)
-}
 
 export function BalanceCards({
   defaultCurrency,
@@ -63,13 +53,17 @@ export function BalanceCards({
     .filter((b) => b.currency === "USD" && b.account_type !== "tarjeta_credito")
     .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
 
-  const arsRate = getConversionRate(rateType, rates, manualRate, "ARS")
   const usdRate = getConversionRate(rateType, rates, manualRate, "USD")
+  const arsRate = getConversionRate(rateType, rates, manualRate, "ARS")
+  const hasUSD = Math.abs(totalUSD) > 0.005
+  const hasARS = Math.abs(totalARS) > 0.005
 
-  const grandTotal =
-    displayCurrency === "ARS"
-      ? totalARS + totalUSD * usdRate
-      : totalUSD + totalARS / arsRate
+  let grandTotal: number | null
+  if (displayCurrency === "ARS") {
+    grandTotal = hasUSD && usdRate == null ? null : totalARS + totalUSD * (usdRate ?? 0)
+  } else {
+    grandTotal = hasARS && arsRate == null ? null : totalUSD + (arsRate ? totalARS / arsRate : 0)
+  }
 
   return (
     <div
@@ -100,6 +94,16 @@ export function BalanceCards({
         {/* Big hero number */}
         {isLoading ? (
           <Skeleton className="h-12 w-56 bg-primary-foreground/20" />
+        ) : grandTotal == null ? (
+          <div className="space-y-0.5">
+            <p
+              className="text-2xl sm:text-4xl md:text-5xl font-bold tabular-nums text-primary-foreground leading-none"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              —
+            </p>
+            <p className="text-[11px] font-medium text-primary-foreground/70">Sin cotización del dólar</p>
+          </div>
         ) : (
           <p
             className="text-2xl sm:text-4xl md:text-5xl font-bold tabular-nums text-primary-foreground leading-none truncate min-w-0"

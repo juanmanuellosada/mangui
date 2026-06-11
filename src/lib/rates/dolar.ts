@@ -69,7 +69,30 @@ export async function getRateData(
 }
 
 /**
+ * Returns the conversion rate for `fromCurrency` → the other currency.
+ * Returns `null` when no usable rate is available (missing API data, zero, or
+ * manual with no valid manualRate), so callers can surface an explicit error
+ * instead of silently computing a wrong number.
+ */
+export function getConversionRate(
+  rateType: RateType,
+  rates: RatesMap,
+  manualRate: number | null,
+  fromCurrency: "ARS" | "USD"
+): number | null {
+  if (rateType === "manual") {
+    return manualRate != null && manualRate > 0 ? manualRate : null
+  }
+  const data = rates[rateType as keyof RatesMap]
+  if (!data) return null
+  const r = fromCurrency === "ARS" ? data.sell : data.buy
+  return r != null && r > 0 ? r : null
+}
+
+/**
  * Converts an amount between ARS and USD.
+ * Returns `null` when the required rate is unavailable (instead of silently
+ * falling back to rate = 1 and producing a wrong number).
  *
  * @param amount       - the amount in `fromCurrency`
  * @param fromCurrency - 'ARS' | 'USD'
@@ -85,22 +108,10 @@ export async function convertAmount(
   rateType: RateType,
   manualRate?: number | null,
   ratesMap?: RatesMap
-): Promise<number> {
+): Promise<number | null> {
   if (fromCurrency === toCurrency) return amount
-
-  let rate: number
-  if (rateType === "manual") {
-    rate = manualRate ?? 1
-  } else {
-    const map = ratesMap ?? (await fetchDolarRates())
-    const data = map[rateType]
-    // Use sell rate when buying USD (ARS → USD); buy rate when selling USD (USD → ARS)
-    rate = fromCurrency === "ARS" ? (data?.sell ?? 1) : (data?.buy ?? 1)
-  }
-
-  if (fromCurrency === "ARS" && toCurrency === "USD") {
-    return amount / rate
-  }
-  // USD → ARS
-  return amount * rate
+  const map = rateType === "manual" ? ({} as RatesMap) : (ratesMap ?? (await fetchDolarRates()))
+  const rate = getConversionRate(rateType, map, manualRate ?? null, fromCurrency)
+  if (rate == null) return null
+  return fromCurrency === "ARS" && toCurrency === "USD" ? amount / rate : amount * rate
 }

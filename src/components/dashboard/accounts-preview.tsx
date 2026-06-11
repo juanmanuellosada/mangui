@@ -13,6 +13,7 @@ import {
   type AccountBalance,
 } from "@/lib/accounts"
 import { formatCurrency, cn } from "@/lib/utils"
+import { getConversionRate } from "@/lib/rates/dolar"
 import type { RateType, RatesMap } from "@/lib/rates/dolar"
 import type { Tables } from "@/lib/database.types"
 import { fetchAllMovements } from "@/lib/movements"
@@ -74,17 +75,6 @@ function AccountCardSkeleton() {
   )
 }
 
-function getConversionRate(
-  rateType: RateType,
-  rates: RatesMap,
-  manualRate: number | null,
-  fromCurrency: "ARS" | "USD"
-): number {
-  if (rateType === "manual") return manualRate ?? 1
-  const data = rates[rateType as keyof RatesMap]
-  if (!data) return 0
-  return fromCurrency === "ARS" ? (data.sell || 0) : (data.buy || 0)
-}
 
 export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreviewProps) {
   const { data: accounts, isLoading: loadingAccounts } = useQuery({
@@ -163,12 +153,12 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
               // Convert ARS → USD
               if (currency === "ARS") {
                 const rate = getConversionRate(rateType, rates, manualRate, "ARS")
-                cardAmountUSD = rate > 0 ? cardAmountARS / rate : null
+                cardAmountUSD = rate != null ? cardAmountARS / rate : null
               } else {
                 // Card is in USD — flip display: show USD as primary, ARS as secondary
                 cardAmountUSD = cardAmountARS
                 const rate = getConversionRate(rateType, rates, manualRate, "USD")
-                cardAmountARS = rate > 0 ? cardAmountUSD * rate : 0
+                cardAmountARS = rate != null ? cardAmountUSD * rate : 0
               }
             }
 
