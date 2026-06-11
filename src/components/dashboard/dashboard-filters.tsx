@@ -98,8 +98,8 @@ export function DashboardGlobalFilters() {
   )
 
   return (
-    <div className="flex flex-nowrap items-center gap-2">
-<div className="flex-1 min-w-0">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="w-full sm:flex-1 min-w-0">
         <MangoMultiSelect
           values={accountIds}
           onChange={setAccountIds}
@@ -108,7 +108,7 @@ export function DashboardGlobalFilters() {
           showSearch
         />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="w-full sm:flex-1 min-w-0">
         <MangoMultiSelect
           values={categoryIds}
           onChange={setCategoryIds}
