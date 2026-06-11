@@ -205,9 +205,9 @@ const DAY_PICKER_CLASSNAMES = {
   ].join(" "),
   month_grid: "w-full border-collapse",
   weekdays: "flex",
-  weekday: "w-9 h-7 text-[11px] font-medium text-muted-foreground flex items-center justify-center",
+  weekday: "w-11 sm:w-9 h-7 text-[11px] font-medium text-muted-foreground flex items-center justify-center",
   week: "flex",
-  day: "w-9 h-9 p-0 text-center",
+  day: "w-11 h-11 sm:w-9 sm:h-9 p-0 text-center",
   day_button: [
     "w-full h-full rounded-full text-xs font-medium",
     "flex items-center justify-center",
