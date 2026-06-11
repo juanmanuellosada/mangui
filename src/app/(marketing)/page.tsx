@@ -93,6 +93,12 @@ export default async function LandingPage() {
             >
               Precios
             </Link>
+            <Link
+              href="/calculadoras"
+              className="hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1"
+            >
+              Calculadoras
+            </Link>
           </nav>
 
           <div className="flex items-center gap-2">
@@ -1097,6 +1103,14 @@ export default async function LandingPage() {
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
                     Precios
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/calculadoras"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  >
+                    Calculadoras
                   </Link>
                 </li>
                 <li>
