@@ -33,6 +33,7 @@ import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { AiFillBar, type AiExtractResult } from "@/components/movements/ai-fill-bar"
 import { usePlan } from "@/lib/use-plan"
 import Link from "next/link"
 import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
@@ -126,6 +127,18 @@ interface MovementFormProps {
    * When undefined, no transfer tab is shown (e.g. in edit mode).
    */
   initialMode?: MovementMode
+}
+
+function _norm(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim()
+}
+function matchByName<T extends { id: string; name: string }>(name: string, items: T[]): string | undefined {
+  const target = _norm(name)
+  if (!target) return undefined
+  const exact = items.find((i) => _norm(i.name) === target)
+  if (exact) return exact.id
+  const fuzzy = items.find((i) => _norm(i.name).includes(target) || target.includes(_norm(i.name)))
+  return fuzzy?.id
 }
 
 export function MovementForm({
@@ -413,6 +426,35 @@ export function MovementForm({
 
   const showTransferTab = !!initialMode
 
+  function handleAiResult(r: AiExtractResult) {
+    // type / visual mode
+    setMode(r.type)
+    setValue("type", r.type, { shouldValidate: false })
+    // account (resolve name → id)
+    if (r.cuenta) {
+      const accId = matchByName(r.cuenta, accounts)
+      if (accId) setValue("account_id", accId, { shouldValidate: true })
+    }
+    // currency (note: for non-credit-card accounts the form may re-derive this from the account)
+    if (r.original_currency) setValue("original_currency", r.original_currency, { shouldValidate: false })
+    // amount
+    if (typeof r.amount === "number" && r.amount > 0) setValue("amount", r.amount, { shouldValidate: true })
+    // category (match within the right type)
+    if (r.categoria) {
+      const catId = matchByName(r.categoria, categories.filter((c) => c.type === r.type))
+      if (catId) setValue("category_id", catId, { shouldValidate: false })
+    }
+    // date + is_future
+    if (r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) {
+      setValue("date", r.fecha, { shouldValidate: false })
+      setValue("is_future", r.fecha > today, { shouldValidate: false })
+    }
+    // note
+    if (r.nota) setValue("note", r.nota, { shouldValidate: false })
+    // cuotas (only meaningful for credit-card expense; the form guards it anyway)
+    if (r.cuotas && r.cuotas >= 2) setValue("cuotas", r.cuotas, { shouldValidate: false })
+  }
+
   return (
     <div className="space-y-5">
       {/* 3-way type toggle (when transfer tab is enabled) */}
@@ -489,6 +531,9 @@ export function MovementForm({
       ) : (
         /* ── Movement body ── */
         <form onSubmit={handleFormSubmit} className="space-y-5">
+          {isCreateMode && (
+            <AiFillBar accounts={accounts} categories={categories} onResult={handleAiResult} />
+          )}
           {/* 3.1 — Date FIRST, using MangoDatePicker */}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground font-medium">Fecha</Label>
