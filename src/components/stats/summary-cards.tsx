@@ -25,8 +25,8 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
 
   if (type === "income") {
     return (
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <TrendingUp className="h-4 w-4 text-success flex-shrink-0" aria-hidden />
             <p className="text-xs font-medium text-muted-foreground truncate">Total ingresos</p>
@@ -36,7 +36,7 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
             +{formatCurrency(income, currency)}
           </p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
             <p className="text-xs font-medium text-muted-foreground truncate">Cantidad</p>
@@ -44,7 +44,7 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
           {period && <p className="text-[10px] text-muted-foreground/70 leading-none">{period}</p>}
           <p className="text-base font-bold tabular-nums text-foreground leading-tight">{incomeCount}</p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <Divide className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
             <p className="text-xs font-medium text-muted-foreground truncate">Promedio</p>
@@ -60,8 +60,8 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
 
   if (type === "expense") {
     return (
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" aria-hidden />
             <p className="text-xs font-medium text-muted-foreground truncate">Total gastos</p>
@@ -71,7 +71,7 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
             -{formatCurrency(expense, currency)}
           </p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
             <p className="text-xs font-medium text-muted-foreground truncate">Cantidad</p>
@@ -79,7 +79,7 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
           {period && <p className="text-[10px] text-muted-foreground/70 leading-none">{period}</p>}
           <p className="text-base font-bold tabular-nums text-foreground leading-tight">{expenseCount}</p>
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <Divide className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
             <p className="text-xs font-medium text-muted-foreground truncate">Promedio</p>
@@ -95,9 +95,9 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
 
   // type === "all"
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       {/* Ingresos */}
-      <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+      <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
         <div className="flex items-center gap-1.5">
           <TrendingUp className="h-4 w-4 text-success flex-shrink-0" aria-hidden />
           <p className="text-xs font-medium text-muted-foreground truncate">Ingresos</p>
@@ -111,7 +111,7 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
       </div>
 
       {/* Gastos */}
-      <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+      <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
         <div className="flex items-center gap-1.5">
           <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" aria-hidden />
           <p className="text-xs font-medium text-muted-foreground truncate">Gastos</p>
@@ -125,7 +125,7 @@ export function SummaryCards({ totals, currency = "ARS", period, type = "all", m
       </div>
 
       {/* Balance neto */}
-      <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
+      <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5 min-w-0">
         <div className="flex items-center gap-1.5">
           <Scale className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
           <p className="text-xs font-medium text-muted-foreground truncate">Balance</p>

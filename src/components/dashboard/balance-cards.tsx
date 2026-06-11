@@ -110,7 +110,7 @@ export function BalanceCards({
         )}
 
         {/* Sub-totals in the other currency */}
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           {/* ARS pill */}
           <button
             type="button"

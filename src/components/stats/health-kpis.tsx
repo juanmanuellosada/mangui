@@ -106,9 +106,9 @@ export function HealthKpis({
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5 space-y-4">
       <h3 className="text-sm font-semibold">Salud financiera</h3>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Savings rate */}
-        <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-1">
+        <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-1 min-w-0">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
             Tasa de ahorro
           </p>
@@ -127,7 +127,7 @@ export function HealthKpis({
         </div>
 
         {/* Daily expense */}
-        <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-1">
+        <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-1 min-w-0">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
             Ritmo diario
           </p>
@@ -138,7 +138,7 @@ export function HealthKpis({
         </div>
 
         {/* Projected EOM balance */}
-        <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-1">
+        <div className="rounded-xl border border-border/50 bg-muted/30 p-3 space-y-1 min-w-0">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
             Fin de mes
           </p>
