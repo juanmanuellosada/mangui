@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, type ReactNode } from "react"
 import Link from "next/link"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -16,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -210,8 +209,7 @@ function CreateAccountDialog({
 }
 
 // ── Edit dialog ───────────────────────────────────────────────
-function EditAccountDialog({ account, userId, isDemo }: { account: Account; userId?: string; isDemo?: boolean }) {
-  const [open, setOpen] = useState(false)
+function EditAccountDialog({ account, userId, open, onOpenChange }: { account: Account; userId?: string; open: boolean; onOpenChange: (v: boolean) => void }) {
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -272,43 +270,30 @@ function EditAccountDialog({ account, userId, isDemo }: { account: Account; user
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       toast.success("Cuenta actualizada")
-      setOpen(false)
+      onOpenChange(false)
     },
   })
 
   return (
-    <>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"}
-        className="press-effect cursor-pointer"
-        onClick={() => setOpen(true)}
-        disabled={isDemo}
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </Button>
-      <MangoSheet
-        open={open}
-        onOpenChange={setOpen}
-        title="Editar cuenta"
-        description="Modificá los datos de la cuenta."
-      >
-        <AccountForm
-          defaultValues={accountToFormValues(account)}
-          onSubmit={async (values) => { await mutation.mutateAsync(values) }}
-          isLoading={mutation.isPending}
-          submitLabel="Guardar cambios"
-          userId={userId}
-        />
-      </MangoSheet>
-    </>
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Editar cuenta"
+      description="Modificá los datos de la cuenta."
+    >
+      <AccountForm
+        defaultValues={accountToFormValues(account)}
+        onSubmit={async (values) => { await mutation.mutateAsync(values) }}
+        isLoading={mutation.isPending}
+        submitLabel="Guardar cambios"
+        userId={userId}
+      />
+    </MangoSheet>
   )
 }
 
 // ── Delete dialog ─────────────────────────────────────────────
-function DeleteAccountDialog({ account, isDemo }: { account: Account; isDemo?: boolean }) {
-  const [open, setOpen] = useState(false)
+function DeleteAccountDialog({ account, open, onOpenChange }: { account: Account; open: boolean; onOpenChange: (v: boolean) => void }) {
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -344,17 +329,12 @@ function DeleteAccountDialog({ account, isDemo }: { account: Account; isDemo?: b
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       toast.success("Cuenta eliminada")
-      setOpen(false)
+      onOpenChange(false)
     },
   })
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
-        <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" disabled={isDemo}>
-          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-        </Button>
-      } />
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent compact className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Eliminar cuenta</DialogTitle>
@@ -366,7 +346,7 @@ function DeleteAccountDialog({ account, isDemo }: { account: Account; isDemo?: b
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             disabled={mutation.isPending}
           >
             Cancelar
@@ -382,6 +362,71 @@ function DeleteAccountDialog({ account, isDemo }: { account: Account; isDemo?: b
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ── Detail row helper ─────────────────────────────────────────
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <span className="text-sm font-medium text-right min-w-0 break-words">{value}</span>
+    </div>
+  )
+}
+
+// ── Account detail sheet ──────────────────────────────────────
+function AccountDetailSheet({
+  account, currentBalance, isCreditCard, isDemo, open, onOpenChange, onEdit, onDelete,
+}: {
+  account: Account
+  currentBalance: number
+  isCreditCard: boolean
+  isDemo?: boolean
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  return (
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Detalle de la cuenta"
+      footer={
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" onClick={onDelete} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" />
+            Eliminar
+          </Button>
+          <Button onClick={onEdit} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect">
+            <Pencil className="h-4 w-4" />
+            Editar
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="text-center">
+          <p className={cn("text-3xl font-bold tabular-nums leading-tight", currentBalance < 0 ? "text-destructive" : "text-foreground")}>
+            {formatCurrency(currentBalance, account.currency)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border/60 divide-y divide-border/40">
+          <DetailRow label="Nombre" value={account.name} />
+          <DetailRow label="Tipo" value={ACCOUNT_TYPE_LABELS[account.type]} />
+          <DetailRow label="Moneda" value={<CurrencyChip currency={account.currency} size="sm" />} />
+          {account.account_number ? <DetailRow label="Número" value={account.account_number} /> : null}
+          <DetailRow label="Estado" value={account.is_hidden ? "Oculta" : "Visible"} />
+        </div>
+        {isCreditCard ? (
+          <Link href="/tarjetas" className="flex items-center justify-center gap-1.5 h-10 rounded-xl border border-primary/30 text-primary text-sm font-medium hover:bg-primary/10 transition-colors duration-150">
+            Ver resumen de tarjeta
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        ) : null}
+      </div>
+    </MangoSheet>
   )
 }
 
@@ -425,6 +470,9 @@ function AccountCard({
 }) {
   const currentBalance = balance?.current_balance ?? account.initial_balance
   const isCreditCard = account.type === "tarjeta_credito"
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   function handleCardClick() {
     if (selectionMode && onToggle) onToggle(account.id)
@@ -432,14 +480,14 @@ function AccountCard({
 
   return (
     <div
-      onClick={selectionMode ? handleCardClick : undefined}
+      onClick={selectionMode ? handleCardClick : () => setDetailOpen(true)}
       role={selectionMode ? "checkbox" : undefined}
       aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "px-4 py-3 flex items-center gap-3",
         "hover:bg-muted/40 transition-colors duration-150",
         account.is_hidden && "opacity-60",
-        selectionMode && "cursor-pointer",
+        "cursor-pointer",
         isSelected && selectedItemCn(true)
       )}
     >
@@ -482,9 +530,9 @@ function AccountCard({
       </div>
 
       {/* Balance / Amount due */}
-      <div className="flex-shrink-0 mr-1">
+      <div className="shrink-0 mr-1">
         {isCreditCard && cardPayment ? (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 justify-end">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-1 sm:gap-x-4 justify-end">
             {/* A pagar — closed statement */}
             {(() => {
               const today = startOfDay(new Date())
@@ -574,6 +622,7 @@ function AccountCard({
           )}
           title="Ver resumen"
           aria-label="Ver resumen de tarjeta"
+          onClick={(e) => e.stopPropagation()}
         >
           <ChevronRight className="h-4 w-4" />
         </Link>
@@ -581,10 +630,28 @@ function AccountCard({
 
       {/* Actions — hidden in selection mode */}
       {!selectionMode && (
-        <div className="flex gap-0.5 flex-shrink-0">
-          <EditAccountDialog account={account} userId={userId} isDemo={isDemo} />
-          <DeleteAccountDialog account={account} isDemo={isDemo} />
-        </div>
+        <>
+          <div className="hidden lg:flex gap-0.5 flex-shrink-0">
+            <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Editar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditOpen(true) }} disabled={isDemo}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon-sm" title={isDemo ? "No disponible en el modo demo" : "Eliminar cuenta"} className="press-effect cursor-pointer" onClick={(e) => { e.stopPropagation(); setDeleteOpen(true) }} disabled={isDemo}>
+              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            </Button>
+          </div>
+          <EditAccountDialog account={account} userId={userId} open={editOpen} onOpenChange={setEditOpen} />
+          <DeleteAccountDialog account={account} open={deleteOpen} onOpenChange={setDeleteOpen} />
+          <AccountDetailSheet
+            account={account}
+            currentBalance={currentBalance}
+            isCreditCard={isCreditCard}
+            isDemo={isDemo}
+            open={detailOpen}
+            onOpenChange={setDetailOpen}
+            onEdit={() => { setDetailOpen(false); setEditOpen(true) }}
+            onDelete={() => { setDetailOpen(false); setDeleteOpen(true) }}
+          />
+        </>
       )}
     </div>
   )
@@ -811,20 +878,23 @@ function AccountsFilterBar({ filters, onChange, resultCount, totalCount }: Accou
           />
         </div>
 
-        {/* Moneda */}
-        <CurrencySegmented
-          value={filters.moneda === "todas" ? "all" : filters.moneda}
-          onChange={(v) => onChange({ ...filters, moneda: v === "all" ? "todas" : v })}
-        />
-
-        {/* Visibilidad */}
-        <div className="w-[110px] shrink-0">
-          <MangoSelect
-            value={filters.visibilidad}
-            onChange={(v) => onChange({ ...filters, visibilidad: v as VisibilidadFilter })}
-            options={VISIBILIDAD_OPTIONS}
-            aria-label="Filtrar por visibilidad"
-          />
+        {/* Moneda + Visibilidad — full row on mobile */}
+        <div className="flex gap-2 w-full lg:contents">
+          <div className="flex-1 lg:flex-none">
+            <CurrencySegmented
+              value={filters.moneda === "todas" ? "all" : filters.moneda}
+              onChange={(v) => onChange({ ...filters, moneda: v === "all" ? "todas" : v })}
+              className="flex w-full lg:inline-flex lg:w-auto"
+            />
+          </div>
+          <div className="flex-1 lg:w-[110px] lg:flex-none">
+            <MangoSelect
+              value={filters.visibilidad}
+              onChange={(v) => onChange({ ...filters, visibilidad: v as VisibilidadFilter })}
+              options={VISIBILIDAD_OPTIONS}
+              aria-label="Filtrar por visibilidad"
+            />
+          </div>
         </div>
 
         {/* Sort segmented control */}
