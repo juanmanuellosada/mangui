@@ -186,7 +186,7 @@ function draftFromValue(v: DateRangeValue): DraftState {
 // ─── Calendar class names (reused from MangoDatePicker) ───────────────────────
 
 const DAY_PICKER_CLASSNAMES = {
-  months: "flex flex-col",
+  months: "relative flex flex-col",
   month: "relative space-y-2",
   month_caption: "flex items-center justify-center h-9 mb-1 px-9",
   caption_label: "text-sm font-semibold text-foreground capitalize",
@@ -444,22 +444,22 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
           }}
         >
           {/* Two-column layout: LEFT controls + RIGHT calendar */}
-          <div className="flex">
+          <div className="flex flex-col sm:flex-row max-h-[80vh] overflow-y-auto sm:max-h-none sm:overflow-visible">
             {/* ── LEFT column ── */}
-            <div className="flex flex-col gap-3 p-4 w-52 border-r border-border/40">
+            <div className="flex flex-col gap-3 p-4 w-full sm:w-52 border-b sm:border-b-0 sm:border-r border-border/40">
               {/* Operator dropdown */}
               <div>
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
                   Condición
                 </p>
-                <div className="flex flex-col gap-0.5">
+                <div className="flex flex-wrap gap-1 sm:flex-col sm:gap-0.5">
                   {OPERATOR_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => setOperator(opt.value)}
                       className={cn(
-                        "w-full text-left text-sm px-2.5 py-1.5 rounded-md transition-colors duration-100",
+                        "text-left sm:w-full text-sm px-2.5 py-1.5 rounded-md transition-colors duration-100",
                         draft.operator === opt.value && !draft.preset && !draft.lastn
                           ? "bg-primary text-primary-foreground font-medium"
                           : "text-foreground hover:bg-muted/60",
@@ -479,14 +479,14 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
                   Período
                 </p>
-                <div className="flex flex-col gap-0.5">
+                <div className="flex flex-wrap gap-1 sm:flex-col sm:gap-0.5">
                   {PRESETS.map((p) => (
                     <button
                       key={p.key}
                       type="button"
                       onClick={() => selectPreset(p.key)}
                       className={cn(
-                        "w-full text-left text-sm px-2.5 py-1.5 rounded-md transition-colors duration-100",
+                        "text-left sm:w-full text-sm px-2.5 py-1.5 rounded-md transition-colors duration-100",
                         draft.preset === p.key
                           ? "bg-primary text-primary-foreground font-medium"
                           : "text-foreground hover:bg-muted/60",
