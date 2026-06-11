@@ -78,12 +78,16 @@ export default function CalculadorasPage() {
           </div>
         </Link>
 
-        {/* Coming soon: Conversor */}
-        <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 opacity-60 cursor-not-allowed">
-          <div>
-            <span className="text-xs font-semibold text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
-              Próximamente
+        {/* Live: Conversor de dólar */}
+        <Link
+          href="/calculadoras/conversor-dolar"
+          className="rounded-2xl border border-border/60 bg-card p-6 hover:border-primary/30 transition-colors duration-200 flex flex-col gap-3 group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-primary bg-primary/10 rounded-full px-2.5 py-0.5">
+              Disponible
             </span>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-150" aria-hidden="true" />
           </div>
           <div>
             <h2
@@ -93,10 +97,10 @@ export default function CalculadorasPage() {
               Conversor Blue / MEP / CCL
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Convertí entre pesos y dólares usando el tipo de cambio que te conviene.
+              Convertí pesos y dólares con el Oficial, Blue, MEP y CCL en tiempo real.
             </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* CTA */}
