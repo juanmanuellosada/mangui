@@ -1115,6 +1115,14 @@ export default async function LandingPage() {
                 </li>
                 <li>
                   <Link
+                    href="/comparar"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                  >
+                    Comparativas
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/register"
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                   >
