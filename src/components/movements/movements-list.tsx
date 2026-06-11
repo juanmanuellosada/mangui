@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -1335,7 +1335,10 @@ export function MovementsList() {
   const ms = useMultiSelect()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkPending, setBulkPending] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
   const queryClient = useQueryClient()
+
+  useEffect(() => { setHydrated(true) }, [])
 
   const { data: accounts = [] } = useQuery({
     queryKey: ACCOUNTS_KEY,
@@ -1562,12 +1565,10 @@ export function MovementsList() {
           Movimientos
         </h1>
         <div className="flex items-center gap-2">
-          {!isLoading && totalItems > 0 && !ms.selectionMode && (
+          {hydrated && !isLoading && totalItems > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          <div className="hidden lg:block">
-            <QuickAddMenu accounts={accounts} />
-          </div>
+          <div className="hidden lg:block">{hydrated && <QuickAddMenu accounts={accounts} />}</div>
         </div>
       </div>
 
@@ -1583,7 +1584,7 @@ export function MovementsList() {
       />
 
       {/* Adaptive summary cards */}
-      {!isLoading && totalItems > 0 && (
+      {hydrated && !isLoading && totalItems > 0 && (
         <div className="space-y-2">
           {filter.type === "all" && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1623,7 +1624,7 @@ export function MovementsList() {
           )}
         </div>
       )}
-      {isLoading && (
+      {(!hydrated || isLoading) && (
         <div className="space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[...Array(3)].map((_, i) => (
@@ -1635,7 +1636,7 @@ export function MovementsList() {
       )}
 
       {/* Loading skeleton */}
-      {isLoading && (
+      {(!hydrated || isLoading) && (
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="space-y-2">
@@ -1658,7 +1659,7 @@ export function MovementsList() {
       )}
 
       {/* Empty state */}
-      {!isLoading && totalItems === 0 && (
+      {hydrated && !isLoading && totalItems === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <ArrowDownCircle className="h-8 w-8 text-primary" />
@@ -1682,7 +1683,7 @@ export function MovementsList() {
       )}
 
       {/* Feed (flat or grouped) */}
-      {!isLoading && groupedFeed.length > 0 && (
+      {hydrated && !isLoading && groupedFeed.length > 0 && (
         <div className="space-y-5">
           {groupedFeed.map(({ key, label, items }) => (
             <div key={key}>
@@ -1733,7 +1734,7 @@ export function MovementsList() {
       )}
 
       {/* Load more / truncation notice */}
-      {!isLoading && (movementsAtLimit || transfersAtLimit) && (
+      {hydrated && !isLoading && (movementsAtLimit || transfersAtLimit) && (
         <p className="text-xs text-center text-muted-foreground pt-2">
           Mostrando los primeros {FETCH_LIMIT} registros. Usá los filtros de fecha para ver períodos anteriores.
         </p>
