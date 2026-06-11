@@ -25,6 +25,7 @@ import {
   Scale,
   Hash,
   Divide,
+  type LucideIcon,
 } from "lucide-react"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
@@ -185,6 +186,37 @@ function formatDayLabel(dateStr: string): string {
   return format(date, "EEE d MMM", { locale: es })
 }
 
+// ── Summary stat card ─────────────────────────────────────────────────────────
+
+function SummaryStat({
+  icon: Icon,
+  iconClassName,
+  label,
+  dateLabel,
+  value,
+  valueClassName,
+}: {
+  icon: LucideIcon
+  iconClassName?: string
+  label: string
+  dateLabel: string
+  value: React.ReactNode
+  valueClassName?: string
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-4 flex items-center justify-between gap-3 sm:block sm:space-y-1.5">
+      <div className="min-w-0 space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          <Icon className={cn("h-4 w-4 flex-shrink-0", iconClassName)} aria-hidden />
+          <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
+        </div>
+        <p className="text-[10px] text-muted-foreground/70 leading-none">{dateLabel}</p>
+      </div>
+      <p className={cn("text-base font-bold tabular-nums leading-tight shrink-0", valueClassName)}>{value}</p>
+    </div>
+  )
+}
+
 // ── Movement row ──────────────────────────────────────────────────────────────
 
 function MovementRow({
@@ -248,7 +280,7 @@ function MovementRow({
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap min-w-0">
           <p className="text-sm font-medium truncate">
             {category?.name ?? "Sin categoría"}
           </p>
@@ -259,7 +291,7 @@ function MovementRow({
             <Link
               href={`/cuotas/${movement.installment_purchase_id}`}
               className={cn(
-                "inline-flex items-center gap-0.5 px-1.5 py-0 rounded-md text-[10px] font-bold",
+                "inline-flex items-center gap-0.5 px-1.5 py-0 rounded-md text-[10px] font-bold flex-shrink-0",
                 "bg-primary/10 text-primary hover:bg-primary/20 transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               )}
@@ -295,7 +327,7 @@ function MovementRow({
 
       {/* Actions — visible on hover, hidden in selection mode */}
       {!selectionMode && (
-        <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
+        <div className="hidden lg:flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -404,7 +436,7 @@ function TransferRow({
 
       {/* Actions — hidden in selection mode */}
       {!selectionMode && (
-        <div className="flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
+        <div className="hidden lg:flex gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-1">
           <Button
             variant="ghost"
             size="icon-sm"
@@ -505,77 +537,6 @@ function QuickAddMenu({ accounts }: { accounts: Account[] }) {
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-// ── Mobile FAB ────────────────────────────────────────────────────────────────
-
-function FABQuickAdd({ accounts }: { accounts: Account[] }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const quickAdd = useQuickAdd()
-  const router = useRouter()
-
-  const openDialog = (m: "movement" | "transfer", type?: "income" | "expense") => {
-    setMenuOpen(false)
-    quickAdd.open(m, type)
-  }
-
-  if (!accounts.length) return null
-
-  return (
-    <div className="lg:hidden fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.5rem)] right-4 z-30 flex flex-col items-end gap-2">
-      {menuOpen && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-          <div className="relative z-20 flex flex-col items-end gap-2">
-            {(
-              [
-                { m: "movement" as const, type: "income" as const, icon: ArrowUpCircle, label: "Ingreso", color: "bg-success text-white", isAI: false },
-                { m: "movement" as const, type: "expense" as const, icon: ArrowDownCircle, label: "Gasto", color: "bg-destructive text-white", isAI: false },
-                { m: "transfer" as const, type: undefined, icon: ArrowLeftRight, label: "Transferencia", color: "bg-muted-foreground text-white", isAI: false },
-                { m: "movement" as const, type: undefined, icon: Sparkles, label: "Cargar con IA", color: "bg-primary/80 text-primary-foreground", isAI: true },
-              ] as const
-            ).map(({ m, type, icon: Icon, label, color, isAI }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false)
-                  if (isAI) {
-                    router.push("/ia")
-                  } else {
-                    openDialog(m, type as "income" | "expense" | undefined)
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 h-11 px-4 rounded-full shadow-md press-effect",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  color
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-sm font-semibold">{label}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setMenuOpen((v) => !v)}
-        className={cn(
-          "w-14 h-14 rounded-full bg-primary text-primary-foreground",
-          "shadow-lg shadow-primary/35 press-effect relative z-20",
-          "flex items-center justify-center",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          menuOpen && "rotate-45 transition-transform duration-150"
-        )}
-        aria-label="Agregar"
-      >
-        <PlusCircle className="h-6 w-6" />
-      </button>
     </div>
   )
 }
@@ -1113,15 +1074,15 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
       </div>
 
       {/* Fecha · Agrupar · Cuentas · Categorías — single row */}
-      <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5 flex-1 min-w-0">
+      <div className="sm:col-span-2 lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end gap-3">
+        <div className="space-y-1.5 w-full lg:flex-1 lg:min-w-0">
           <Label className="text-xs">Fecha</Label>
           <DateRangeFilter
             value={filter.date}
             onChange={(date: DateRangeValue) => onChange({ ...filter, date })}
           />
         </div>
-        <div className="space-y-1.5 w-44 shrink-0">
+        <div className="space-y-1.5 w-full lg:w-44 lg:shrink-0">
           <Label className="text-xs flex items-center gap-1">
             <LayoutList className="h-3 w-3" aria-hidden />
             Agrupar
@@ -1133,7 +1094,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
             aria-label="Agrupar movimientos"
           />
         </div>
-        <div className="space-y-1.5 w-44 shrink-0">
+        <div className="space-y-1.5 w-full lg:w-44 lg:shrink-0">
           <Label className="text-xs">Cuentas</Label>
           <MangoMultiSelect
             values={filter.accountIds}
@@ -1144,7 +1105,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
             aria-label="Filtrar por cuenta"
           />
         </div>
-        <div className="space-y-1.5 w-44 shrink-0">
+        <div className="space-y-1.5 w-full lg:w-44 lg:shrink-0">
           <Label className="text-xs">Categorías</Label>
           <MangoMultiSelect
             values={filter.categoryIds}
@@ -1626,131 +1587,32 @@ export function MovementsList() {
         <div className="space-y-2">
           {filter.type === "all" && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4 text-success flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Ingresos</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-success leading-tight">
-                  +{formatCurrency(totals.income, "ARS")}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Gastos</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-destructive leading-tight">
-                  −{formatCurrency(totals.expense, "ARS")}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Scale className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Balance</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className={`text-base font-bold tabular-nums leading-tight ${totals.net >= 0 ? "text-success" : "text-destructive"}`}>
-                  {totals.net >= 0 ? "+" : "−"}{formatCurrency(Math.abs(totals.net), "ARS")}
-                </p>
-              </div>
+              <SummaryStat icon={TrendingUp} iconClassName="text-success" label="Ingresos" dateLabel={filter.date.label} value={`+${formatCurrency(totals.income, "ARS")}`} valueClassName="text-success" />
+              <SummaryStat icon={TrendingDown} iconClassName="text-destructive" label="Gastos" dateLabel={filter.date.label} value={`−${formatCurrency(totals.expense, "ARS")}`} valueClassName="text-destructive" />
+              <SummaryStat icon={Scale} iconClassName="text-muted-foreground" label="Balance" dateLabel={filter.date.label} value={`${totals.net >= 0 ? "+" : "−"}${formatCurrency(Math.abs(totals.net), "ARS")}`} valueClassName={totals.net >= 0 ? "text-success" : "text-destructive"} />
             </div>
           )}
 
           {filter.type === "income" && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4 text-success flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Total ingresos</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-success leading-tight">
-                  +{formatCurrency(totals.income, "ARS")}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Cantidad</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
-                  {incomeCount}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Divide className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Promedio</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
-                  {formatCurrency(avgIncome, "ARS")}
-                </p>
-              </div>
+              <SummaryStat icon={TrendingUp} iconClassName="text-success" label="Total ingresos" dateLabel={filter.date.label} value={`+${formatCurrency(totals.income, "ARS")}`} valueClassName="text-success" />
+              <SummaryStat icon={Hash} iconClassName="text-muted-foreground" label="Cantidad" dateLabel={filter.date.label} value={incomeCount} valueClassName="text-foreground" />
+              <SummaryStat icon={Divide} iconClassName="text-muted-foreground" label="Promedio" dateLabel={filter.date.label} value={formatCurrency(avgIncome, "ARS")} valueClassName="text-foreground" />
             </div>
           )}
 
           {filter.type === "expense" && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingDown className="h-4 w-4 text-destructive flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Total gastos</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-destructive leading-tight">
-                  −{formatCurrency(totals.expense, "ARS")}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Cantidad</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
-                  {expenseCount}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Divide className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Promedio</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
-                  {formatCurrency(avgExpense, "ARS")}
-                </p>
-              </div>
+              <SummaryStat icon={TrendingDown} iconClassName="text-destructive" label="Total gastos" dateLabel={filter.date.label} value={`−${formatCurrency(totals.expense, "ARS")}`} valueClassName="text-destructive" />
+              <SummaryStat icon={Hash} iconClassName="text-muted-foreground" label="Cantidad" dateLabel={filter.date.label} value={expenseCount} valueClassName="text-foreground" />
+              <SummaryStat icon={Divide} iconClassName="text-muted-foreground" label="Promedio" dateLabel={filter.date.label} value={formatCurrency(avgExpense, "ARS")} valueClassName="text-foreground" />
             </div>
           )}
 
           {filter.type === "transfer" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <ArrowLeftRight className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Transferencias</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
-                  {transferCount}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <p className="text-xs font-medium text-muted-foreground truncate">Total movido</p>
-                </div>
-                <p className="text-[10px] text-muted-foreground/70 leading-none">{filter.date.label}</p>
-                <p className="text-base font-bold tabular-nums text-foreground leading-tight">
-                  {formatCurrency(transferTotal, "ARS")}
-                </p>
-              </div>
+              <SummaryStat icon={ArrowLeftRight} iconClassName="text-muted-foreground" label="Transferencias" dateLabel={filter.date.label} value={transferCount} valueClassName="text-foreground" />
+              <SummaryStat icon={TrendingUp} iconClassName="text-muted-foreground" label="Total movido" dateLabel={filter.date.label} value={formatCurrency(transferTotal, "ARS")} valueClassName="text-foreground" />
             </div>
           )}
 
@@ -1763,9 +1625,9 @@ export function MovementsList() {
       )}
       {isLoading && (
         <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-[76px] rounded-2xl" />
+              <Skeleton key={i} className="h-[64px] sm:h-[76px] rounded-2xl" />
             ))}
           </div>
           <Skeleton className="h-3 w-24" />
@@ -1875,11 +1737,6 @@ export function MovementsList() {
         <p className="text-xs text-center text-muted-foreground pt-2">
           Mostrando los primeros {FETCH_LIMIT} registros. Usá los filtros de fecha para ver períodos anteriores.
         </p>
-      )}
-
-      {/* Mobile FAB */}
-      {accounts.length > 0 && (
-        <FABQuickAdd accounts={accounts} />
       )}
 
       {/* Edit dialogs */}
