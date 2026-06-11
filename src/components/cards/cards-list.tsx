@@ -203,17 +203,17 @@ function CreditCardVisual({
             Resumen · cierre {format(cycle.cycleEnd, "d MMM", { locale: es })}
           </p>
           {isMultiCurrency ? (
-            <p
-              className="text-white text-2xl font-bold tabular-nums leading-none"
+            <div
+              className="text-white text-xl sm:text-2xl font-bold tabular-nums leading-tight flex flex-col sm:flex-row sm:items-baseline sm:gap-2"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {formatCurrency(arsTotal, "ARS")}
-              <span className="text-white/60 mx-2 font-normal">·</span>
-              {formatCurrency(usdTotal, "USD")}
-            </p>
+              <span>{formatCurrency(arsTotal, "ARS")}</span>
+              <span className="hidden sm:inline text-white/60 font-normal">·</span>
+              <span>{formatCurrency(usdTotal, "USD")}</span>
+            </div>
           ) : (
             <p
-              className="text-white text-3xl font-bold tabular-nums leading-none"
+              className="text-white text-2xl sm:text-3xl font-bold tabular-nums leading-none"
               style={{ fontFamily: "var(--font-display)" }}
             >
               {formatCurrency(
@@ -791,20 +791,20 @@ function CardBlock({
         {/* A pagar block */}
         <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-1">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">A pagar</p>
-          <div className="flex items-end justify-between gap-2">
+          <div className="flex items-start sm:items-end justify-between gap-2">
             {isMultiCurrency ? (
-              <p
-                className="text-xl font-bold tabular-nums leading-none text-foreground"
+              <div
+                className="text-lg sm:text-xl font-bold tabular-nums leading-tight text-foreground flex flex-col sm:flex-row sm:items-baseline sm:gap-2 min-w-0"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {formatCurrency(arsTotal, "ARS")}
-                <span className="text-muted-foreground mx-2 font-normal text-base">·</span>
-                {formatCurrency(usdTotal, "USD")}
-              </p>
+                <span>{formatCurrency(arsTotal, "ARS")}</span>
+                <span className="hidden sm:inline text-muted-foreground font-normal text-base">·</span>
+                <span>{formatCurrency(usdTotal, "USD")}</span>
+              </div>
             ) : (
               <p
                 className={cn(
-                  "text-2xl font-bold tabular-nums leading-none",
+                  "text-xl sm:text-2xl font-bold tabular-nums leading-none",
                   isOverdue ? "text-destructive" : "text-foreground"
                 )}
                 style={{ fontFamily: "var(--font-display)" }}
@@ -813,14 +813,14 @@ function CardBlock({
               </p>
             )}
             {isPaid && cycle.statement?.paid_date && (
-              <p className="text-xs font-semibold text-success pb-0.5">
+              <p className="text-xs font-semibold text-success pb-0.5 flex-shrink-0 whitespace-nowrap">
                 Pagado {format(parseISO(cycle.statement.paid_date), "d MMM", { locale: es })}
               </p>
             )}
             {!isPaid && dueDate != null && (
               <p
                 className={cn(
-                  "text-xs font-semibold tabular-nums pb-0.5",
+                  "text-xs font-semibold tabular-nums pb-0.5 flex-shrink-0 whitespace-nowrap",
                   isOverdue
                     ? "text-destructive"
                     : isDueToday
