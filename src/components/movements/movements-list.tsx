@@ -217,6 +217,124 @@ function SummaryStat({
   )
 }
 
+// ── Detail sheet helpers ──────────────────────────────────────────────────────
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <span className="text-sm font-medium text-right min-w-0 break-words">{value}</span>
+    </div>
+  )
+}
+
+function MovementDetailSheet({
+  movement, account, category, isDemo, open, onOpenChange, onEdit, onDelete,
+}: {
+  movement: Movement
+  account: Account | undefined
+  category: Category | undefined
+  isDemo?: boolean
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const isIncome = movement.type === "income"
+  const displayAmount = movement.converted_amount ?? movement.amount
+  const displayCurrency = account?.currency ?? movement.original_currency
+  const isCuota = movement.installment_purchase_id !== null
+  return (
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Detalle del movimiento"
+      footer={
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" onClick={onDelete} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" />
+            Eliminar
+          </Button>
+          <Button onClick={onEdit} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect">
+            <Pencil className="h-4 w-4" />
+            Editar
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="text-center">
+          <p className={cn("text-3xl font-bold tabular-nums leading-tight", isIncome ? "text-success" : "text-destructive")}>
+            {isIncome ? "+ " : "− "}{formatCurrency(displayAmount, displayCurrency)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border/60 divide-y divide-border/40">
+          <DetailRow label="Categoría" value={category?.name ?? "Sin categoría"} />
+          <DetailRow label="Cuenta" value={account?.name ?? "—"} />
+          <DetailRow label="Fecha" value={format(parseISO(movement.date), "d 'de' MMMM yyyy", { locale: es })} />
+          {movement.note ? <DetailRow label="Nota" value={movement.note} /> : null}
+          {isCuota && movement.installment_number !== null && movement.installment_total !== null ? (
+            <DetailRow label="Cuota" value={`${movement.installment_number}/${movement.installment_total}`} />
+          ) : null}
+          {movement.is_future ? <DetailRow label="Estado" value="Programado" /> : null}
+        </div>
+      </div>
+    </MangoSheet>
+  )
+}
+
+function TransferDetailSheet({
+  transfer, fromAccount, toAccount, isDemo, open, onOpenChange, onEdit, onDelete,
+}: {
+  transfer: Transfer
+  fromAccount: Account | undefined
+  toAccount: Account | undefined
+  isDemo?: boolean
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const isCross = fromAccount && toAccount && fromAccount.currency !== toAccount.currency
+  return (
+    <MangoSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Detalle de transferencia"
+      footer={
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" onClick={onDelete} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" />
+            Eliminar
+          </Button>
+          <Button onClick={onEdit} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="press-effect">
+            <Pencil className="h-4 w-4" />
+            Editar
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="text-center">
+          <p className="text-3xl font-bold tabular-nums leading-tight">
+            − {formatCurrency(transfer.from_amount, fromAccount?.currency ?? "ARS")}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border/60 divide-y divide-border/40">
+          <DetailRow label="Desde" value={fromAccount?.name ?? "—"} />
+          <DetailRow label="Hacia" value={toAccount?.name ?? "—"} />
+          {isCross ? (
+            <DetailRow label="Monto recibido" value={`+ ${formatCurrency(transfer.to_amount, toAccount?.currency ?? "ARS")}`} />
+          ) : null}
+          <DetailRow label="Fecha" value={format(parseISO(transfer.date), "d 'de' MMMM yyyy", { locale: es })} />
+          {transfer.note ? <DetailRow label="Nota" value={transfer.note} /> : null}
+          {transfer.is_future ? <DetailRow label="Estado" value="Programado" /> : null}
+        </div>
+      </div>
+    </MangoSheet>
+  )
+}
+
 // ── Movement row ──────────────────────────────────────────────────────────────
 
 function MovementRow({
@@ -225,6 +343,7 @@ function MovementRow({
   category,
   onEdit,
   onDelete,
+  onOpenDetail,
   selectionMode,
   isSelected,
   onToggle,
@@ -235,6 +354,7 @@ function MovementRow({
   category: Category | undefined
   onEdit: (m: Movement) => void
   onDelete: (m: Movement) => void
+  onOpenDetail?: (m: Movement) => void
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
@@ -248,12 +368,12 @@ function MovementRow({
 
   return (
     <div
-      onClick={selectionMode ? () => onToggle?.(movement.id) : undefined}
+      onClick={selectionMode ? () => onToggle?.(movement.id) : () => onOpenDetail?.(movement)}
       role={selectionMode ? "checkbox" : undefined}
       aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "flex items-center gap-3 py-3 group",
-        selectionMode && "cursor-pointer",
+        "cursor-pointer",
         isSelected && selectedItemCn(true)
       )}
     >
@@ -333,7 +453,7 @@ function MovementRow({
             size="icon-sm"
             title={isDemo ? "No disponible en el modo demo" : "Editar"}
             className="press-effect cursor-pointer"
-            onClick={() => onEdit(movement)}
+            onClick={(e) => { e.stopPropagation(); onEdit(movement) }}
             disabled={isDemo}
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -343,7 +463,7 @@ function MovementRow({
             size="icon-sm"
             title={isDemo ? "No disponible en el modo demo" : "Eliminar"}
             className="press-effect cursor-pointer"
-            onClick={() => onDelete(movement)}
+            onClick={(e) => { e.stopPropagation(); onDelete(movement) }}
             disabled={isDemo}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -362,6 +482,7 @@ function TransferRow({
   toAccount,
   onEdit,
   onDelete,
+  onOpenDetail,
   selectionMode,
   isSelected,
   onToggle,
@@ -372,6 +493,7 @@ function TransferRow({
   toAccount: Account | undefined
   onEdit: (t: Transfer) => void
   onDelete: (t: Transfer) => void
+  onOpenDetail?: (t: Transfer) => void
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
@@ -385,12 +507,12 @@ function TransferRow({
 
   return (
     <div
-      onClick={selectionMode ? () => onToggle?.(selectionId) : undefined}
+      onClick={selectionMode ? () => onToggle?.(selectionId) : () => onOpenDetail?.(transfer)}
       role={selectionMode ? "checkbox" : undefined}
       aria-checked={selectionMode ? isSelected : undefined}
       className={cn(
         "flex items-center gap-3 py-3 group",
-        selectionMode && "cursor-pointer",
+        "cursor-pointer",
         isSelected && selectedItemCn(true)
       )}
     >
@@ -442,7 +564,7 @@ function TransferRow({
             size="icon-sm"
             title={isDemo ? "No disponible en el modo demo" : "Editar"}
             className="press-effect cursor-pointer"
-            onClick={() => onEdit(transfer)}
+            onClick={(e) => { e.stopPropagation(); onEdit(transfer) }}
             disabled={isDemo}
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -452,7 +574,7 @@ function TransferRow({
             size="icon-sm"
             title={isDemo ? "No disponible en el modo demo" : "Eliminar"}
             className="press-effect cursor-pointer"
-            onClick={() => onDelete(transfer)}
+            onClick={(e) => { e.stopPropagation(); onDelete(transfer) }}
             disabled={isDemo}
           >
             <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -1332,6 +1454,8 @@ export function MovementsList() {
   const [deletingMovement, setDeletingMovement] = useState<Movement | null>(null)
   const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null)
   const [deletingTransfer, setDeletingTransfer] = useState<Transfer | null>(null)
+  const [detailMovement, setDetailMovement] = useState<Movement | null>(null)
+  const [detailTransfer, setDetailTransfer] = useState<Transfer | null>(null)
   const ms = useMultiSelect()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkPending, setBulkPending] = useState(false)
@@ -1706,6 +1830,7 @@ export function MovementsList() {
                           category={fi.item.category_id ? categoryMap.get(fi.item.category_id) : undefined}
                           onEdit={setEditingMovement}
                           onDelete={setDeletingMovement}
+                          onOpenDetail={setDetailMovement}
                           selectionMode={ms.selectionMode}
                           isSelected={ms.isSelected(fi.item.id)}
                           onToggle={ms.toggle}
@@ -1718,6 +1843,7 @@ export function MovementsList() {
                           toAccount={accountMap.get(fi.item.to_account_id)}
                           onEdit={setEditingTransfer}
                           onDelete={setDeletingTransfer}
+                          onOpenDetail={setDetailTransfer}
                           selectionMode={ms.selectionMode}
                           isSelected={ms.isSelected(`t-${fi.item.id}`)}
                           onToggle={ms.toggle}
@@ -1738,6 +1864,32 @@ export function MovementsList() {
         <p className="text-xs text-center text-muted-foreground pt-2">
           Mostrando los primeros {FETCH_LIMIT} registros. Usá los filtros de fecha para ver períodos anteriores.
         </p>
+      )}
+
+      {/* Detail sheets */}
+      {detailMovement && (
+        <MovementDetailSheet
+          movement={detailMovement}
+          account={accountMap.get(detailMovement.account_id)}
+          category={detailMovement.category_id ? categoryMap.get(detailMovement.category_id) : undefined}
+          isDemo={isDemo}
+          open={!!detailMovement}
+          onOpenChange={(v) => { if (!v) setDetailMovement(null) }}
+          onEdit={() => { const m = detailMovement; setDetailMovement(null); setEditingMovement(m) }}
+          onDelete={() => { const m = detailMovement; setDetailMovement(null); setDeletingMovement(m) }}
+        />
+      )}
+      {detailTransfer && (
+        <TransferDetailSheet
+          transfer={detailTransfer}
+          fromAccount={accountMap.get(detailTransfer.from_account_id)}
+          toAccount={accountMap.get(detailTransfer.to_account_id)}
+          isDemo={isDemo}
+          open={!!detailTransfer}
+          onOpenChange={(v) => { if (!v) setDetailTransfer(null) }}
+          onEdit={() => { const t = detailTransfer; setDetailTransfer(null); setEditingTransfer(t) }}
+          onDelete={() => { const t = detailTransfer; setDetailTransfer(null); setDeletingTransfer(t) }}
+        />
       )}
 
       {/* Edit dialogs */}
