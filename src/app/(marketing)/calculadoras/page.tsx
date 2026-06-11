@@ -54,12 +54,16 @@ export default function CalculadorasPage() {
           </div>
         </Link>
 
-        {/* Coming soon: Sueldo ajustado */}
-        <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 opacity-60 cursor-not-allowed">
-          <div>
-            <span className="text-xs font-semibold text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
-              Próximamente
+        {/* Live: Sueldo ajustado por inflación */}
+        <Link
+          href="/calculadoras/sueldo-inflacion"
+          className="rounded-2xl border border-border/60 bg-card p-6 hover:border-primary/30 transition-colors duration-200 flex flex-col gap-3 group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-primary bg-primary/10 rounded-full px-2.5 py-0.5">
+              Disponible
             </span>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all duration-150" aria-hidden="true" />
           </div>
           <div>
             <h2
@@ -69,10 +73,10 @@ export default function CalculadorasPage() {
               Sueldo ajustado por inflación
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              ¿Cuánto vale tu sueldo en términos reales comparado con años anteriores?
+              ¿Cuánto vale en pesos de hoy un sueldo del pasado? Según el IPC del INDEC.
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Coming soon: Conversor */}
         <div className="rounded-2xl border border-border/60 bg-card p-6 flex flex-col gap-3 opacity-60 cursor-not-allowed">
