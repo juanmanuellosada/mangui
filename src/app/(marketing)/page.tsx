@@ -214,7 +214,8 @@ export default async function LandingPage() {
                         <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.65_0.2_27)]" />
                         <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.75_0.18_80)]" />
                         <span className="w-2.5 h-2.5 rounded-full bg-[oklch(0.72_0.2_140)]" />
-                        <div className="ml-3 flex-1 h-4 rounded-sm bg-white/5 max-w-[200px] flex items-center px-2">
+                        <div className="ml-3 flex-1 h-4 rounded-sm bg-white/5 max-w-[200px] flex items-center gap-1.5 px-2">
+                          <Image src="/favicon-32.png" alt="" width={11} height={11} className="rounded-[2px] flex-shrink-0" />
                           <span className="text-[9px] text-white/25 font-mono">mangui.com.ar/inicio</span>
                         </div>
                       </div>
