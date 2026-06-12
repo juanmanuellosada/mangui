@@ -570,6 +570,9 @@ export default async function LandingPage() {
                   <p>
                     También cargás gastos hablando: "gasté 3500 en el kiosco" y listo.
                   </p>
+                  <p>
+                    O sacale una foto al ticket: Manguito lee el comprobante y completa el movimiento solo.
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3 pt-1">
