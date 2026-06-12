@@ -40,19 +40,18 @@ interface FciSnapshot {
 }
 
 // ── Wallet → FCI fund map ─────────────────────────────────────────────────────
-// Match substrings derived from the actual fund names observed via curl.
-// "Mercado Fondo" covers Mercado Pago's fund.
-// "Ualintec" covers Ualá's fund (Ualintec Ahorro Pesos).
-// "Fima Premium" covers Personal Pay (Banco Galicia/FIMA, used by Personal Pay).
-// "Super Ahorro $" covers Naranja X (marketed as "Cuenta Naranja", underlying is
-//   Supervielle Super Ahorro).
-// If no confident match exists, the wallet is omitted — see OMIT logic below.
+// Exact fund names as they appear in /v1/finanzas/fci/mercadoDinero/ultimo.
+// Cross-checked against comparatasas.ar mapping (June 2026).
+// If a fund name isn't found in the API response, the wallet is silently omitted.
 
-const WALLET_FCI: Array<{ wallet: string; match: RegExp }> = [
-  { wallet: "Mercado Pago", match: /^mercado fondo/i },
-  { wallet: "Ualá", match: /^ualintec ahorro pesos/i },
-  { wallet: "Naranja X", match: /^super ahorro \$/i },
-  { wallet: "Personal Pay", match: /^fima premium/i },
+const WALLET_FCI: Array<{ wallet: string; fund: string }> = [
+  { wallet: "Mercado Pago", fund: "Mercado Fondo - Clase A" },
+  { wallet: "Ualá",         fund: "Ualintec Ahorro Pesos - Clase A" },
+  { wallet: "Personal Pay", fund: "Delta Pesos - Clase X" },
+  { wallet: "Cocos",        fund: "Cocos Ahorro - Clase A" },
+  { wallet: "Prex",         fund: "Allaria Ahorro - Clase E" },
+  { wallet: "Lemon",        fund: "Fima Premium - Clase P" },
+  { wallet: "Claro Pay",    fund: "SBS Ahorro Pesos - Clase A" },
 ]
 
 const BROWSER_UA =
@@ -156,23 +155,13 @@ export async function getRendimientos(): Promise<Rendimientos> {
     }
 
     const billeteras: RateItem[] = []
-    for (const { wallet, match } of WALLET_FCI) {
-      // Find the fund matching this wallet's pattern
-      let found: { fondo: string; tna: number } | null = null
-      for (const [fondo, tna] of fciTnaByFondo.entries()) {
-        if (match.test(fondo)) {
-          // Prefer Clase A; among matches take highest tna
-          if (!found || /clase a$/i.test(fondo) || tna > found.tna) {
-            found = { fondo, tna }
-            if (/clase a$/i.test(fondo)) break
-          }
-        }
-      }
-      if (!found) continue // omit wallet if fund not found or not sane
+    for (const { wallet, fund } of WALLET_FCI) {
+      const tna = fciTnaByFondo.get(fund)
+      if (tna === undefined) continue // omit wallet if fund not found or not sane
       billeteras.push({
         nombre: wallet,
-        tna: found.tna,
-        nota: `vía el fondo donde coloca tu saldo (${found.fondo})`,
+        tna,
+        nota: "vía el fondo donde coloca tu saldo",
       })
     }
     billeteras.sort((a, b) => b.tna - a.tna)
