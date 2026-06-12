@@ -36,6 +36,7 @@ export default function OfflinePage() {
           "Ver datos ya cargados",
           "Navegar entre secciones visitadas",
           "Revisar tus cuentas y saldos guardados",
+          "Cargar movimientos (se sincronizan al volver la señal)",
         ].map((item) => (
           <div key={item} className="flex items-center gap-3">
             <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
@@ -47,7 +48,6 @@ export default function OfflinePage() {
           Requiere conexión
         </p>
         {[
-          "Cargar nuevos movimientos",
           "Refrescar cotizaciones del dólar",
           "Sincronizar con el servidor",
         ].map((item) => (

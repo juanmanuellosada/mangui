@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { OfflineBanner } from "@/components/offline-banner";
+import { OfflineSyncManager } from "@/components/offline-sync-manager";
 
 // 24 hours in ms — previously fetched data survives offline for a day
 const MAX_AGE = 1000 * 60 * 60 * 24
@@ -91,6 +92,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <Toaster richColors position="top-right" />
         <ServiceWorkerRegister />
         <OfflineBanner />
+        <OfflineSyncManager />
       </PersistQueryClientProvider>
     </ThemeProvider>
   );

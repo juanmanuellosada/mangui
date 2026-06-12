@@ -82,3 +82,18 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", () => {
   // Sin intercepción intencional.
 })
+
+// ---------------------------------------------------------------------------
+// Background sync: cuando el navegador detecta que volvió la señal y hay
+// una sync pendiente con el tag "mangui-sync", notificar a todos los clientes
+// para que drenen la cola de movimientos offline.
+// ---------------------------------------------------------------------------
+self.addEventListener("sync", (event) => {
+  if (event.tag === "mangui-sync") {
+    event.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true, type: "window" }).then((cs) => {
+        cs.forEach((c) => c.postMessage({ type: "drain-queue" }))
+      })
+    )
+  }
+})

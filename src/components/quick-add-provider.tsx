@@ -38,6 +38,7 @@ import { INSTALLMENTS_KEY, computeInstallmentAmounts, computeInstallmentDate, is
 import { isFutureDate } from "@/lib/date-utils"
 import { uploadAttachment } from "@/lib/attachments"
 import { fetchDolarRates } from "@/lib/rates/dolar"
+import { enqueueMovement } from "@/lib/offline-queue"
 
 type Category = Tables<"categories">
 export type QuickAddMode = "movement" | "transfer"
@@ -207,6 +208,27 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     [open]
   )
 
+  // Helper: enqueue a movement payload for offline sync and register background sync.
+  // Returns a sentinel so onSuccess closes the form without trying to read server data.
+  const enqueueOfflineMovement = React.useCallback(
+    async (payload: Record<string, unknown>): Promise<{ __offline: true }> => {
+      await enqueueMovement(payload)
+      toast.success("Movimiento guardado sin conexión", {
+        description: "Se sincroniza solo cuando vuelva la señal.",
+      })
+      // Best-effort background sync registration
+      try {
+        if (typeof navigator !== "undefined" && "serviceWorker" in navigator && "SyncManager" in window) {
+          const reg = await navigator.serviceWorker.ready
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (reg as any).sync.register("mangui-sync").catch(() => {})
+        }
+      } catch { /* never breaks the enqueue */ }
+      return { __offline: true }
+    },
+    []
+  )
+
   const movementMutation = useMutation({
     mutationFn: async ({
       values,
@@ -244,27 +266,41 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       // 3.2 — derive is_future from the date
       const is_future = isFutureDate(values.date)
 
-      const { data, error } = await supabase
-        .from("movements")
-        .insert({
-          user_id: user.id,
-          type: values.type,
-          amount: values.amount,
-          original_currency: values.original_currency,
-          account_id: values.account_id,
-          category_id: values.category_id,
-          date: values.date,
-          note: values.note || null,
-          is_future,
-          dollar_type: isCross ? values.dollar_type : null,
-          converted_amount: isCross ? values.converted_amount : null,
-        })
-        .select()
-        .single()
-      if (error) throw error
+      const movementInsert = {
+        user_id: user.id,
+        type: values.type,
+        amount: values.amount,
+        original_currency: values.original_currency,
+        account_id: values.account_id,
+        category_id: values.category_id,
+        date: values.date,
+        note: values.note || null,
+        is_future,
+        dollar_type: isCross ? values.dollar_type : null,
+        converted_amount: isCross ? values.converted_amount : null,
+      }
 
-      // 4.3 — upload pending attachments (non-blocking on failure)
-      const movementId = data.id
+      // Offline: skip Supabase entirely, enqueue and close
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return enqueueOfflineMovement(movementInsert as Record<string, unknown>)
+      }
+
+      let movementId: string
+      try {
+        const result = await supabase
+          .from("movements")
+          .insert(movementInsert)
+          .select()
+          .single()
+        if (result.error) throw result.error
+        movementId = result.data.id
+      } catch (err) {
+        // Network failure (TypeError = fetch failed, no response) → fall back to offline queue
+        if (err instanceof TypeError) {
+          return enqueueOfflineMovement(movementInsert as Record<string, unknown>)
+        }
+        throw err
+      }
       const uploads: Array<{ file: File; kind: "factura" | "recibo" | "comprobante" }> = []
       if (values.type === "expense") {
         if (pending.factura) uploads.push({ file: pending.factura, kind: "factura" })
@@ -281,9 +317,14 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      return data
+      return null
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // If we enqueued offline, don't invalidate (nothing to fetch) — just close the form.
+      if (data && typeof data === "object" && "__offline" in data) {
+        setIsOpen(false)
+        return
+      }
       queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
