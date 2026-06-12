@@ -60,29 +60,6 @@ export const AUDIENCES: Audience[] = [
       { q: "¿Me avisa del vencimiento del monotributo?", a: "Sí: lo cargás como movimiento recurrente y te llega el recordatorio antes del vencimiento." },
     ],
   },
-  {
-    slug: "parejas",
-    name: "Parejas",
-    title: "Mangui para parejas: planificá las finanzas de a dos",
-    description: "Organizá las finanzas de la pareja: el alquiler, el súper, las vacaciones y el ahorro compartido — con metas, presupuestos y ahorro en dólares.",
-    headline: "Mangui para parejas",
-    subhead: "Organizá las finanzas de a dos: el alquiler, el súper, las vacaciones y el ahorro compartido — cada uno con su panorama claro.",
-    nota: "El modo compartido de a dos (dividir gastos y ver quién puso qué) está en camino. Por ahora, cada uno lleva sus finanzas y planifican juntos con metas y presupuestos.",
-    retos: [
-      { titulo: "Ahorrar juntos para algo grande", texto: "Armás metas (vacaciones, mudanza, un auto) y seguís el avance — en pesos o en dólares." },
-      { titulo: "Saber a dónde se va la plata del hogar", texto: "Categorías y presupuestos para los gastos compartidos: alquiler, súper, servicios." },
-      { titulo: "Ahorrar en dólares como pareja", texto: "Multimoneda y metas en USD para juntar la plata 'fuerte'." },
-    ],
-    features: [
-      { emoji: "🎯", titulo: "Metas", texto: "Definí un objetivo común y mirá cuánto falta." },
-      { emoji: "📊", titulo: "Presupuestos del hogar", texto: "Controlá los gastos compartidos por categoría." },
-      { emoji: "💵", titulo: "Ahorro en dólares", texto: "Junten la plata en USD con metas y cuentas en dólares." },
-    ],
-    faq: [
-      { q: "¿Puedo dividir gastos con mi pareja como en Splitwise?", a: "Todavía no: el modo compartido (dividir gastos y settle-up) está en el roadmap. Hoy cada uno lleva sus finanzas y planifican juntos con metas y presupuestos." },
-      { q: "¿Sirve para ahorrar juntos en dólares?", a: "Sí: con metas en USD y cuentas en dólares pueden seguir cuánto juntaron para el objetivo común." },
-    ],
-  },
 ]
 
 export function getAudience(slug: string): Audience | undefined {

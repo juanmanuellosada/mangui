@@ -4,9 +4,9 @@ import { ArrowRight } from "lucide-react"
 import { AUDIENCES } from "@/lib/marketing/audiences"
 
 export const metadata: Metadata = {
-  title: "Mangui para vos: freelancers, monotributistas y parejas",
+  title: "Mangui para vos: freelancers y monotributistas",
   description:
-    "Mirá cómo Mangui se adapta a vos: freelancers que cobran en dólares, monotributistas con ingresos variables, o parejas que planifican juntas.",
+    "Mirá cómo Mangui se adapta a vos: freelancers que cobran en dólares o monotributistas con ingresos variables.",
 }
 
 export default function ParaIndexPage() {

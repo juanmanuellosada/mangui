@@ -31,7 +31,6 @@ export const COMPARISONS: Comparison[] = [
       { feature: "Cuotas con ciclo de resumen (cierre, vencimiento, sellos)", mangui: y(), rival: n() },
       { feature: "Resumen de tarjeta bimonetario (ARS + USD)", mangui: y(), rival: n() },
       { feature: "Presupuestos, metas y recurrentes", mangui: y(), rival: y() },
-      { feature: "Gastos compartidos / grupos", mangui: n("en el roadmap"), rival: y() },
       { feature: "App web / PWA completa", mangui: y(), rival: y() },
       { feature: "Precio", mangui: y("en pesos (MercadoPago)"), rival: p("en dólares") },
     ],
@@ -40,7 +39,6 @@ export const COMPARISONS: Comparison[] = [
     faq: [
       { q: "¿Mangui o Gasti?", a: "Gasti es cómodo para registrar gastos por chat (WhatsApp, Telegram o web). Mangui va más a fondo con la realidad argentina (tres dólares, cuotas con resumen de tarjeta, resumen bimonetario) y cobra en pesos." },
       { q: "¿Mangui también carga por voz y foto?", a: "Sí. Le hablás a Manguito o le sacás una foto al ticket y la IA completa el movimiento, directo en la app." },
-      { q: "¿Gasti tiene gastos compartidos y Mangui no?", a: "Gasti tiene grupos. En Mangui el modo compartido/pareja está en el roadmap; hoy es una app de finanzas personales completa." },
     ],
   },
   {
@@ -50,7 +48,7 @@ export const COMPARISONS: Comparison[] = [
     description: "Splitwise divide gastos en grupo; Mangui gestiona todas tus finanzas personales en Argentina. Comparativa honesta, ahora que Splitwise se volvió pago.",
     intro: "Splitwise sirve para DIVIDIR gastos compartidos en grupo. Mangui es para gestionar TUS finanzas personales. No son lo mismo — pero si buscás una alternativa argentina ahora que Splitwise se volvió pago, esto te ayuda a decidir.",
     rows: [
-      { feature: "Dividir gastos en grupo / settle-up", mangui: n("en el roadmap"), rival: y() },
+      { feature: "Dividir gastos en grupo / settle-up", mangui: n(), rival: y() },
       { feature: "Finanzas personales completas (ingresos, gastos, ahorro)", mangui: y(), rival: n() },
       { feature: "Multimoneda ARS/USD + 3 dólares", mangui: y(), rival: p("solo montos") },
       { feature: "Cuotas y resúmenes de tarjeta", mangui: y(), rival: n() },
@@ -59,10 +57,10 @@ export const COMPARISONS: Comparison[] = [
       { feature: "Gratis para lo básico", mangui: y(), rival: p("pago desde 2026") },
       { feature: "Precio", mangui: y("en pesos"), rival: p("en dólares") },
     ],
-    cuandoMangui: "Si querés controlar toda tu plata —no solo dividir gastos— en Argentina y en pesos. El modo compartido/pareja está en el roadmap.",
+    cuandoMangui: "Si querés controlar toda tu plata —no solo dividir gastos— en Argentina y en pesos.",
     cuandoRival: "Si SOLO querés dividir los gastos de un viaje o un departamento entre amigos.",
     faq: [
-      { q: "¿Mangui reemplaza a Splitwise?", a: "No del todo: Splitwise está hecho para dividir gastos en grupo, algo que Mangui todavía no hace (está en el roadmap). Pero para controlar tus finanzas personales en Argentina, Mangui hace mucho más." },
+      { q: "¿Mangui reemplaza a Splitwise?", a: "No: Splitwise está hecho para dividir gastos en grupo; Mangui no lo hace. Pero para controlar tus finanzas personales en Argentina, Mangui hace mucho más." },
       { q: "¿Por qué buscar una alternativa a Splitwise?", a: "Splitwise se volvió pago en 2026 y limitó la versión gratis. Si lo usabas para llevar tus cuentas, Mangui es una opción argentina y en pesos." },
     ],
   },
