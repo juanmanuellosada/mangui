@@ -8,7 +8,7 @@ import { z } from "zod"
 import { useTheme } from "next-themes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Settings2, Palette, Database, LogOut, Sun, Moon, Monitor, Info, Download, ShieldCheck, Check, Crown, Sparkles } from "lucide-react"
+import { User, Settings2, Palette, Database, LogOut, Sun, Moon, Monitor, Info, Download, ShieldCheck, Check, Crown, Sparkles, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,9 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import { signOut } from "@/app/actions/auth"
 import { subscribeToPremium, cancelSubscription } from "@/app/actions/subscription"
+import { deleteAccount } from "@/app/actions/account"
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan, PLAN_KEY } from "@/lib/use-plan"
@@ -529,6 +531,12 @@ function DataSection() {
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"
   const [exporting, setExporting] = useState(false)
   const { isPremium: userIsPremium } = usePlan()
+  const isDemo = useIsDemo()
+
+  // Delete account dialog state
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState("")
+  const [deleting, setDeleting] = useState(false)
 
   const handleExport = async () => {
     if (!userIsPremium) return
@@ -540,6 +548,23 @@ function DataSection() {
       toast.error("Error al exportar", { description: err instanceof Error ? err.message : "Error desconocido" })
     } finally {
       setExporting(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    try {
+      const result = await deleteAccount(deleteConfirmation)
+      if (!result.ok) {
+        toast.error("No se pudo eliminar la cuenta", { description: result.error })
+        setDeleting(false)
+        return
+      }
+      // Force a full navigation to clear all in-memory state
+      window.location.href = "/login"
+    } catch {
+      toast.error("Error inesperado al eliminar la cuenta")
+      setDeleting(false)
     }
   }
 
@@ -587,7 +612,7 @@ function DataSection() {
         )}
       </div>
 
-      {/* Delete account — disabled, destructive affordance */}
+      {/* Delete account */}
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -596,20 +621,69 @@ function DataSection() {
               Eliminá permanentemente tu cuenta y todos tus datos.
               Esta acción no se puede deshacer.
             </p>
-            <p className="text-[11px] text-muted-foreground/70 mt-1 italic">
-              Requiere confirmación del servidor — disponible próximamente.
-            </p>
           </div>
           <Button
             variant="destructive"
             size="sm"
-            disabled
-            className="cursor-not-allowed opacity-50 flex-shrink-0 mt-0.5"
+            disabled={isDemo}
+            title={isDemo ? "No disponible en el modo demo" : undefined}
+            className={cn("flex-shrink-0 mt-0.5", isDemo ? "cursor-not-allowed opacity-50" : "cursor-pointer press-effect")}
+            onClick={() => {
+              setDeleteConfirmation("")
+              setDeleteOpen(true)
+            }}
           >
             Eliminar
           </Button>
         </div>
       </div>
+
+      {/* Delete account confirmation dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent compact>
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <TriangleAlert className="h-5 w-5 text-destructive flex-shrink-0" />
+              <DialogTitle className="text-destructive">Eliminar cuenta</DialogTitle>
+            </div>
+            <DialogDescription>
+              Esta acción es <strong>permanente e irreversible</strong>. Se eliminarán tu perfil, cuentas, movimientos, tarjetas, cuotas, transferencias, presupuestos, metas, reglas, archivos adjuntos y tu suscripción Premium si tenés una.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm">
+              Para confirmar, escribí <strong>ELIMINAR</strong> en el campo de abajo:
+            </p>
+            <Input
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              placeholder="ELIMINAR"
+              disabled={deleting}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={deleting}
+              onClick={() => setDeleteOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={deleteConfirmation !== "ELIMINAR" || deleting}
+              onClick={handleDeleteAccount}
+              className="press-effect"
+            >
+              {deleting ? "Eliminando…" : "Eliminar definitivamente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
