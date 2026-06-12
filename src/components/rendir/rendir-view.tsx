@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency, cn } from "@/lib/utils"
 import type { AccountBalance } from "@/lib/accounts"
 import type { Rendimientos, RateItem } from "@/lib/rendimientos/argentinadatos"
-import { TrendingUp, Building2, Smartphone, CircleDollarSign, DollarSign } from "lucide-react"
+import { TrendingUp, Building2, Smartphone, CircleDollarSign, DollarSign, BarChart2, FileText, Bitcoin } from "lucide-react"
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
@@ -73,6 +73,55 @@ function monthlyGain(amount: number, tna: number, currency: "ARS" | "USD" = "ARS
   return formatCurrency(amount * tna / 12, currency)
 }
 
+// ── Toggle "Conocidas / Todas" ────────────────────────────────────────────────
+
+type ToggleView = "conocidas" | "todas"
+
+function KnownToggle({
+  value,
+  onChange,
+}: {
+  value: ToggleView
+  onChange: (v: ToggleView) => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Filtro de entidades"
+      className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 p-0.5 gap-0"
+    >
+      <button
+        type="button"
+        onClick={() => onChange("conocidas")}
+        aria-pressed={value === "conocidas"}
+        className={cn(
+          "inline-flex flex-1 justify-center items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          value === "conocidas"
+            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        Conocidas
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("todas")}
+        aria-pressed={value === "todas"}
+        className={cn(
+          "inline-flex flex-1 justify-center items-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          value === "todas"
+            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        Todas
+      </button>
+    </div>
+  )
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function RateLogo({ logo, nombre }: { logo?: string | null; nombre: string }) {
@@ -118,9 +167,11 @@ interface RateRowProps {
   rank: number
   idleAmount?: number
   currency?: "ARS" | "USD"
+  /** When provided, show this label instead of "TNA" */
+  rateLabel?: string
 }
 
-function RateRow({ item, idleArs, rank, idleAmount, currency = "ARS" }: RateRowProps) {
+function RateRow({ item, idleArs, rank, idleAmount, currency = "ARS", rateLabel = "TNA" }: RateRowProps) {
   const effectiveIdle = idleAmount !== undefined ? idleAmount : idleArs
   const showProjection = effectiveIdle >= 1
   return (
@@ -151,7 +202,7 @@ function RateRow({ item, idleArs, rank, idleAmount, currency = "ARS" }: RateRowP
       {/* Rate + projection */}
       <div className="text-right flex-shrink-0">
         <p className={cn("text-sm font-semibold tabular-nums", rank === 1 ? "text-primary" : "")}>
-          {formatPct(item.tna)} TNA
+          {formatPct(item.tna)} {rateLabel}
         </p>
         {showProjection && (
           <p className="text-xs text-muted-foreground tabular-nums">
@@ -172,9 +223,29 @@ interface SectionProps {
   idleAmount?: number
   currency?: "ARS" | "USD"
   disclaimer?: React.ReactNode
+  rateLabel?: string
+  /** When true, apply the known/all filter */
+  filterable?: boolean
+  showKnown?: boolean
 }
 
-function Section({ title, icon, items, idleArs, isLoading, idleAmount, currency, disclaimer }: SectionProps) {
+function Section({
+  title,
+  icon,
+  items,
+  idleArs,
+  isLoading,
+  idleAmount,
+  currency,
+  disclaimer,
+  rateLabel,
+  filterable = false,
+  showKnown = false,
+}: SectionProps) {
+  const displayed = filterable && showKnown
+    ? items.filter((it) => it.conocida !== false)
+    : items
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -183,18 +254,19 @@ function Section({ title, icon, items, idleArs, isLoading, idleAmount, currency,
       </div>
       {isLoading ? (
         <SectionSkeleton />
-      ) : items.length === 0 ? (
+      ) : displayed.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">Sin datos disponibles.</p>
       ) : (
         <div className="space-y-2">
-          {items.map((item, i) => (
+          {displayed.map((item, i) => (
             <RateRow
-              key={item.nombre}
+              key={`${item.nombre}-${item.modalidad ?? ""}-${item.moneda ?? ""}`}
               item={item}
               idleArs={idleArs}
               rank={i + 1}
               idleAmount={idleAmount}
               currency={currency}
+              rateLabel={rateLabel}
             />
           ))}
         </div>
@@ -207,6 +279,8 @@ function Section({ title, icon, items, idleArs, isLoading, idleAmount, currency,
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export function RendirView() {
+  const [toggleView, setToggleView] = useState<ToggleView>("conocidas")
+
   const { data: balances, isLoading: balancesLoading } = useQuery({
     queryKey: ["account_balances"],
     queryFn: fetchBalances,
@@ -222,6 +296,8 @@ export function RendirView() {
   const idleUsd = balances ? computeIdleUsd(balances) : 0
   const hasIdleArs = idleArs >= 1
   const hasIdleUsd = idleUsd >= 1
+
+  const showKnown = toggleView === "conocidas"
 
   const allEmpty =
     rendimientos &&
@@ -303,6 +379,12 @@ export function RendirView() {
         )}
       </div>
 
+      {/* Global "Conocidas / Todas" toggle */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Filtrar entidades</p>
+        <KnownToggle value={toggleView} onChange={setToggleView} />
+      </div>
+
       {/* Empty state for rates */}
       {!ratesLoading && allEmpty && (
         <div className="text-center py-8 text-muted-foreground text-sm">
@@ -310,7 +392,7 @@ export function RendirView() {
         </div>
       )}
 
-      {/* Three ranked sections */}
+      {/* ARS sections */}
       {(!allEmpty || ratesLoading) && (
         <>
           <Section
@@ -319,6 +401,8 @@ export function RendirView() {
             items={rendimientos?.plazoFijo ?? []}
             idleArs={idleArs}
             isLoading={ratesLoading}
+            filterable
+            showKnown={showKnown}
           />
           <Section
             title="Billeteras remuneradas"
@@ -326,6 +410,8 @@ export function RendirView() {
             items={rendimientos?.billeteras ?? []}
             idleArs={idleArs}
             isLoading={ratesLoading}
+            filterable
+            showKnown={showKnown}
           />
           <Section
             title="FCI mercado de dinero"
@@ -333,16 +419,51 @@ export function RendirView() {
             items={rendimientos?.fci ?? []}
             idleArs={idleArs}
             isLoading={ratesLoading}
+            filterable
+            showKnown={showKnown}
           />
         </>
       )}
+
+      {/* Letras del Tesoro */}
+      <Section
+        title="LECAPs / Letras del Tesoro"
+        icon={<FileText className="h-4 w-4" />}
+        items={rendimientos?.letras ?? []}
+        idleArs={idleArs}
+        isLoading={ratesLoading}
+        rateLabel="TNA"
+        disclaimer={
+          <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+            TNA anualizada desde la TEM mensual · Fechas de vencimiento en zona horaria Argentina.
+          </p>
+        }
+      />
+
+      {/* Plazo Fijo UVA */}
+      <Section
+        title="Plazo fijo UVA"
+        icon={<BarChart2 className="h-4 w-4" />}
+        items={rendimientos?.pfUva ?? []}
+        idleArs={idleArs}
+        isLoading={ratesLoading}
+        filterable
+        showKnown={showKnown}
+        disclaimer={
+          <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+            El rendimiento total incluye ajuste por inflación (UVA) más la tasa nominal.
+          </p>
+        }
+      />
 
       {/* Dólares section */}
       {(() => {
         const usdFciItems = rendimientos?.usdFci ?? []
         const usdStablecoinItems = rendimientos?.usdStablecoin ?? []
-        const usdAllEmpty = !ratesLoading && usdFciItems.length === 0 && usdStablecoinItems.length === 0
-        const topUsd = usdFciItems[0] ?? usdStablecoinItems[0]
+        const cuentasUsdItems = rendimientos?.cuentasRemuneradasUsd ?? []
+        const criptopesosItems = rendimientos?.criptopesos ?? []
+        const usdAllEmpty = !ratesLoading && usdFciItems.length === 0 && usdStablecoinItems.length === 0 && cuentasUsdItems.length === 0
+        const topUsd = cuentasUsdItems[0] ?? usdFciItems[0] ?? usdStablecoinItems[0]
 
         if (usdAllEmpty) {
           return (
@@ -375,6 +496,19 @@ export function RendirView() {
               </div>
             )}
 
+            {/* Cuentas remuneradas USD */}
+            <Section
+              title="Cuentas remuneradas en USD"
+              icon={<DollarSign className="h-4 w-4" />}
+              items={cuentasUsdItems}
+              idleArs={idleArs}
+              idleAmount={idleUsd}
+              currency="USD"
+              isLoading={ratesLoading}
+              filterable
+              showKnown={showKnown}
+            />
+
             {/* FCI en dólares */}
             <Section
               title="FCI en dólares"
@@ -384,23 +518,45 @@ export function RendirView() {
               idleAmount={idleUsd}
               currency="USD"
               isLoading={ratesLoading}
+              filterable
+              showKnown={showKnown}
             />
 
             {/* Stablecoins */}
             <Section
-              title="Stablecoins (USDT)"
+              title="Stablecoins (USDT · USDC · DAI)"
               icon={<CircleDollarSign className="h-4 w-4" />}
               items={usdStablecoinItems}
               idleArs={idleArs}
               idleAmount={idleUsd}
               currency="USD"
               isLoading={ratesLoading}
+              filterable
+              showKnown={showKnown}
               disclaimer={
                 <p className="text-xs text-muted-foreground leading-relaxed mt-1">
                   Rendimientos de plataformas cripto — implican riesgo de custodia y no están garantizados.
                 </p>
               }
             />
+
+            {/* Criptopesos */}
+            {(criptopesosItems.length > 0 || ratesLoading) && (
+              <Section
+                title="Criptopesos"
+                icon={<Bitcoin className="h-4 w-4" />}
+                items={criptopesosItems}
+                idleArs={idleArs}
+                isLoading={ratesLoading}
+                filterable
+                showKnown={showKnown}
+                disclaimer={
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                    Tokens vinculados al peso argentino en exchanges — riesgo de custodia y no garantizados.
+                  </p>
+                }
+              />
+            )}
           </div>
         )
       })()}
