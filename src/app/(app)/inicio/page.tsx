@@ -17,6 +17,7 @@ import { MoneyFlowSankey } from "@/components/dashboard/money-flow-sankey"
 import { DashboardFiltersProvider, DashboardGlobalFilters } from "@/components/dashboard/dashboard-filters"
 import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
 import { GoalsSummary } from "@/components/dashboard/goals-summary"
+import { RendirNudge } from "@/components/dashboard/rendir-nudge"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -129,6 +130,9 @@ export default async function DashboardPage() {
 
       {/* Goals summary widget */}
       {hasAccounts && <GoalsSummary />}
+
+      {/* Rendir nudge — shows only when idle ARS ≥ $100.000 */}
+      {hasAccounts && <RendirNudge />}
 
       {/* Exchange rates strip */}
       <Suspense fallback={<Skeleton className="h-9 w-full rounded-xl" />}>

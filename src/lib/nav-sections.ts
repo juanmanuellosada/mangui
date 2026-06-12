@@ -15,6 +15,7 @@ import {
   Settings,
   Tag,
   Target,
+  TrendingUp,
   Wallet,
   Zap,
   ArrowLeftRight,
@@ -39,6 +40,7 @@ export const PRIMARY_NAV: NavSection[] = [
   { icon: Zap, label: "Reglas", href: "/reglas" },
   { icon: Wallet, label: "Presupuestos", href: "/presupuestos" },
   { icon: Target, label: "Metas", href: "/metas" },
+  { icon: TrendingUp, label: "Dónde rendir", href: "/rendir" },
 ];
 
 /** Footer / utility items — shown below the divider in the sidebar. */
@@ -61,6 +63,7 @@ export const MORE_SHEET_NAV: NavSection[] = [
   { icon: Zap, label: "Reglas", href: "/reglas" },
   { icon: Wallet, label: "Presupuestos", href: "/presupuestos" },
   { icon: Target, label: "Metas", href: "/metas" },
+  { icon: TrendingUp, label: "Dónde rendir", href: "/rendir" },
   { icon: Bot, label: "IA", href: "/ia" },
   { icon: Plug, label: "Integraciones", href: "/integraciones" },
   { icon: Settings, label: "Ajustes", href: "/ajustes" },
