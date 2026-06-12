@@ -90,7 +90,7 @@ export async function getRendimientos(): Promise<Rendimientos> {
       .map((r) => ({
         nombre: r.entidad,
         tna: r.tnaClientes, // already a decimal fraction
-        logo: r.logo ?? null,
+        logo: r.logo ? r.logo.replace(/^http:\/\//i, "https://") : null,
         enlace: r.enlace ?? null,
       }))
       .sort((a, b) => b.tna - a.tna)

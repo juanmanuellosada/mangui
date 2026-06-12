@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -62,6 +63,26 @@ function monthlyGain(amount: number, tna: number): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+function RateLogo({ logo, nombre }: { logo?: string | null; nombre: string }) {
+  const [errored, setErrored] = useState(false)
+  if (logo && !errored) {
+    return (
+      <img
+        src={logo}
+        alt=""
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="h-7 w-7 rounded-md object-contain bg-white p-0.5 flex-shrink-0"
+      />
+    )
+  }
+  return (
+    <div className="h-7 w-7 rounded-md bg-primary/15 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0 uppercase">
+      {nombre.charAt(0)}
+    </div>
+  )
+}
+
 function SectionSkeleton() {
   return (
     <div className="space-y-2">
@@ -100,6 +121,9 @@ function RateRow({ item, idleArs, rank }: RateRowProps) {
       >
         {rank}
       </div>
+
+      {/* Logo / avatar */}
+      <RateLogo logo={item.logo} nombre={item.nombre} />
 
       {/* Name + nota */}
       <div className="flex-1 min-w-0">
@@ -210,7 +234,10 @@ export function RendirView() {
                 <p className="text-[10px] font-medium opacity-70 uppercase tracking-wide">
                   Mejor plazo fijo
                 </p>
-                <p className="text-xs font-semibold truncate">{topPlazoFijo.nombre.split(" ").slice(0, 3).join(" ")}</p>
+                <div className="flex items-center gap-1.5">
+                  <RateLogo logo={topPlazoFijo.logo} nombre={topPlazoFijo.nombre} />
+                  <p className="text-xs font-semibold truncate">{topPlazoFijo.nombre.split(" ").slice(0, 3).join(" ")}</p>
+                </div>
                 <p className="text-sm font-bold tabular-nums">
                   ~{monthlyGain(idleArs, topPlazoFijo.tna)}/mes
                 </p>
@@ -221,7 +248,10 @@ export function RendirView() {
                 <p className="text-[10px] font-medium opacity-70 uppercase tracking-wide">
                   Mejor billetera
                 </p>
-                <p className="text-xs font-semibold">{topBilletera.nombre}</p>
+                <div className="flex items-center gap-1.5">
+                  <RateLogo logo={topBilletera.logo} nombre={topBilletera.nombre} />
+                  <p className="text-xs font-semibold">{topBilletera.nombre}</p>
+                </div>
                 <p className="text-sm font-bold tabular-nums">
                   ~{monthlyGain(idleArs, topBilletera.tna)}/mes
                 </p>
@@ -232,7 +262,10 @@ export function RendirView() {
                 <p className="text-[10px] font-medium opacity-70 uppercase tracking-wide">
                   Mejor FCI
                 </p>
-                <p className="text-xs font-semibold truncate">{topFci.nombre.replace(/ - Clase [A-Z]$/i, "")}</p>
+                <div className="flex items-center gap-1.5">
+                  <RateLogo logo={topFci.logo} nombre={topFci.nombre} />
+                  <p className="text-xs font-semibold truncate">{topFci.nombre.replace(/ - Clase [A-Z]$/i, "")}</p>
+                </div>
                 <p className="text-sm font-bold tabular-nums">
                   ~{monthlyGain(idleArs, topFci.tna)}/mes
                 </p>
