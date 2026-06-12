@@ -76,14 +76,6 @@ self.addEventListener("notificationclick", (event) => {
 })
 
 // ---------------------------------------------------------------------------
-// Fetch: passthrough — no cachea nada, deja que el navegador resuelva.
-// Requerido para que la PWA sea instalable (el navegador exige un fetch handler).
-// ---------------------------------------------------------------------------
-self.addEventListener("fetch", () => {
-  // Sin intercepción intencional.
-})
-
-// ---------------------------------------------------------------------------
 // Background sync: cuando el navegador detecta que volvió la señal y hay
 // una sync pendiente con el tag "mangui-sync", notificar a todos los clientes
 // para que drenen la cola de movimientos offline.

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  images: {
+    unoptimized: true,
+  },
   async redirects() {
     return [{ source: "/app/:path*", destination: "/:path*", permanent: true }];
   },
