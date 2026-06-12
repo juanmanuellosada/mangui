@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SiteFooter } from "@/components/marketing/site-footer";
 
 export const revalidate = 1800
 
@@ -1065,114 +1066,7 @@ export default async function LandingPage() {
         </section>
       </main>
 
-      {/* ══ FOOTER ═══════════════════════════════════════════ */}
-      <footer className="border-t border-white/10 bg-black/40 backdrop-blur-[2px] py-10">
-        <div className="container mx-auto px-5 max-w-6xl">
-          <div className="grid grid-cols-1 md:grid-cols-[1.8fr_1fr_1fr] gap-8">
-            {/* Brand column */}
-            <div className="flex flex-col gap-4">
-              <Link
-                href="/"
-                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded w-fit"
-              >
-                <BrandLockup size={26} />
-              </Link>
-              <p className="text-xs text-muted-foreground leading-relaxed max-w-[24ch]">
-                Finanzas personales para la realidad argentina.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                © {new Date().getFullYear()} mangui
-              </p>
-            </div>
-
-            {/* Producto */}
-            <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold text-foreground">Producto</p>
-              <ul className="space-y-2">
-                <li>
-                  <Link
-                    href="#funciones"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Funciones
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="#precios"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Precios
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/calculadoras"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Calculadoras
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/comparar"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Comparativas
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/para"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Mangui para vos
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/register"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Crear cuenta
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/login"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Ingresar
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold text-foreground">Legal</p>
-              <ul className="space-y-2">
-                <li>
-                  <Link
-                    href="/privacidad"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Privacidad
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/terminos"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                  >
-                    Términos
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
