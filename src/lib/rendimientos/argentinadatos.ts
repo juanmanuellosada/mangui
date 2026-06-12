@@ -326,14 +326,12 @@ export async function getRendimientos(): Promise<Rendimientos> {
   for (const { wallet, fund } of WALLET_FCI) {
     const tna = fciTnaByFondo.get(fund)
     if (tna === undefined) continue
-    const logo = getLogo(wallet)
-    billeteras.push({
+    const base: RateItem = {
       nombre: wallet,
       tna,
       nota: "vía el fondo donde coloca tu saldo",
-      logo,
-      conocida: true,
-    })
+    }
+    billeteras.push(applyMarca(base))
   }
   billeteras.sort((a, b) => b.tna - a.tna)
 
@@ -456,18 +454,4 @@ export async function getRendimientos(): Promise<Rendimientos> {
 function formatLetrasDate(iso: string): string {
   const d = new Date(iso + "T00:00:00")
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })
-}
-
-const WALLET_LOGOS: Record<string, string> = {
-  "Mercado Pago": "/icons/ar/bancos-billeteras/mercadopago.svg",
-  "Ualá":         "/icons/ar/bancos-billeteras/uala.svg",
-  "Personal Pay": "/icons/ar/bancos-billeteras/personal-pay.svg",
-  "Cocos":        "/icons/ar/bancos-billeteras/cocos.svg",
-  "Prex":         "/icons/ar/bancos-billeteras/prex.svg",
-  "Lemon":        "/icons/ar/bancos-billeteras/lemon.svg",
-  "Claro Pay":    "/icons/ar/bancos-billeteras/claro-pay.svg",
-}
-
-function getLogo(wallet: string): string | null {
-  return WALLET_LOGOS[wallet] ?? null
 }
