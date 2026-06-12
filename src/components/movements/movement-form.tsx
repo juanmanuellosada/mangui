@@ -35,6 +35,7 @@ import { computeInstallmentAmounts } from "@/lib/installments"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { AiFillBar, type AiExtractResult } from "@/components/movements/ai-fill-bar"
 import { usePlan } from "@/lib/use-plan"
+import { useMonthlyAttachmentCount } from "@/hooks/use-monthly-attachment-count"
 import Link from "next/link"
 import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
 import { todayAR } from "@/lib/date-utils"
@@ -161,7 +162,8 @@ export function MovementForm({
 }: MovementFormProps) {
   const today = todayAR()
   const isDemo = useIsDemo()
-  const { isPremium: userIsPremium } = usePlan()
+  const { isPremium: userIsPremium, limits } = usePlan()
+  const { count: monthlyAttachmentCount } = useMonthlyAttachmentCount()
 
   // 3-way mode state (only relevant when initialMode is provided)
   const [mode, setMode] = useState<MovementMode>(initialMode ?? (defaultValues?.type ?? "expense"))
@@ -853,10 +855,86 @@ export function MovementForm({
           </div>
 
           {/* 4.2 — Attachment slots by movement type */}
-          {type === "expense" && (
-            <div className="space-y-3">
-              {userIsPremium ? (
-                <>
+          {(() => {
+            if (!userIsPremium) {
+              const attachLimit = limits.attachments
+              const pendingCount = (pendingFactura ? 1 : 0) + (pendingRecibo ? 1 : 0) + (pendingComprobante ? 1 : 0)
+              const usedThisMonth = monthlyAttachmentCount
+              const totalUsed = usedThisMonth + pendingCount
+              const atCap = totalUsed >= attachLimit
+
+              if (type === "expense") {
+                return (
+                  <div className="space-y-3">
+                    <AttachmentSlot
+                      label="Factura o ticket"
+                      pendingFile={pendingFactura}
+                      existingAttachment={existingFactura}
+                      onSelect={setPendingFactura}
+                      onClearPending={() => setPendingFactura(null)}
+                      onDeleted={onAttachmentDeleted}
+                      disabled={isLoading || isDemo || (!pendingFactura && atCap)}
+                    />
+                    <AttachmentSlot
+                      label="Recibo / comprobante de pago"
+                      pendingFile={pendingRecibo}
+                      existingAttachment={existingRecibo}
+                      onSelect={setPendingRecibo}
+                      onClearPending={() => setPendingRecibo(null)}
+                      onDeleted={onAttachmentDeleted}
+                      disabled={isLoading || isDemo || (!pendingRecibo && atCap)}
+                    />
+                    {atCap ? (
+                      <p className="text-xs text-muted-foreground px-0.5">
+                        Adjuntos: {Math.min(totalUsed, attachLimit)}/{attachLimit} este mes ·{" "}
+                        <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">
+                          pasá a Premium para ilimitados
+                        </Link>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground px-0.5">
+                        {totalUsed}/{attachLimit} este mes
+                      </p>
+                    )}
+                  </div>
+                )
+              }
+
+              if (type === "income") {
+                return (
+                  <div className="space-y-3">
+                    <AttachmentSlot
+                      label="Comprobante"
+                      pendingFile={pendingComprobante}
+                      existingAttachment={existingComprobante}
+                      onSelect={setPendingComprobante}
+                      onClearPending={() => setPendingComprobante(null)}
+                      onDeleted={onAttachmentDeleted}
+                      disabled={isLoading || isDemo || (!pendingComprobante && atCap)}
+                    />
+                    {atCap ? (
+                      <p className="text-xs text-muted-foreground px-0.5">
+                        Adjuntos: {Math.min(totalUsed, attachLimit)}/{attachLimit} este mes ·{" "}
+                        <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">
+                          pasá a Premium para ilimitados
+                        </Link>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground px-0.5">
+                        {totalUsed}/{attachLimit} este mes
+                      </p>
+                    )}
+                  </div>
+                )
+              }
+
+              return null
+            }
+
+            // Premium: unlimited, original behavior
+            if (type === "expense") {
+              return (
+                <div className="space-y-3">
                   <AttachmentSlot
                     label="Factura o ticket"
                     pendingFile={pendingFactura}
@@ -875,33 +953,26 @@ export function MovementForm({
                     onDeleted={onAttachmentDeleted}
                     disabled={isLoading || isDemo}
                   />
-                </>
-              ) : (
-                <div className="flex items-center justify-between rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-                  <span>Adjuntos</span>
-                  <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">Premium</Link>
                 </div>
-              )}
-            </div>
-          )}
-          {type === "income" && (
-            userIsPremium ? (
-              <AttachmentSlot
-                label="Comprobante"
-                pendingFile={pendingComprobante}
-                existingAttachment={existingComprobante}
-                onSelect={setPendingComprobante}
-                onClearPending={() => setPendingComprobante(null)}
-                onDeleted={onAttachmentDeleted}
-                disabled={isLoading || isDemo}
-              />
-            ) : (
-              <div className="flex items-center justify-between rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-                <span>Adjuntos</span>
-                <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">Premium</Link>
-              </div>
-            )
-          )}
+              )
+            }
+
+            if (type === "income") {
+              return (
+                <AttachmentSlot
+                  label="Comprobante"
+                  pendingFile={pendingComprobante}
+                  existingAttachment={existingComprobante}
+                  onSelect={setPendingComprobante}
+                  onClearPending={() => setPendingComprobante(null)}
+                  onDeleted={onAttachmentDeleted}
+                  disabled={isLoading || isDemo}
+                />
+              )
+            }
+
+            return null
+          })()}
 
           {/* Submit */}
           <Button

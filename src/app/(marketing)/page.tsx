@@ -996,10 +996,12 @@ export default async function LandingPage() {
 
                 <ul className="space-y-2.5 flex-1">
                   {[
-                    "1 cuenta",
-                    "1 presupuesto",
-                    "1 meta",
+                    "3 cuentas",
+                    "3 presupuestos",
+                    "3 metas",
                     "3 recurrentes",
+                    "2 reglas automáticas",
+                    "5 adjuntos/mes",
                     "IA hasta 10 consultas/día",
                     "Movimientos ilimitados",
                     "Cuotas y transferencias",

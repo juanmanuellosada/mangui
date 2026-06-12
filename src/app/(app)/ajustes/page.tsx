@@ -22,7 +22,7 @@ import { subscribeToPremium, cancelSubscription } from "@/app/actions/subscripti
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan, PLAN_KEY } from "@/lib/use-plan"
-import { PREMIUM_PRICE_ARS, ANNUAL_PRICE_ARS } from "@/lib/plans"
+import { PREMIUM_PRICE_ARS, ANNUAL_PRICE_ARS, FREE } from "@/lib/plans"
 import type { Tables } from "@/lib/database.types"
 
 type Profile = Tables<"profiles">
@@ -945,13 +945,13 @@ function PlanSection() {
 
   // Free plan
   const usageLimits = [
-    { label: "Cuentas", value: "1/1" },
-    { label: "Presupuestos", value: "1/1" },
-    { label: "Metas", value: "1/1" },
-    { label: "Recurrentes", value: "3/3" },
-    { label: "IA", value: "10/día" },
-    { label: "Reglas automáticas", value: "Premium" },
-    { label: "Adjuntos", value: "Premium" },
+    { label: "Cuentas", value: `${FREE.accounts}` },
+    { label: "Presupuestos", value: `${FREE.budgets}` },
+    { label: "Metas", value: `${FREE.goals}` },
+    { label: "Recurrentes", value: `${FREE.recurring}` },
+    { label: "Reglas", value: `${FREE.rules}` },
+    { label: "Adjuntos", value: `${FREE.attachments}/mes` },
+    { label: "IA", value: `${FREE.aiPerDay}/día` },
     { label: "Export CSV", value: "Premium" },
   ]
 

@@ -7,18 +7,18 @@ export interface PlanLimits {
   goals: number;
   recurring: number;
   rules: number;
-  attachments: boolean;
+  attachments: number;
   exportCsv: boolean;
   aiPerDay: number;
 }
 
 export const FREE: PlanLimits = {
-  accounts: 1,
-  budgets: 1,
-  goals: 1,
+  accounts: 3,
+  budgets: 3,
+  goals: 3,
   recurring: 3,
-  rules: 0,
-  attachments: false,
+  rules: 2,
+  attachments: 5,
   exportCsv: false,
   aiPerDay: 10,
 };
@@ -29,7 +29,7 @@ export const PREMIUM: PlanLimits = {
   goals: Infinity,
   recurring: Infinity,
   rules: Infinity,
-  attachments: true,
+  attachments: Infinity,
   exportCsv: true,
   aiPerDay: Infinity,
 };

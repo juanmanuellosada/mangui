@@ -446,9 +446,7 @@ function RuleFilterBar({
 export function RulesList() {
   const queryClient = useQueryClient()
   const isDemo = useIsDemo()
-  const { isPremium: userIsPremium } = usePlan()
-  // Rules are premium-only (FREE limit = 0)
-  const isPremiumFeature = !userIsPremium
+  const { isPremium: userIsPremium, limits } = usePlan()
 
   const [filters, setFilters] = useState<RuleFilters>(DEFAULT_FILTERS)
   const [showForm, setShowForm] = useState(false)
@@ -460,6 +458,7 @@ export function RulesList() {
   const [bulkPending, setBulkPending] = useState(false)
 
   const { data: rules = [], isLoading: rulesLoading } = useQuery({ queryKey: RULES_KEY, queryFn: fetchRules })
+  const atLimit = !userIsPremium && rules.length >= limits.rules
   const { data: conditions = [], isLoading: condsLoading } = useQuery({ queryKey: RULE_CONDITIONS_KEY, queryFn: fetchConditions })
   const { data: categories = [] } = useQuery({ queryKey: CATEGORIES_KEY, queryFn: fetchCategories })
   const { data: accounts = [] } = useQuery({ queryKey: ACCOUNTS_KEY, queryFn: fetchAccounts })
@@ -554,8 +553,8 @@ export function RulesList() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
 
-      if (!ruleId && isPremiumFeature) {
-        throw new Error("Las reglas automáticas son una función Premium. Mejorá tu plan para crearlas.")
+      if (!ruleId && atLimit) {
+        throw new Error("Alcanzaste el límite del plan Free. Mejorá a Premium para crear más reglas.")
       }
 
       if (ruleId) {
@@ -689,16 +688,16 @@ export function RulesList() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {!isLoading && rules.length > 0 && !ms.selectionMode && !isDemo && !isPremiumFeature && (
+          {!isLoading && rules.length > 0 && !ms.selectionMode && !isDemo && !atLimit && (
             <SelectButton onClick={ms.enter} />
           )}
           {!ms.selectionMode && (
-            isPremiumFeature ? (
+            atLimit ? (
               <Link
                 href="/ajustes#plan"
                 className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
               >
-                Función Premium
+                Mejorá a Premium
               </Link>
             ) : (
               <Button
@@ -764,12 +763,12 @@ export function RulesList() {
                 Cre&#225; tu primera regla para que mangui categorice movimientos autom&#225;ticamente.
               </p>
             </div>
-            {isPremiumFeature ? (
+            {atLimit ? (
               <Link
                 href="/ajustes#plan"
                 className="mt-1 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
               >
-                Función Premium
+                Mejorá a Premium
               </Link>
             ) : (
               <Button type="button" onClick={() => openNewForm()} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="mt-1 h-9 text-sm">

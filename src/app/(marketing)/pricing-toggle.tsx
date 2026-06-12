@@ -18,11 +18,10 @@ const fmt = (n: number) =>
 const PREMIUM_FEATURES = [
   "Todo lo de Free, más:",
   "Cuentas ilimitadas",
-  "Presupuestos ilimitados",
-  "Metas ilimitadas",
+  "Presupuestos y metas ilimitados",
   "Recurrentes ilimitados",
-  "Reglas automáticas",
-  "Adjuntos en movimientos",
+  "Reglas ilimitadas",
+  "Adjuntos ilimitados",
   "Export CSV",
   "IA sin límite diario",
 ]
