@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { QuickAddProvider } from "@/components/quick-add-provider";
 import { DemoBanner } from "@/components/demo-banner";
+import { ShareDraftReader } from "@/components/share-draft-reader";
 
 /**
  * Protected app shell layout.
@@ -43,6 +44,7 @@ export default async function AppLayout({
 
   return (
     <QuickAddProvider>
+      <ShareDraftReader />
       <div className="min-h-screen flex bg-background">
         {/* Desktop sidebar — active state handled client-side via usePathname */}
         <AppSidebar name={name} email={email} avatarUrl={avatarUrl} />

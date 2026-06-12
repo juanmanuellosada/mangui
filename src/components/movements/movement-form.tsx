@@ -128,6 +128,8 @@ interface MovementFormProps {
    * When undefined, no transfer tab is shown (e.g. in edit mode).
    */
   initialMode?: MovementMode
+  /** When provided, the form is pre-filled via handleAiResult on mount (once). */
+  initialAiResult?: AiExtractResult
 }
 
 function _norm(s: string): string {
@@ -155,6 +157,7 @@ export function MovementForm({
   existingAttachments,
   onAttachmentDeleted,
   initialMode,
+  initialAiResult,
 }: MovementFormProps) {
   const today = todayAR()
   const isDemo = useIsDemo()
@@ -209,6 +212,16 @@ export function MovementForm({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
+
+  // Pre-fill from AI result on mount (share target flow)
+  const appliedAiResult = useRef(false)
+  useEffect(() => {
+    if (initialAiResult && !appliedAiResult.current) {
+      appliedAiResult.current = true
+      handleAiResult(initialAiResult)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Account + currency logic (D1) ──────────────────────────────────────────
 

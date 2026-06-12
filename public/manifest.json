@@ -9,6 +9,17 @@
   "orientation": "portrait-primary",
   "lang": "es-AR",
   "categories": ["finance", "productivity"],
+  "share_target": {
+    "action": "/compartir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "image", "accept": ["image/*", "image/jpeg", "image/png", "image/webp"] }]
+    }
+  },
   "icons": [
     {
       "src": "/favicon-16.png",

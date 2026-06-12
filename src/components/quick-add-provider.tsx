@@ -26,6 +26,7 @@ import type { InstallmentFormValues } from "@/components/installments/installmen
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
 import type { Tables } from "@/lib/database.types"
+import type { AiExtractResult } from "@/components/movements/ai-fill-bar"
 import {
   MOVEMENTS_KEY,
   TRANSFERS_KEY,
@@ -52,6 +53,7 @@ export interface QuickAddPreset {
 
 interface QuickAddContextValue {
   open: (mode?: QuickAddMode, defaultType?: "income" | "expense", preset?: QuickAddPreset) => void
+  openWithAiResult: (result: AiExtractResult) => void
 }
 
 const QuickAddContext = React.createContext<QuickAddContextValue | null>(null)
@@ -174,6 +176,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = React.useState<QuickAddMode>("movement")
   const [defaultType, setDefaultType] = React.useState<"income" | "expense">("expense")
   const [preset, setPreset] = React.useState<QuickAddPreset | undefined>(undefined)
+  const [pendingAiResult, setPendingAiResult] = React.useState<AiExtractResult | null>(null)
   const queryClient = useQueryClient()
 
   const { data: accounts = [] } = useQuery({
@@ -193,6 +196,15 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     setMode(m === "transfer" ? "movement" : m)
     setDefaultType(type)
     setPreset(p)
+    setPendingAiResult(null)
+    setIsOpen(true)
+  }, [])
+
+  const openWithAiResult = React.useCallback((result: AiExtractResult) => {
+    setMode("movement")
+    setDefaultType(result.type)
+    setPreset(undefined)
+    setPendingAiResult(result)
     setIsOpen(true)
   }, [])
 
@@ -323,6 +335,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       // If we enqueued offline, don't invalidate (nothing to fetch) — just close the form.
       if (data && typeof data === "object" && "__offline" in data) {
         setIsOpen(false)
+        setPendingAiResult(null)
         return
       }
       queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
@@ -331,6 +344,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
       toast.success("Movimiento creado")
       setIsOpen(false)
+      setPendingAiResult(null)
     },
     onError: (err: Error) => {
       toast.error("Error al crear el movimiento", { description: err.message })
@@ -404,13 +418,16 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const sheetDescription = "Registrá un movimiento o transferencia."
 
   return (
-    <QuickAddContext.Provider value={{ open: openWithTransferTracking }}>
+    <QuickAddContext.Provider value={{ open: openWithTransferTracking, openWithAiResult }}>
       {children}
 
       {/* MangoSheet — movement (3-way toggle: Gasto / Ingreso / Transferencia) */}
       <MangoSheet
         open={isOpen}
-        onOpenChange={setIsOpen}
+        onOpenChange={(v) => {
+          setIsOpen(v)
+          if (!v) setPendingAiResult(null)
+        }}
         title={sheetTitle}
         description={sheetDescription}
       >
@@ -434,6 +451,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           submitLabel="Crear movimiento"
           isCreateMode
           initialMode={movementInitialMode}
+          initialAiResult={pendingAiResult ?? undefined}
         />
       </MangoSheet>
     </QuickAddContext.Provider>
