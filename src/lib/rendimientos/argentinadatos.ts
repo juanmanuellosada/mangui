@@ -17,6 +17,8 @@ export interface Rendimientos {
   plazoFijo: RateItem[]
   billeteras: RateItem[]
   fci: RateItem[]
+  usdFci: RateItem[]
+  usdStablecoin: RateItem[]
   updatedAt: string
 }
 
@@ -37,6 +39,18 @@ interface FciSnapshot {
   vcp: number | null
   ccp: number | null
   patrimonio: number | null
+}
+
+interface StablecoinYield {
+  moneda: string
+  apy: number
+  fecha: string
+  [key: string]: unknown
+}
+
+interface StablecoinEntity {
+  entidad: string
+  rendimientos: StablecoinYield[]
 }
 
 // ── Wallet → FCI fund map ─────────────────────────────────────────────────────
@@ -63,7 +77,7 @@ export async function getRendimientos(): Promise<Rendimientos> {
   const updatedAt = new Date().toISOString()
 
   try {
-    const [plazoFijoRaw, ultimoRaw, penultimoRaw] = await Promise.all([
+    const [plazoFijoRaw, ultimoRaw, penultimoRaw, stablecoinRaw] = await Promise.all([
       fetch("https://api.argentinadatos.com/v1/finanzas/tasas/plazoFijo", {
         headers: { "User-Agent": BROWSER_UA },
         next: { revalidate: 21600 },
@@ -82,6 +96,12 @@ export async function getRendimientos(): Promise<Rendimientos> {
           next: { revalidate: 21600 },
         },
       ).then((r) => (r.ok ? (r.json() as Promise<FciSnapshot[]>) : [])),
+      fetch("https://api.argentinadatos.com/v1/finanzas/rendimientos", {
+        headers: { "User-Agent": BROWSER_UA },
+        next: { revalidate: 21600 },
+      })
+        .then((r) => (r.ok ? (r.json() as Promise<StablecoinEntity[]>) : []))
+        .catch(() => [] as StablecoinEntity[]),
     ])
 
     // ── Plazo fijo ────────────────────────────────────────────────────────────
@@ -147,6 +167,69 @@ export async function getRendimientos(): Promise<Rendimientos> {
       nota: "estimado",
     }))
 
+    // ── USD FCI (dollar money-market funds) ──────────────────────────────────
+    const usdFciWithTna: Array<{ fondo: string; tna: number }> = []
+
+    for (const ultimo of ultimoRaw as FciSnapshot[]) {
+      if (!ultimo.fondo || !ultimo.fecha || !(ultimo.vcp! > 0)) continue
+
+      // Keep only dollar-denominated funds (opposite of the ARS filter)
+      if (!/d[oó]lar/i.test(ultimo.fondo)) continue
+
+      const penultimo = penultimoByFondo.get(ultimo.fondo)
+      if (!penultimo || !penultimo.fecha || !(penultimo.vcp! > 0)) continue
+
+      const daysBetween =
+        (new Date(ultimo.fecha).getTime() -
+          new Date(penultimo.fecha).getTime()) /
+        86400000
+      if (daysBetween <= 0) continue
+
+      const dailyReturn = (ultimo.vcp! / penultimo.vcp! - 1) / daysBetween
+      const tna = dailyReturn * 365
+
+      // Sane filter: 0%–30% TNA (USD yields are low)
+      if (tna <= 0 || tna >= 0.3) continue
+
+      usdFciWithTna.push({ fondo: ultimo.fondo, tna })
+    }
+
+    usdFciWithTna.sort((a, b) => b.tna - a.tna)
+
+    const usdFci: RateItem[] = usdFciWithTna.slice(0, 6).map(({ fondo, tna }) => ({
+      nombre: fondo,
+      tna,
+      nota: "estimado · en dólares",
+    }))
+
+    // ── USD Stablecoin (USDT yields) ──────────────────────────────────────────
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const usdStablecoin: RateItem[] = []
+    for (const entity of stablecoinRaw as StablecoinEntity[]) {
+      const validUsdtEntries = (entity.rendimientos ?? []).filter(
+        (r) =>
+          r.moneda === "USDT" &&
+          r.fecha &&
+          new Date(r.fecha) >= thirtyDaysAgo &&
+          r.apy > 0,
+      )
+      if (validUsdtEntries.length === 0) continue
+
+      const bestApy = Math.max(...validUsdtEntries.map((r) => r.apy))
+      const tna = bestApy / 100 // apy is a percent, convert to decimal
+
+      usdStablecoin.push({
+        nombre:
+          entity.entidad.charAt(0).toUpperCase() + entity.entidad.slice(1),
+        tna,
+        nota: "stablecoin USDT · cripto",
+      })
+    }
+    usdStablecoin.sort((a, b) => b.tna - a.tna)
+    const topUsdStablecoin = usdStablecoin.slice(0, 8)
+
     // ── Billeteras (wallet → FCI map) ─────────────────────────────────────────
     // Build a lookup from all computed tna entries (not just top 8)
     const fciTnaByFondo = new Map<string, number>()
@@ -166,9 +249,9 @@ export async function getRendimientos(): Promise<Rendimientos> {
     }
     billeteras.sort((a, b) => b.tna - a.tna)
 
-    return { plazoFijo, billeteras, fci, updatedAt }
+    return { plazoFijo, billeteras, fci, usdFci, usdStablecoin: topUsdStablecoin, updatedAt }
   } catch {
     // On any upstream failure, return empty arrays gracefully
-    return { plazoFijo: [], billeteras: [], fci: [], updatedAt }
+    return { plazoFijo: [], billeteras: [], fci: [], usdFci: [], usdStablecoin: [], updatedAt }
   }
 }

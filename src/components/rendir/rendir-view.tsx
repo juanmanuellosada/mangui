@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency, cn } from "@/lib/utils"
 import type { AccountBalance } from "@/lib/accounts"
 import type { Rendimientos, RateItem } from "@/lib/rendimientos/argentinadatos"
-import { TrendingUp, Building2, Smartphone, CircleDollarSign } from "lucide-react"
+import { TrendingUp, Building2, Smartphone, CircleDollarSign, DollarSign } from "lucide-react"
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
@@ -47,6 +47,18 @@ function computeIdleArs(balances: AccountBalance[]): number {
     .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
 }
 
+function computeIdleUsd(balances: AccountBalance[]): number {
+  return balances
+    .filter(
+      (b) =>
+        !b.is_hidden &&
+        b.currency === "USD" &&
+        b.account_type != null &&
+        LIQUID_TYPES.has(b.account_type),
+    )
+    .reduce((sum, b) => sum + (b.current_balance ?? 0), 0)
+}
+
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
 function formatPct(tna: number): string {
@@ -57,8 +69,8 @@ function formatPct(tna: number): string {
   }) + "%"
 }
 
-function monthlyGain(amount: number, tna: number): string {
-  return formatCurrency(amount * tna / 12, "ARS")
+function monthlyGain(amount: number, tna: number, currency: "ARS" | "USD" = "ARS"): string {
+  return formatCurrency(amount * tna / 12, currency)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -104,10 +116,13 @@ interface RateRowProps {
   item: RateItem
   idleArs: number
   rank: number
+  idleAmount?: number
+  currency?: "ARS" | "USD"
 }
 
-function RateRow({ item, idleArs, rank }: RateRowProps) {
-  const showProjection = idleArs >= 1
+function RateRow({ item, idleArs, rank, idleAmount, currency = "ARS" }: RateRowProps) {
+  const effectiveIdle = idleAmount !== undefined ? idleAmount : idleArs
+  const showProjection = effectiveIdle >= 1
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-accent/30 transition-colors">
       {/* Rank badge */}
@@ -140,7 +155,7 @@ function RateRow({ item, idleArs, rank }: RateRowProps) {
         </p>
         {showProjection && (
           <p className="text-xs text-muted-foreground tabular-nums">
-            ~{monthlyGain(idleArs, item.tna)}/mes
+            ~{monthlyGain(effectiveIdle, item.tna, currency)}/mes
           </p>
         )}
       </div>
@@ -154,9 +169,12 @@ interface SectionProps {
   items: RateItem[]
   idleArs: number
   isLoading: boolean
+  idleAmount?: number
+  currency?: "ARS" | "USD"
+  disclaimer?: React.ReactNode
 }
 
-function Section({ title, icon, items, idleArs, isLoading }: SectionProps) {
+function Section({ title, icon, items, idleArs, isLoading, idleAmount, currency, disclaimer }: SectionProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -170,10 +188,18 @@ function Section({ title, icon, items, idleArs, isLoading }: SectionProps) {
       ) : (
         <div className="space-y-2">
           {items.map((item, i) => (
-            <RateRow key={item.nombre} item={item} idleArs={idleArs} rank={i + 1} />
+            <RateRow
+              key={item.nombre}
+              item={item}
+              idleArs={idleArs}
+              rank={i + 1}
+              idleAmount={idleAmount}
+              currency={currency}
+            />
           ))}
         </div>
       )}
+      {disclaimer}
     </div>
   )
 }
@@ -193,7 +219,9 @@ export function RendirView() {
   })
 
   const idleArs = balances ? computeIdleArs(balances) : 0
+  const idleUsd = balances ? computeIdleUsd(balances) : 0
   const hasIdleArs = idleArs >= 1
+  const hasIdleUsd = idleUsd >= 1
 
   const allEmpty =
     rendimientos &&
@@ -308,6 +336,74 @@ export function RendirView() {
           />
         </>
       )}
+
+      {/* Dólares section */}
+      {(() => {
+        const usdFciItems = rendimientos?.usdFci ?? []
+        const usdStablecoinItems = rendimientos?.usdStablecoin ?? []
+        const usdAllEmpty = !ratesLoading && usdFciItems.length === 0 && usdStablecoinItems.length === 0
+        const topUsd = usdFciItems[0] ?? usdStablecoinItems[0]
+
+        if (usdAllEmpty) {
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground"><DollarSign className="h-4 w-4" /></span>
+                <h2 className="text-sm font-semibold">Rendir en dólares</h2>
+              </div>
+              <p className="text-sm text-muted-foreground py-2">No pudimos cargar las tasas en dólares ahora.</p>
+            </div>
+          )
+        }
+
+        return (
+          <div className="space-y-5">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground"><DollarSign className="h-4 w-4" /></span>
+              <h2 className="text-sm font-semibold">Rendir en dólares</h2>
+            </div>
+
+            {/* Personalization line */}
+            {!balancesLoading && hasIdleUsd && topUsd && (
+              <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 space-y-0.5">
+                <p className="text-sm font-medium">
+                  Tenés ~{formatCurrency(idleUsd, "USD")} quietos
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Con {topUsd.nombre.split(" ").slice(0, 3).join(" ")} podrías ganar ~{monthlyGain(idleUsd, topUsd.tna, "USD")}/mes
+                </p>
+              </div>
+            )}
+
+            {/* FCI en dólares */}
+            <Section
+              title="FCI en dólares"
+              icon={<TrendingUp className="h-4 w-4" />}
+              items={usdFciItems}
+              idleArs={idleArs}
+              idleAmount={idleUsd}
+              currency="USD"
+              isLoading={ratesLoading}
+            />
+
+            {/* Stablecoins */}
+            <Section
+              title="Stablecoins (USDT)"
+              icon={<CircleDollarSign className="h-4 w-4" />}
+              items={usdStablecoinItems}
+              idleArs={idleArs}
+              idleAmount={idleUsd}
+              currency="USD"
+              isLoading={ratesLoading}
+              disclaimer={
+                <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                  Rendimientos de plataformas cripto — implican riesgo de custodia y no están garantizados.
+                </p>
+              }
+            />
+          </div>
+        )
+      })()}
 
       {/* Disclaimer */}
       <p className="text-xs text-muted-foreground text-center leading-relaxed pb-2">
