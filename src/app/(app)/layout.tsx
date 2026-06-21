@@ -54,7 +54,7 @@ export default async function AppLayout({
           {/* Demo read-only banner — only shown for the demo account */}
           <DemoBanner />
 
-          <main className="flex-1 pb-24 lg:pb-8 px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+          <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+6rem)] lg:pb-8">
             <div className="mx-auto w-full max-w-7xl">
               {children}
             </div>
