@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ar.com.mangui.www.twa",
+      "sha256_cert_fingerprints": [
+        "EC:BF:44:9E:84:AE:7B:1A:79:C8:84:EC:6A:F7:43:E1:2A:4C:C5:83:66:A2:A7:4D:96:5F:FF:20:C9:5C:77:73"
+      ]
+    }
+  }
+]
