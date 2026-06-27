@@ -200,6 +200,7 @@ export const EMOJI_CATALOG: EmojiCategory[] = [
       { emoji: "🧢", keywords: ["gorra", "cap", "hat"] },
       { emoji: "👜", keywords: ["cartera", "bolso", "bag", "handbag"] },
       { emoji: "🎒", keywords: ["mochila", "backpack", "escuela"] },
+      { emoji: "🎓", keywords: ["graduacion", "gorro", "universidad", "estudio", "educacion", "titulo", "escuela"] },
       { emoji: "💍", keywords: ["anillo", "joya", "ring", "compromiso"] },
       { emoji: "👒", keywords: ["sombrero", "moda", "estilo"] },
       { emoji: "🧣", keywords: ["bufanda", "scarf", "invierno"] },
