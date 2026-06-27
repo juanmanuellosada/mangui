@@ -180,6 +180,7 @@ export const EMOJI_CATALOG: EmojiCategory[] = [
       { emoji: "🪛", keywords: ["destornillador", "herramienta", "arreglo"] },
       { emoji: "🔧", keywords: ["llave inglesa", "herramienta", "wrench", "arreglo"] },
       { emoji: "🔨", keywords: ["martillo", "herramienta", "hammer", "construccion"] },
+      { emoji: "🪏", keywords: ["pala", "shovel", "jardin", "herramienta", "construccion", "ahorro"] },
     ],
   },
   {
