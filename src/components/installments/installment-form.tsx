@@ -16,6 +16,7 @@ import { fetchDolarRates } from "@/lib/rates/dolar"
 import { computeInstallmentAmounts } from "@/lib/installments"
 import { DOLLAR_TYPE_LABELS, type DollarType } from "@/lib/movements"
 import type { Account } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
 
 type Category = Tables<"categories">
@@ -269,11 +270,7 @@ export function InstallmentForm({
               ...expenseCategories.map((c) => ({
                 value: c.id,
                 label: c.name,
-                leading: c.icon ? (
-                  <span className="text-base leading-none select-none" aria-hidden>
-                    {c.icon}
-                  </span>
-                ) : undefined,
+                leading: c.icon ? <CategoryIconChip icon={c.icon} /> : undefined,
               })),
             ]}
             placeholder="Categoría"

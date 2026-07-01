@@ -27,6 +27,7 @@ import {
 } from "@/lib/rules"
 import { ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 import { formatCurrency } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -469,11 +470,7 @@ export function RuleForm({
               ...categories.map((c) => ({
                 value: c.id,
                 label: c.name,
-                leading: c.icon ? (
-                  <span className="text-base leading-none select-none" aria-hidden>
-                    {c.icon}
-                  </span>
-                ) : undefined,
+                leading: c.icon ? <CategoryIconChip icon={c.icon} /> : undefined,
               })),
             ]}
             placeholder="– Sin cambio –"

@@ -28,6 +28,7 @@ import {
   type GoalPeriod,
 } from "@/lib/goals"
 import { AccountIconChip } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 import { createClient } from "@/lib/supabase/client"
 import type { Tables } from "@/lib/database.types"
 import { useIsDemo } from "@/lib/use-is-demo"
@@ -440,11 +441,7 @@ export function GoalForm({
   const categoryOptions = categories.map((c) => ({
     value: c.id,
     label: c.name,
-    leading: c.icon ? (
-      <span className="text-base leading-none select-none" aria-hidden>
-        {c.icon}
-      </span>
-    ) : undefined,
+    leading: c.icon ? <CategoryIconChip icon={c.icon} /> : undefined,
   }))
 
   const expenseCategoryOptions = categories
@@ -452,11 +449,7 @@ export function GoalForm({
     .map((c) => ({
       value: c.id,
       label: c.name,
-      leading: c.icon ? (
-        <span className="text-base leading-none select-none" aria-hidden>
-          {c.icon}
-        </span>
-      ) : undefined,
+      leading: c.icon ? <CategoryIconChip icon={c.icon} /> : undefined,
     }))
 
   // Auto-calculated target for reduction (shown inline)

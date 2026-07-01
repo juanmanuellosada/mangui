@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { AccountIconChip, type Account } from "@/lib/accounts"
+import { CategoryIconChip } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
 import { DOLLAR_TYPE_LABELS, type DollarType } from "@/lib/movements"
 import {
@@ -707,11 +708,7 @@ export function MovementForm({
                 ...filteredCategories.map((c) => ({
                   value: c.id,
                   label: c.name,
-                  leading: c.icon ? (
-                    <span className="text-base leading-none select-none" aria-hidden>
-                      {c.icon}
-                    </span>
-                  ) : undefined,
+                  leading: c.icon ? <CategoryIconChip icon={c.icon} /> : undefined,
                 })),
               ]}
               placeholder="Categoría"
