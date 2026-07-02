@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { assertCronAuth } from "@/lib/cron-auth"
 import { sendPushToUser } from "@/lib/notifications"
 import { nextCloseDate, computeDueDate, toDateString } from "@/lib/cards"
 import { format, addDays, parseISO, startOfDay, isAfter } from "date-fns"
@@ -21,14 +22,8 @@ import { format, addDays, parseISO, startOfDay, isAfter } from "date-fns"
  */
 export async function GET(req: NextRequest) {
   // Auth check
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization")
-    const provided = authHeader?.replace("Bearer ", "")
-    if (provided !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-  }
+  const authError = assertCronAuth(req)
+  if (authError) return authError
 
   const admin = createAdminClient()
   if (!admin) {

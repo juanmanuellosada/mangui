@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { fetchIpcSeries, IPC_SERIES_ID } from "@/lib/inflation/indec"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { assertCronAuth } from "@/lib/cron-auth"
 
 /**
  * GET /api/cron/refresh-inflation
@@ -8,14 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
  * inflation_index (idempotente). Protegido por CRON_SECRET (Authorization: Bearer).
  */
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization")
-    const provided = authHeader?.replace("Bearer ", "")
-    if (provided !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-  }
+  const authError = assertCronAuth(req)
+  if (authError) return authError
 
   const supabase = createAdminClient()
   if (!supabase) {

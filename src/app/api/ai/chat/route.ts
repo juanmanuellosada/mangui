@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isPremium, FREE } from "@/lib/plans"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
 import {
   streamText,
@@ -76,48 +76,25 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("ai_unlimited, plan, payment_exempt, mp_subscription_status")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  const premiumByPlan = isPremium({
-    payment_exempt: profile?.payment_exempt ?? null,
-    mp_subscription_status: profile?.mp_subscription_status ?? null,
-  })
-  const isUnlimited = premiumByPlan || profile?.ai_unlimited === true
-  const dailyLimit = isUnlimited ? Infinity : FREE.aiPerDay
-
-  if (dailyLimit !== Infinity) {
-    const todayStart = `${todayAR()}T00:00:00.000Z`
-    const { count, error: countError } = await admin
-      .from("ai_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", todayStart)
-
-    if (countError) {
-      return NextResponse.json(
-        { error: "Error al verificar uso diario." },
-        { status: 500 }
-      )
-    }
-
-    if ((count ?? 0) >= dailyLimit) {
-      return NextResponse.json(
-        {
-          error: "rate_limited",
-          message: "Alcanzaste el límite diario.",
-        },
-        { status: 429 }
-      )
-    }
+  let allowed: boolean
+  try {
+    ;({ allowed } = await checkAiRateLimit(admin, user.id, MODEL_ID))
+  } catch {
+    return NextResponse.json(
+      { error: "Error al verificar uso diario." },
+      { status: 500 }
+    )
   }
 
-  // 5. Log usage: 1 row per user message (fire-and-forget, before AI call so
-  //    it counts even if the model errors mid-stream)
-  admin.from("ai_usage").insert({ user_id: user.id, model: MODEL_ID }).then()
+  if (!allowed) {
+    return NextResponse.json(
+      {
+        error: "rate_limited",
+        message: "Alcanzaste el límite diario.",
+      },
+      { status: 429 }
+    )
+  }
 
   // 6. Build model
   const google = createGoogleGenerativeAI({ apiKey })

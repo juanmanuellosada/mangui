@@ -1402,6 +1402,10 @@ export type Database = {
       }
     }
     Functions: {
+      check_and_increment_ai_usage: {
+        Args: { p_user_id: string; p_limit: number | null; p_model: string | null }
+        Returns: boolean
+      }
       seed_default_categories: {
         Args: { p_user_id: string }
         Returns: undefined

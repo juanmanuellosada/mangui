@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { assertCronAuth } from "@/lib/cron-auth"
 import type { Enums } from "@/lib/database.types"
 import { todayAR } from "@/lib/date-utils"
 
@@ -17,14 +18,8 @@ type RateType = Enums<"rate_type">
  */
 export async function GET(req: NextRequest) {
   // --- Auth check ---
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization")
-    const provided = authHeader?.replace("Bearer ", "")
-    if (provided !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-  }
+  const authError = assertCronAuth(req)
+  if (authError) return authError
 
   // --- Admin client ---
   const supabase = createAdminClient()

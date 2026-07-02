@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { assertCronAuth } from "@/lib/cron-auth"
 import { advanceNextRun, computeNextRun } from "@/lib/recurring"
 import { parseISO, startOfDay, isAfter, isBefore, isEqual } from "date-fns"
 import type { Tables } from "@/lib/database.types"
@@ -20,14 +21,8 @@ const BATCH_SIZE = 50
  */
 export async function GET(req: NextRequest) {
   // --- Auth check ---
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization")
-    const provided = authHeader?.replace("Bearer ", "")
-    if (provided !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-  }
+  const authError = assertCronAuth(req)
+  if (authError) return authError
 
   // --- Admin client ---
   const supabase = createAdminClient()
