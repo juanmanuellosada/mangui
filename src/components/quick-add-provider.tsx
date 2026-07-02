@@ -40,6 +40,7 @@ import { fetchDolarRates } from "@/lib/rates/dolar"
 import { enqueueMovement } from "@/lib/offline-queue"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
+import { LEARNING_KEY, recordCategoryLearning } from "@/lib/category-learning"
 
 export type QuickAddMode = "movement" | "transfer"
 
@@ -302,7 +303,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
 
       return null
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       // If we enqueued offline, don't invalidate (nothing to fetch) — just close the form.
       if (data && typeof data === "object" && "__offline" in data) {
         setIsOpen(false)
@@ -313,6 +314,13 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
       queryClient.invalidateQueries({ queryKey: INSTALLMENTS_KEY })
+      // Fire-and-forget: register this note→categoría association for future
+      // auto-fill suggestions. Covers both the single-movement and the cuotas
+      // (installment purchase) branches above, since both share this onSuccess.
+      if (variables.values.category_id && variables.values.note) {
+        recordCategoryLearning(createClient(), variables.values.note, variables.values.category_id)
+        queryClient.invalidateQueries({ queryKey: LEARNING_KEY })
+      }
       toast.success("Movimiento creado")
       setIsOpen(false)
       setPendingAiResult(null)

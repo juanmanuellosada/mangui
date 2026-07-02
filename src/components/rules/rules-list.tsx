@@ -49,6 +49,7 @@ import {
   type SuggestedRule,
 } from "@/lib/rules"
 import { RuleForm, type RuleFormValues, type ConditionDraft } from "./rule-form"
+import { LearnedCategories } from "./learned-categories"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
 import { QueryError } from "@/components/ui/query-error"
@@ -798,6 +799,9 @@ export function RulesList() {
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
         <p>Las reglas se aplican al crear un movimiento. La de mayor prioridad gana. No sobreescriben tu elecci&#243;n manual.</p>
       </div>
+
+      {/* Lo que Mangui aprendió (categorización implícita) */}
+      <LearnedCategories />
 
       {/* Form dialog */}
       <Dialog

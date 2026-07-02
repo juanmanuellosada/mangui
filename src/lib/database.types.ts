@@ -288,6 +288,44 @@ export type Database = {
           },
         ]
       }
+      category_learning: {
+        Row: {
+          category_id: string
+          created_at: string
+          hit_count: number
+          id: string
+          last_used_at: string
+          merchant_key: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          hit_count?: number
+          id?: string
+          last_used_at?: string
+          merchant_key: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          hit_count?: number
+          id?: string
+          last_used_at?: string
+          merchant_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_learning_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           account_ids: string[]
@@ -1402,6 +1440,10 @@ export type Database = {
       }
     }
     Functions: {
+      bump_category_learning: {
+        Args: { p_merchant_key: string; p_category_id: string }
+        Returns: undefined
+      }
       check_and_increment_ai_usage: {
         Args: { p_user_id: string; p_limit: number | null; p_model: string | null }
         Returns: boolean

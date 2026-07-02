@@ -263,7 +263,7 @@ type Movement = {
  * Normalize a note for keyword extraction:
  * lowercase, strip numbers/symbols, collapse whitespace, trim.
  */
-function normalizeNote(note: string): string {
+export function normalizeNote(note: string): string {
   return note
     .toLowerCase()
     .replace(/\d+([.,]\d+)*/g, " ") // strip numeric amounts
@@ -277,7 +277,7 @@ function normalizeNote(note: string): string {
  * For short notes (≤3 words), use the full note.
  * For longer notes, use the first word that's ≥3 chars.
  */
-function extractKeyword(normalized: string): string | null {
+export function extractKeyword(normalized: string): string | null {
   const words = normalized.split(" ").filter((w) => w.length >= 3)
   if (words.length === 0) return null
   // Prefer the full note if short

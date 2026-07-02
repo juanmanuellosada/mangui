@@ -5,7 +5,7 @@ import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useQuery } from "@tanstack/react-query"
-import { Zap, X, ArrowLeftRight } from "lucide-react"
+import { Zap, X, ArrowLeftRight, Brain } from "lucide-react"
 import { parseISO } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,8 @@ import {
   type AutoRule,
   type AutoRuleCondition,
 } from "@/lib/rules"
+import { suggestLearnedCategory } from "@/lib/category-learning"
+import { useCategoryLearning } from "@/lib/hooks/use-category-learning"
 import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
@@ -301,6 +303,7 @@ export function MovementForm({
 
   // ── Rule auto-fill (create mode only) ─────────────────────────────────────
   const [ruleHint, setRuleHint] = useState<{ ruleName: string; ruleId: string } | null>(null)
+  const [learnHint, setLearnHint] = useState<{ categoryId: string } | null>(null)
   const userSetCategory = useRef(false)
 
   const { data: activeRules = [] } = useQuery({
@@ -317,6 +320,8 @@ export function MovementForm({
     staleTime: 60_000,
   })
 
+  const { data: learnings = [] } = useCategoryLearning()
+
   const condsByRule = useMemo(() => {
     const map = new Map<string, AutoRuleCondition[]>()
     for (const c of ruleConditions) {
@@ -327,7 +332,7 @@ export function MovementForm({
   }, [ruleConditions])
 
   useEffect(() => {
-    if (!isCreateMode || activeRules.length === 0) return
+    if (!isCreateMode) return
     if (userSetCategory.current) return
 
     const draft = {
@@ -336,7 +341,7 @@ export function MovementForm({
       account_id: accountId ?? undefined,
       type,
     }
-    const matched = findMatchingRule(activeRules, condsByRule, draft)
+    const matched = activeRules.length > 0 ? findMatchingRule(activeRules, condsByRule, draft) : null
     if (matched) {
       if (matched.action_category_id) {
         setValue("category_id", matched.action_category_id)
@@ -348,8 +353,22 @@ export function MovementForm({
     } else {
       setRuleHint((prev) => (prev ? null : prev))
     }
+
+    // Sugerencia aprendida: solo cuando la regla no fijó ya una categoría
+    // (la regla explícita del usuario siempre gana sobre lo aprendido).
+    if (!matched?.action_category_id) {
+      const learnedId = suggestLearnedCategory(learnings, note ?? null, type, categories)
+      if (learnedId) {
+        setValue("category_id", learnedId)
+        setLearnHint({ categoryId: learnedId })
+      } else {
+        setLearnHint((prev) => (prev ? null : prev))
+      }
+    } else {
+      setLearnHint((prev) => (prev ? null : prev))
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note, amount, accountId, type, isCreateMode, activeRules.length, condsByRule])
+  }, [note, amount, accountId, type, isCreateMode, activeRules, condsByRule, learnings, categories])
 
   // ── Live rate preview for cross-currency ─────────────────────────────────
   const [liveRate, setLiveRate] = useState<number | null>(null)
@@ -459,7 +478,12 @@ export function MovementForm({
     // category (match within the right type)
     if (r.categoria) {
       const catId = matchByName(r.categoria, categories.filter((c) => c.type === r.type))
-      if (catId) setValue("category_id", catId, { shouldValidate: false })
+      if (catId) {
+        setValue("category_id", catId, { shouldValidate: false })
+        // Mark as user-set so the rule/learned auto-fill effect doesn't overwrite
+        // the AI's suggestion (it otherwise runs on every note/amount/account change).
+        userSetCategory.current = true
+      }
     }
     // date + is_future
     if (r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) {
@@ -694,6 +718,12 @@ export function MovementForm({
                   Auto
                 </span>
               )}
+              {!ruleHint && learnHint && !userSetCategory.current && (
+                <span className="text-[10px] text-primary font-medium flex items-center gap-0.5">
+                  <Brain className="h-2.5 w-2.5" />
+                  Auto
+                </span>
+              )}
             </div>
             {/* 2.2 — showSearch on category */}
             <MangoSelect
@@ -701,6 +731,7 @@ export function MovementForm({
               onChange={(v) => {
                 userSetCategory.current = true
                 setRuleHint(null)
+                setLearnHint(null)
                 setValue("category_id", v === "none" ? null : v)
               }}
               options={[
@@ -713,7 +744,9 @@ export function MovementForm({
               ]}
               placeholder="Categoría"
               showSearch
-              triggerClassName={cn(ruleHint && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20")}
+              triggerClassName={cn(
+                (ruleHint || learnHint) && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20"
+              )}
             />
           </div>
 
@@ -729,6 +762,28 @@ export function MovementForm({
                 onClick={() => {
                   userSetCategory.current = true
                   setRuleHint(null)
+                  setValue("category_id", null)
+                }}
+                className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                aria-label="Descartar sugerencia"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Learned category hint chip (only when no rule already suggested one) */}
+          {!ruleHint && learnHint && !userSetCategory.current && (
+            <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2">
+              <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="text-xs text-primary flex-1">
+                Aprendido de tus cargas
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  userSetCategory.current = true
+                  setLearnHint(null)
                   setValue("category_id", null)
                 }}
                 className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"

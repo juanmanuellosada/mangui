@@ -74,6 +74,7 @@ import {
   type MovementsFilter,
   type MovementsFilterType,
 } from "@/lib/movements"
+import { LEARNING_KEY, recordCategoryLearning } from "@/lib/category-learning"
 import {
   format,
   isToday,
@@ -947,10 +948,20 @@ export function EditMovementDialog({
       }
       toast.error("Error al actualizar", { description: err.message })
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
+      // A category correction on edit is the strongest learning signal —
+      // only record when the category actually changed (not on every save).
+      if (
+        variables.values.category_id &&
+        variables.values.category_id !== movement.category_id &&
+        variables.values.note
+      ) {
+        recordCategoryLearning(createClient(), variables.values.note, variables.values.category_id)
+        queryClient.invalidateQueries({ queryKey: LEARNING_KEY })
+      }
       toast.success("Movimiento actualizado")
       onOpenChange(false)
     },
