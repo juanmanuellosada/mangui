@@ -9,11 +9,9 @@ import { cn } from "@/lib/utils"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { RatesStrip } from "@/components/rates-strip"
 import { BalanceCards } from "@/components/dashboard/balance-cards"
-import { CategoryPieChart } from "@/components/dashboard/category-pie-chart"
-import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart"
 import { RecentMovements } from "@/components/dashboard/recent-movements"
 import { AccountsPreview } from "@/components/dashboard/accounts-preview"
-import { MoneyFlowSankey } from "@/components/dashboard/money-flow-sankey"
+import { DashboardCharts } from "@/components/dashboard/dashboard-charts"
 import { DashboardFiltersProvider, DashboardGlobalFilters } from "@/components/dashboard/dashboard-filters"
 import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
 import { GoalsSummary } from "@/components/dashboard/goals-summary"
@@ -117,11 +115,7 @@ export default async function DashboardPage() {
       {hasAccounts && (
         <DashboardFiltersProvider>
           <DashboardGlobalFilters />
-          <MoneyFlowSankey />
-          <div className="grid md:grid-cols-2 gap-4 [&>*]:min-w-0">
-            <CategoryPieChart />
-            <IncomeExpenseChart />
-          </div>
+          <DashboardCharts />
         </DashboardFiltersProvider>
       )}
 

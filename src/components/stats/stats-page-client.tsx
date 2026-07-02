@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -14,7 +15,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { fetchAllMovements } from "@/lib/movements"
 import {
   filterMovements,
   summaryTotals,
@@ -25,10 +25,7 @@ import {
 } from "@/lib/stats"
 import { StatsFilterBar, defaultFilter, filterToStatsFilter, type FilterState, type DateRangeValue } from "./stats-filter-bar"
 import { SummaryCards } from "./summary-cards"
-import { CategoryDistributionChart } from "./category-distribution-chart"
-import { IncomeExpenseSeriesChart } from "./income-expense-series-chart"
 import { WeekdayPatternBars } from "./weekday-pattern-chart"
-import { CompareTab } from "./compare-tab"
 import { TopMovements } from "./top-movements"
 import { HealthKpis } from "./health-kpis"
 import { ExpenseByAccount } from "./expense-by-account"
@@ -48,6 +45,33 @@ type Category = Tables<"categories">
 type Budget = Tables<"budgets">
 type RecurringTransaction = Tables<"recurring_transactions">
 
+// ── Code-split chart components (recharts/evilcharts-backed, heavy) ────────────
+
+const CategoryDistributionChart = dynamic(
+  () => import("./category-distribution-chart").then((m) => m.CategoryDistributionChart),
+  { ssr: false, loading: () => <Skeleton className="h-[420px] rounded-2xl" /> }
+)
+const IncomeExpenseSeriesChart = dynamic(
+  () => import("./income-expense-series-chart").then((m) => m.IncomeExpenseSeriesChart),
+  { ssr: false, loading: () => <Skeleton className="h-72 rounded-2xl" /> }
+)
+const CompareTab = dynamic(
+  () => import("./compare-tab").then((m) => m.CompareTab),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+          <Skeleton className="h-24 rounded-2xl" />
+        </div>
+        <Skeleton className="h-56 rounded-2xl" />
+      </div>
+    ),
+  }
+)
+
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
 async function fetchBudgets(): Promise<Budget[]> {
@@ -66,6 +90,68 @@ async function fetchRecurring(): Promise<RecurringTransaction[]> {
     .from("recurring_transactions")
     .select("*")
     .eq("status", "active")
+  if (error) throw error
+  return data
+}
+
+/**
+ * Upper bound (in months) applied when the active date selection is
+ * unbounded on the lower end (e.g. the "Todo el historial" preset, or the
+ * "antes de" operator with no start date). Explicit before this cap, we
+ * fetch exactly the range the user asked for — this only kicks in when
+ * there is no lower bound to query by. Documented here per design decision;
+ * see stats-page-client return contract for the rationale.
+ */
+const STATS_UNBOUNDED_MONTHS_CAP = 24
+
+/**
+ * incomeExpenseSeries() always renders the last 6 months relative to today,
+ * independent of the active filter/tab — so the fetch range must always
+ * cover at least that window too.
+ */
+const SERIES_MONTHS_BACK = 6
+
+/**
+ * Compute the [from, to] date range to fetch from Supabase, as the union of:
+ * - the "Resumen" tab's active date filter,
+ * - the "Comparar" tab's period 1 and period 2,
+ * - the fixed last-6-months window used by the income/expense series chart.
+ * Any unbounded side is clamped to STATS_UNBOUNDED_MONTHS_CAP months back /
+ * today, so the query never falls back to "select everything".
+ */
+function computeStatsRange(
+  filterDate: DateRangeValue,
+  period1: DateRangeValue,
+  period2: DateRangeValue
+): { from: string; to: string } {
+  const today = new Date()
+  const todayStr = format(today, "yyyy-MM-dd")
+  const capFrom = format(startOfMonth(subMonths(today, STATS_UNBOUNDED_MONTHS_CAP - 1)), "yyyy-MM-dd")
+  const seriesFrom = format(startOfMonth(subMonths(today, SERIES_MONTHS_BACK - 1)), "yyyy-MM-dd")
+
+  const froms = [filterDate.from, period1.from, period2.from, seriesFrom].map((f) => f ?? capFrom)
+  const tos = [filterDate.to, period1.to, period2.to, todayStr].map((t) => t ?? todayStr)
+
+  return {
+    from: froms.reduce((min, f) => (f < min ? f : min)),
+    to: tos.reduce((max, t) => (t > max ? t : max)),
+  }
+}
+
+/**
+ * fetchMovementsInRange — server-side date-bounded movements query for the
+ * Estadísticas page. Replaces the previous unbounded "fetch everything"
+ * query; only date is filtered server-side, account/category/type filters
+ * stay client-side (unchanged) via filterMovements().
+ */
+async function fetchMovementsInRange(from: string, to: string): Promise<Movement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .gte("date", from)
+    .lte("date", to)
+    .order("date", { ascending: false })
   if (error) throw error
   return data
 }
@@ -203,14 +289,19 @@ export function StatsPageClient() {
     return { operator: "between", preset: "last_month", from: r.from, to: r.to, label: r.label }
   })
 
+  const statsRange = useMemo(
+    () => computeStatsRange(filter.date, period1, period2),
+    [filter.date, period1, period2]
+  )
+
   const {
     data: movements = [],
     isLoading: loadingMovements,
     isError: movementsError,
     refetch: refetchMovements,
   } = useQuery({
-    queryKey: ["movements", "stats-all"],
-    queryFn: fetchAllMovements,
+    queryKey: ["movements", "stats-range", statsRange.from, statsRange.to],
+    queryFn: () => fetchMovementsInRange(statsRange.from, statsRange.to),
   })
 
   const { data: categories = [], isLoading: loadingCategories } = useCategories({ orderBy: "name" })

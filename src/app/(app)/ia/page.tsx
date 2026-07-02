@@ -1,5 +1,5 @@
 import { getAiUsageToday } from "@/app/actions/ai-settings"
-import { AiChat } from "@/components/ai/ai-chat"
+import { AiChatLoader } from "@/components/ai/ai-chat-loader"
 import { FREE } from "@/lib/plans"
 
 export default async function IAPage() {
@@ -10,6 +10,6 @@ export default async function IAPage() {
   const limit = usage.ok ? usage.limit : FREE.aiPerDay
 
   return (
-    <AiChat initialUsed={used} initialUnlimited={unlimited} initialLimit={limit} />
+    <AiChatLoader initialUsed={used} initialUnlimited={unlimited} initialLimit={limit} />
   )
 }
