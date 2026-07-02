@@ -32,6 +32,7 @@ import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/compo
 import { bulkDelete } from "@/lib/bulk-delete"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -254,6 +255,20 @@ function MovementDetailSheet({
           <DetailRow label="Cuenta" value={account?.name ?? "—"} />
           <DetailRow label="Fecha" value={format(parseISO(movement.date), "d 'de' MMMM yyyy", { locale: es })} />
           {movement.note ? <DetailRow label="Nota" value={movement.note} /> : null}
+          {movement.tags.length > 0 ? (
+            <DetailRow
+              label="Tags"
+              value={
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {movement.tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="h-5 text-[11px]">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              }
+            />
+          ) : null}
           {isCuota && movement.installment_number !== null && movement.installment_total !== null ? (
             <DetailRow label="Cuota" value={`${movement.installment_number}/${movement.installment_total}`} />
           ) : null}
@@ -318,6 +333,8 @@ function TransferDetailSheet({
 
 // ── Movement row ──────────────────────────────────────────────────────────────
 
+const MAX_ROW_TAGS = 3
+
 function MovementRow({
   movement,
   account,
@@ -325,6 +342,7 @@ function MovementRow({
   onEdit,
   onDelete,
   onOpenDetail,
+  onTagClick,
   selectionMode,
   isSelected,
   onToggle,
@@ -336,6 +354,7 @@ function MovementRow({
   onEdit: (m: Movement) => void
   onDelete: (m: Movement) => void
   onOpenDetail?: (m: Movement) => void
+  onTagClick?: (tag: string) => void
   selectionMode?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
@@ -406,6 +425,25 @@ function MovementRow({
           {account?.name ?? "—"}
           {movement.note ? ` · ${movement.note}` : ""}
         </p>
+        {movement.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {movement.tags.slice(0, MAX_ROW_TAGS).map((tag) => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className={cn("h-4 text-[10px] px-1.5", onTagClick && "cursor-pointer hover:bg-muted")}
+                onClick={onTagClick ? (e) => { e.stopPropagation(); onTagClick(tag) } : undefined}
+              >
+                {tag}
+              </Badge>
+            ))}
+            {movement.tags.length > MAX_ROW_TAGS && (
+              <span className="text-[10px] text-muted-foreground self-center">
+                +{movement.tags.length - MAX_ROW_TAGS}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Amount */}
@@ -892,6 +930,7 @@ export function EditMovementDialog({
           category_id: values.category_id,
           date: values.date,
           note: values.note || null,
+          tags: values.tags,
           is_future,
           dollar_type: isCross ? values.dollar_type : null,
           converted_amount: isCross ? values.converted_amount : null,
@@ -1245,7 +1284,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Buscar por nota, categoría o cuenta…"
+            placeholder="Buscar por nota, tag, categoría o cuenta…"
             value={filter.search}
             onChange={(e) => onChange({ ...filter, search: e.target.value })}
             className={cn(
@@ -1842,6 +1881,7 @@ export function MovementsList() {
                           onEdit={setEditingMovement}
                           onDelete={setDeletingMovement}
                           onOpenDetail={setDetailMovement}
+                          onTagClick={(tag) => setFilter((f) => ({ ...f, search: tag }))}
                           selectionMode={ms.selectionMode}
                           isSelected={ms.isSelected(fi.item.id)}
                           onToggle={ms.toggle}

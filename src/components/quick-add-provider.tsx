@@ -68,7 +68,8 @@ export function useQuickAdd(): QuickAddContextValue {
 
 async function createInstallmentPurchaseWithMovements(
   values: InstallmentFormValues,
-  accounts: Account[]
+  accounts: Account[],
+  tags: string[] = []
 ): Promise<void> {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -140,6 +141,7 @@ async function createInstallmentPurchaseWithMovements(
       dollar_type: isCross ? values.dollar_type : null,
       converted_amount: convertedAmount,
       note: null,
+      tags,
     })
   }
 
@@ -242,7 +244,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           currency: values.original_currency,
           dollar_type: isCross ? values.dollar_type : null,
         }
-        await createInstallmentPurchaseWithMovements(installmentValues, accounts)
+        await createInstallmentPurchaseWithMovements(installmentValues, accounts, values.tags)
         return null
       }
 
@@ -259,6 +261,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         category_id: values.category_id,
         date: values.date,
         note: values.note || null,
+        tags: values.tags,
         is_future,
         dollar_type: isCross ? values.dollar_type : null,
         converted_amount: isCross ? values.converted_amount : null,

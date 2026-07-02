@@ -111,7 +111,9 @@ export async function fetchMovements(
       .filter((c) => c.name.toLowerCase().includes(term.toLowerCase()))
       .map((c) => c.id)
 
-    const orParts: string[] = [`note.ilike.%${escaped}%`]
+    // tags.cs.{"term"} matches only an exact tag (PostgREST arrays don't support
+    // ilike) — so tag search is exact while note search stays partial/ilike.
+    const orParts: string[] = [`note.ilike.%${escaped}%`, `tags.cs.{"${escaped}"}`]
     if (matchAccIds.length > 0) {
       orParts.push(`account_id.in.(${matchAccIds.join(",")})`)
     }

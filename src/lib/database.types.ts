@@ -815,6 +815,7 @@ export type Database = {
           note: string | null
           original_currency: Database["public"]["Enums"]["currency"]
           recurring_id: string | null
+          tags: string[]
           type: Database["public"]["Enums"]["movement_type"]
           updated_at: string
           user_id: string
@@ -836,6 +837,7 @@ export type Database = {
           note?: string | null
           original_currency: Database["public"]["Enums"]["currency"]
           recurring_id?: string | null
+          tags?: string[]
           type: Database["public"]["Enums"]["movement_type"]
           updated_at?: string
           user_id: string
@@ -857,6 +859,7 @@ export type Database = {
           note?: string | null
           original_currency?: Database["public"]["Enums"]["currency"]
           recurring_id?: string | null
+          tags?: string[]
           type?: Database["public"]["Enums"]["movement_type"]
           updated_at?: string
           user_id?: string

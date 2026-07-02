@@ -15,6 +15,7 @@ import { MangoSelect } from "@/components/ui/mango-select"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { AttachmentSlot } from "@/components/ui/attachment-slot"
+import { TagsInput } from "@/components/ui/tags-input"
 import { TransferForm, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
@@ -76,6 +77,7 @@ export type MovementFormValues = {
   category_id: string | null
   date: string
   note: string
+  tags: string[]
   is_future: boolean
   // cross-currency
   dollar_type: DollarType | null
@@ -92,6 +94,7 @@ const movementSchema = z.object({
   category_id: z.string().nullable(),
   date: z.string().min(1, "Seleccioná una fecha"),
   note: z.string(),
+  tags: z.array(z.string()),
   is_future: z.boolean(),
   dollar_type: z
     .enum(["oficial", "blue", "mep", "ccl", "tarjeta"])
@@ -188,6 +191,7 @@ export function MovementForm({
       category_id: null,
       date: today,
       note: "",
+      tags: [],
       is_future: false,
       dollar_type: null,
       converted_amount: null,
@@ -203,6 +207,7 @@ export function MovementForm({
   const dollarType = watch("dollar_type")
   const convertedAmount = watch("converted_amount")
   const note = watch("note")
+  const tags = watch("tags")
   const categoryId = watch("category_id")
   const dateStr = watch("date")
   const cuotas = watch("cuotas")
@@ -906,6 +911,18 @@ export function MovementForm({
             />
           </div>
 
+          {/* Tags libres */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground font-medium">
+              Tags (opcional)
+            </Label>
+            <TagsInput
+              value={tags}
+              onChange={(v) => setValue("tags", v, { shouldValidate: false })}
+              placeholder="Ej: viaje, cumpleaños… (Enter para agregar)"
+            />
+          </div>
+
           {/* 4.2 — Attachment slots by movement type */}
           {(() => {
             if (!userIsPremium) {
@@ -1066,6 +1083,7 @@ export function movementToFormValues(
     category_id: movement.category_id,
     date: movement.date,
     note: movement.note ?? "",
+    tags: movement.tags ?? [],
     is_future: movement.is_future,
     dollar_type: (movement.dollar_type as DollarType | null) ?? null,
     converted_amount: movement.converted_amount ?? null,
