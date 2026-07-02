@@ -45,7 +45,7 @@ export default function TerminosPage() {
               constituye asesoramiento financiero ni de inversión.
             </p>
             <p>
-              El servicio se brinda "tal como está". Hacemos nuestro mejor
+              El servicio se brinda &quot;tal como está&quot;. Hacemos nuestro mejor
               esfuerzo para mantenerlo disponible y actualizado, pero no podemos
               garantizar disponibilidad ininterrumpida ni exactitud absoluta de
               las cotizaciones o datos externos que procesamos.

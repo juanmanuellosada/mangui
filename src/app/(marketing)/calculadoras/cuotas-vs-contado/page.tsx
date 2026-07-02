@@ -79,7 +79,7 @@ export default function CuotasVsContadoPage() {
           Cuando pagás cuotas fijas en pesos, cada cuota cuesta nominalmente lo mismo, pero en términos reales vale menos porque el peso pierde poder adquisitivo con la inflación. Esta calculadora descuenta cada cuota futura por la inflación esperada y suma todos esos valores para obtener el <strong className="text-foreground">valor presente</strong> — es decir, cuánto te cuestan las cuotas en pesos de hoy.
         </p>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Si ese valor presente es menor que el precio al contado, conviene financiar: la inflación "licuó" parte del recargo. Si es mayor, el contado sigue siendo más barato aunque los bancos ofrezcan "sin interés".
+          Si ese valor presente es menor que el precio al contado, conviene financiar: la inflación &quot;licuó&quot; parte del recargo. Si es mayor, el contado sigue siendo más barato aunque los bancos ofrezcan &quot;sin interés&quot;.
         </p>
         <p className="text-muted-foreground text-sm leading-relaxed">
           La <strong className="text-foreground">inflación de indiferencia</strong> es el número clave: la tasa mensual a partir de la cual da exactamente lo mismo pagar en cuotas o al contado. Si creés que la inflación va a superar ese umbral, financiar es la decisión racional.

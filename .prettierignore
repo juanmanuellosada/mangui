@@ -1,0 +1,6 @@
+node_modules
+.next
+public/icons
+*.min.*
+package-lock.json
+supabase/migrations

@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { PostHogProvider } from "@/components/analytics/posthog-provider";
 
 const iaWriterQuattro = localFont({
   src: [
@@ -101,7 +103,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <PostHogProvider>
+          <Providers>{children}</Providers>
+        </PostHogProvider>
+        <Analytics />
       </body>
     </html>
   );

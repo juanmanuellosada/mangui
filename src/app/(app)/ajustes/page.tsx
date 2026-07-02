@@ -425,7 +425,7 @@ function PreferencesSection({ prefs }: { prefs: UserPreferences | null }) {
             aria-invalid={!!errors.manual_rate}
           />
           <p className="text-xs text-muted-foreground">
-            Se usará este valor cuando selecciones "Manual" como tipo de cambio en movimientos.
+            Se usará este valor cuando selecciones &quot;Manual&quot; como tipo de cambio en movimientos.
           </p>
         </div>
       )}

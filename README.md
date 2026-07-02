@@ -79,19 +79,23 @@ src/
     utils.ts          → cn() helper
   middleware.ts       → Next.js middleware (auth guard)
 supabase/
-  migrations/         → Migraciones SQL (pendientes)
+  migrations/         → Migraciones SQL (44 aplicadas)
 ```
 
 ---
 
 ## Estado del proyecto
 
-**Foundation scaffold** — la base está lista pero no hay funcionalidad implementada aún. Próximos pasos:
+**En producción** en [www.mangui.com.ar](https://www.mangui.com.ar), con app en Google Play vía TWA. Funcionalidad implementada:
 
-1. Diseño del esquema de base de datos (usuarios, cuentas, transacciones, categorías).
-2. Flujo de autenticación completo (login/register con Supabase Auth).
-3. CRUD de transacciones y cuentas.
-4. Dashboard con datos reales.
+- Auth completo (Supabase Auth, login/registro/recuperación).
+- Movimientos, cuentas, tarjetas con cuotas, transferencias.
+- Recurrentes automáticos y reglas de categorización.
+- Presupuestos por categoría y metas de ahorro.
+- Estadísticas y dashboard con datos reales.
+- IA (Manguito, sobre Gemini) para quick-add y chat.
+- PWA instalable con soporte offline y notificaciones push.
+- Multimoneda ARS/USD, inflación INDEC, sección "dónde rendir" y cobros con MercadoPago.
 
 ---
 

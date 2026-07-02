@@ -181,7 +181,7 @@ export default async function LandingPage() {
                 </div>
 
                 <p className="text-xs leading-relaxed" style={{ color: "rgba(240,244,238,0.45)" }}>
-                  "Ver demo" abre una cuenta de ejemplo, solo lectura. Sin registro.
+                  &quot;Ver demo&quot; abre una cuenta de ejemplo, solo lectura. Sin registro.
                 </p>
 
                 <Link
@@ -569,7 +569,7 @@ export default async function LandingPage() {
                     Manguito conoce tus gastos, tus cuentas y tu historial. Preguntale en español, sin formularios, sin categorías.
                   </p>
                   <p>
-                    También cargás gastos hablando: "gasté 3500 en el kiosco" y listo.
+                    También cargás gastos hablando: &quot;gasté 3500 en el kiosco&quot; y listo.
                   </p>
                   <p>
                     O sacale una foto al ticket: Manguito lee el comprobante y completa el movimiento solo.
@@ -1066,7 +1066,7 @@ export default async function LandingPage() {
               </Link>
             </div>
             <p className="text-xs text-white/30">
-              "Ver demo" abre una cuenta de ejemplo, solo lectura.
+              &quot;Ver demo&quot; abre una cuenta de ejemplo, solo lectura.
             </p>
           </div>
         </section>

@@ -710,6 +710,19 @@ function CardBlock({
     })
   }, [cycle, account.id, openQuickAdd])
 
+  // Unified list: all expense movements sorted by date ascending.
+  // Hook must run unconditionally (before the early return below), so it
+  // tolerates a missing cycle by falling back to an empty array.
+  const allCycleMovements = useMemo(
+    () =>
+      cycle
+        ? [...cycle.movements].sort((a, b) =>
+            (a as Movement).date.localeCompare((b as Movement).date)
+          )
+        : [],
+    [cycle]
+  )
+
   if (!cycle) return null
 
   const isPaid = cycle.statement?.status === "pagado"
@@ -719,15 +732,6 @@ function CardBlock({
   const dueDate = cycle.dueDate ? parseISO(cycle.dueDate) : null
   const isOverdue = !isPaid && dueDate != null && isBefore(dueDate, today)
   const isDueToday = !isPaid && !isOverdue && dueDate != null && toDateString(dueDate) === toDateString(today)
-
-  // Unified list: all expense movements sorted by date ascending
-  const allCycleMovements = useMemo(
-    () =>
-      [...cycle.movements].sort((a, b) =>
-        (a as Movement).date.localeCompare((b as Movement).date)
-      ),
-    [cycle.movements]
-  )
 
   const { ARS: arsTotal, USD: usdTotal } = cycle.totalsByCurrency
   const isMultiCurrency = !isPaid && arsTotal > 0 && usdTotal > 0
