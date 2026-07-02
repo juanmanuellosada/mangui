@@ -4,12 +4,14 @@ import { useEffect, useState, useCallback } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
+  AlertTriangle,
   Bell,
   BellOff,
   CreditCard,
   Download,
   Mail,
   Monitor,
+  PiggyBank,
   Repeat,
   Smartphone,
   Trash2,
@@ -271,7 +273,7 @@ export default function IntegracionesPage() {
 
   // ── Update preferences mutation ──────────────────────────────────────────
   const updatePrefsMutation = useMutation({
-    mutationFn: async (update: Partial<Pick<UserPreferences, "push_enabled" | "card_reminder_enabled" | "notify_hour" | "weekly_insights_enabled">>) => {
+    mutationFn: async (update: Partial<Pick<UserPreferences, "push_enabled" | "card_reminder_enabled" | "notify_hour" | "weekly_insights_enabled" | "budget_alerts_enabled" | "unusual_charge_enabled">>) => {
       const supabase = createClient()
       const {
         data: { user },
@@ -475,6 +477,56 @@ export default function IntegracionesPage() {
               }}
               disabled={!isSubscribed || !prefs?.push_enabled}
               aria-label="Transacciones recurrentes"
+            />
+          )}
+        </Row>
+
+        {/* Budget alerts */}
+        <Row
+          icon={PiggyBank}
+          iconClassName={isSubscribed && prefs?.push_enabled ? "bg-primary/10" : "bg-muted"}
+          label="Alertas de presupuesto"
+          description="Avisos cuando llegás al 80% de un presupuesto o te lo pasás"
+        >
+          {loadingPrefs ? (
+            <Skeleton className="h-5 w-9 rounded-full" />
+          ) : (
+            <Switch
+              checked={(prefs?.budget_alerts_enabled ?? false) && isSubscribed && (prefs?.push_enabled ?? false)}
+              onCheckedChange={(v) => {
+                if (!isSubscribed || !prefs?.push_enabled) {
+                  toast.info("Primero activá las notificaciones push")
+                  return
+                }
+                updatePrefsMutation.mutate({ budget_alerts_enabled: v })
+              }}
+              disabled={!isSubscribed || !prefs?.push_enabled || updatePrefsMutation.isPending || isDemo}
+              aria-label="Alertas de presupuesto"
+            />
+          )}
+        </Row>
+
+        {/* Unusual charge alerts */}
+        <Row
+          icon={AlertTriangle}
+          iconClassName={isSubscribed && prefs?.push_enabled ? "bg-primary/10" : "bg-muted"}
+          label="Cargos inusuales"
+          description="Aviso cuando un gasto es mucho más alto que tu promedio en esa categoría"
+        >
+          {loadingPrefs ? (
+            <Skeleton className="h-5 w-9 rounded-full" />
+          ) : (
+            <Switch
+              checked={(prefs?.unusual_charge_enabled ?? false) && isSubscribed && (prefs?.push_enabled ?? false)}
+              onCheckedChange={(v) => {
+                if (!isSubscribed || !prefs?.push_enabled) {
+                  toast.info("Primero activá las notificaciones push")
+                  return
+                }
+                updatePrefsMutation.mutate({ unusual_charge_enabled: v })
+              }}
+              disabled={!isSubscribed || !prefs?.push_enabled || updatePrefsMutation.isPending || isDemo}
+              aria-label="Cargos inusuales"
             />
           )}
         </Row>

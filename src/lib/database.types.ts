@@ -1372,6 +1372,7 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          budget_alerts_enabled: boolean
           card_reminder_enabled: boolean
           created_at: string
           default_currency: Database["public"]["Enums"]["currency"]
@@ -1381,11 +1382,13 @@ export type Database = {
           push_enabled: boolean
           rate_type: Database["public"]["Enums"]["rate_type"]
           theme: Database["public"]["Enums"]["ui_theme"]
+          unusual_charge_enabled: boolean
           updated_at: string
           user_id: string
           weekly_insights_enabled: boolean
         }
         Insert: {
+          budget_alerts_enabled?: boolean
           card_reminder_enabled?: boolean
           created_at?: string
           default_currency?: Database["public"]["Enums"]["currency"]
@@ -1395,11 +1398,13 @@ export type Database = {
           push_enabled?: boolean
           rate_type?: Database["public"]["Enums"]["rate_type"]
           theme?: Database["public"]["Enums"]["ui_theme"]
+          unusual_charge_enabled?: boolean
           updated_at?: string
           user_id: string
           weekly_insights_enabled?: boolean
         }
         Update: {
+          budget_alerts_enabled?: boolean
           card_reminder_enabled?: boolean
           created_at?: string
           default_currency?: Database["public"]["Enums"]["currency"]
@@ -1409,6 +1414,7 @@ export type Database = {
           push_enabled?: boolean
           rate_type?: Database["public"]["Enums"]["rate_type"]
           theme?: Database["public"]["Enums"]["ui_theme"]
+          unusual_charge_enabled?: boolean
           updated_at?: string
           user_id?: string
           weekly_insights_enabled?: boolean

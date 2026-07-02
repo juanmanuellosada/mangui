@@ -83,3 +83,37 @@ export async function sendPushToUser(
 
   return successCount
 }
+
+/**
+ * Try to log the event_key first (idempotency guard).
+ * If the insert succeeds → run the send callback.
+ * If the insert fails with a duplicate error → already sent, skip.
+ * Returns true if the notification was sent.
+ */
+export async function tryNotify(
+  admin: AdminClient,
+  userId: string,
+  eventKey: string,
+  send: () => Promise<void>
+): Promise<boolean> {
+  const { error } = await admin.from("notification_log").insert({
+    user_id: userId,
+    event_key: eventKey,
+    channel: "push",
+  })
+
+  if (error) {
+    // Duplicate key → already sent
+    if (error.code === "23505") return false
+    console.error("[notifications] tryNotify log insert error:", error)
+    return false
+  }
+
+  try {
+    await send()
+    return true
+  } catch (err) {
+    console.error("[notifications] tryNotify send error for", eventKey, err)
+    return false
+  }
+}
