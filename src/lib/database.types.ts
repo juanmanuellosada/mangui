@@ -983,6 +983,7 @@ export type Database = {
           mp_preapproval_id: string | null
           mp_subscription_status: string | null
           name: string | null
+          onboarding_completed_at: string | null
           payment_exempt: boolean
           payment_exempt_reason: string | null
           plan: string
@@ -999,6 +1000,7 @@ export type Database = {
           mp_preapproval_id?: string | null
           mp_subscription_status?: string | null
           name?: string | null
+          onboarding_completed_at?: string | null
           payment_exempt?: boolean
           payment_exempt_reason?: string | null
           plan?: string
@@ -1015,6 +1017,7 @@ export type Database = {
           mp_preapproval_id?: string | null
           mp_subscription_status?: string | null
           name?: string | null
+          onboarding_completed_at?: string | null
           payment_exempt?: boolean
           payment_exempt_reason?: string | null
           plan?: string

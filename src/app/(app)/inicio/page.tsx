@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Wallet } from "lucide-react"
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [{ count }, prefsResult, rates] = await Promise.all([
+  const [{ count }, prefsResult, profileResult, rates] = await Promise.all([
     supabase
       .from("accounts")
       .select("id", { count: "exact", head: true })
@@ -37,8 +38,18 @@ export default async function DashboardPage() {
       .select("default_currency, rate_type, manual_rate")
       .eq("user_id", user!.id)
       .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("onboarding_completed_at, is_demo")
+      .eq("id", user!.id)
+      .maybeSingle(),
     fetchDolarRates(),
   ])
+
+  const profile = profileResult.data
+  if (!profile?.onboarding_completed_at && !profile?.is_demo) {
+    redirect("/bienvenida")
+  }
 
   const hasAccounts = (count ?? 0) > 0
   const firstName =
