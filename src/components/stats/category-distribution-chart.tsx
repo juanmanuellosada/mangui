@@ -10,6 +10,7 @@ import {
 } from "@/components/evilcharts/charts/pie-chart"
 import type { ChartConfig } from "@/components/evilcharts/ui/chart"
 import { formatCurrency, cn } from "@/lib/utils"
+import { renderCategoryIcon } from "@/lib/categories"
 import type { CategoryDistributionItem } from "@/lib/stats"
 import Link from "next/link"
 
@@ -55,7 +56,7 @@ export function CategoryDistributionChart({ items, type, currency = "ARS" }: Cat
       const emoji = item.icon || null
       cfg[item.name] = {
         label: item.name,
-        ...(emoji ? { icon: () => <span className="text-sm leading-none select-none">{emoji}</span> } : {}),
+        ...(emoji ? { icon: () => renderCategoryIcon(item.icon, { size: "h-3.5 w-3.5", className: "text-sm" }) } : {}),
         colors: {
           light: [COLORS_LIGHT[idx % COLORS_LIGHT.length]],
           dark: [COLORS_DARK[idx % COLORS_DARK.length]],

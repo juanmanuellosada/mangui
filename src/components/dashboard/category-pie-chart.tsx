@@ -12,6 +12,7 @@ import {
   Legend,
 } from "@/components/evilcharts/charts/pie-chart"
 import type { ChartConfig } from "@/components/evilcharts/ui/chart"
+import { renderCategoryIcon } from "@/lib/categories"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
 import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
@@ -121,7 +122,7 @@ export function CategoryPieChart() {
       rows.push({ name, value: Math.round(value * 100) / 100 })
       cfg[name] = {
         label: name,
-        ...(emoji ? { icon: () => <span className="text-sm leading-none select-none">{emoji}</span> } : {}),
+        ...(emoji ? { icon: () => renderCategoryIcon(emoji, { size: "h-3.5 w-3.5", className: "text-sm" }) } : {}),
         colors: {
           light: [CATEGORY_COLORS_LIGHT[idx % CATEGORY_COLORS_LIGHT.length]],
           dark: [CATEGORY_COLORS_DARK[idx % CATEGORY_COLORS_DARK.length]],
