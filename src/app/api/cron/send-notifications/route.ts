@@ -31,7 +31,7 @@ type MovementRow = Pick<
  * Sends deduped push notifications for:
  *  1. Card close reminder (48hs, with projected amount) + due reminder (3 días) — if card_reminder_enabled
  *  2. Pending recurring_occurrences with scheduled_date ≤ today
- *  3. Budget alerts at 80% usage / exceeded — if budget_alerts_enabled
+ *  3. Budget alerts at configurable threshold (default 80%) usage / exceeded — if budget_alerts_enabled
  *  4. Unusual charge vs. category history — if unusual_charge_enabled
  *
  * Dedup: UNIQUE(user_id, event_key) on notification_log. If insert succeeds →
@@ -203,7 +203,7 @@ export async function GET(req: NextRequest) {
       console.error("[send-notifications] recurring occurrences error for user", userId, err)
     }
 
-    // ── 3. Budget alerts (80% / excedido) ────────────────────────────────
+    // ── 3. Budget alerts (umbral configurable, default 80% / excedido) ────
     if (prefs.budget_alerts_enabled) {
       try {
         const { data: budgets } = await admin
@@ -229,7 +229,9 @@ export async function GET(req: NextRequest) {
           const body =
             progress.status === "exceeded"
               ? `Te pasaste del presupuesto ${budget.name} (${formatCurrency(progress.spent, budget.currency)} de ${formatCurrency(progress.limit, budget.currency)}).`
-              : `Vas al ${Math.round(progress.percent)}% de tu presupuesto ${budget.name}.`
+              : `Vas al ${Math.round(progress.percent)}% de tu presupuesto ${budget.name}${
+                  budget.alert_threshold !== 80 ? ` (avisamos desde el ${budget.alert_threshold}%)` : ""
+                }.`
 
           const sent = await tryNotify(admin, userId, eventKey, async () => {
             await sendPushToUser(admin, userId, { title, body, url: "/presupuestos" })

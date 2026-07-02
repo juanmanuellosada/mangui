@@ -559,6 +559,14 @@ function BudgetCard({
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
               {periodLabel(budget.period)}
             </span>
+            {budget.alert_threshold !== 80 && (
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                title="Umbral de alerta configurado"
+              >
+                Aviso {budget.alert_threshold}%
+              </span>
+            )}
             {isPaused && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 Pausado
@@ -656,6 +664,13 @@ function BudgetCard({
             </div>
           </div>
 
+          {/* Sobrante acumulado del período anterior (rollover) */}
+          {progress.carry > 0 && (
+            <p className="text-[10px] text-success text-right tabular-nums">
+              incluye {formatCurrency(progress.carry, budget.currency)} de sobrante
+            </p>
+          )}
+
           {/* Window label using activeBudgetWindow */}
           <p className="text-[10px] text-muted-foreground tabular-nums">
             {windowLabelFromBudget(budget)}
@@ -716,6 +731,8 @@ function CreateBudgetDialog({
           category_ids: values.category_ids,
           account_ids: values.account_ids,
           is_recurring: values.is_recurring,
+          rollover_enabled: values.rollover_enabled,
+          alert_threshold: values.alert_threshold,
           start_date: values.start_date,
           end_date: values.end_date || null,
           status: "active",
@@ -814,6 +831,8 @@ function EditBudgetDialog({
           category_ids: values.category_ids,
           account_ids: values.account_ids,
           is_recurring: values.is_recurring,
+          rollover_enabled: values.rollover_enabled,
+          alert_threshold: values.alert_threshold,
           start_date: values.start_date,
           end_date: values.end_date || null,
           updated_at: new Date().toISOString(),

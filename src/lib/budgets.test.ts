@@ -24,6 +24,8 @@ function makeBudget(overrides: Partial<Budget>): Budget {
     category_ids: [],
     account_ids: [],
     icon: null,
+    rollover_enabled: false,
+    alert_threshold: 80,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -384,6 +386,108 @@ describe("computeBudgetProgress", () => {
       const movements = [makeMovement({ amount: 1500 })]
       const p = computeBudgetProgress(globalBudget, movements as any, ref)
       expect(p.status).toBe("exceeded")
+    })
+  })
+
+  describe("alert_threshold (custom)", () => {
+    it("custom threshold of 50 → near at 50%", () => {
+      const budget = makeBudget({
+        is_recurring: true,
+        period: "monthly",
+        start_date: "2026-01-01",
+        limit_amount: 1000,
+        alert_threshold: 50,
+      })
+      const movements = [makeMovement({ amount: 500 })] // 50%
+      const p = computeBudgetProgress(budget, movements as any, ref)
+      expect(p.status).toBe("near")
+    })
+
+    it("custom threshold of 50 → on_track just below it", () => {
+      const budget = makeBudget({
+        is_recurring: true,
+        period: "monthly",
+        start_date: "2026-01-01",
+        limit_amount: 1000,
+        alert_threshold: 50,
+      })
+      const movements = [makeMovement({ amount: 490 })] // 49%
+      const p = computeBudgetProgress(budget, movements as any, ref)
+      expect(p.status).toBe("on_track")
+    })
+  })
+
+  describe("rollover", () => {
+    it("carries positive leftover from the previous period into effectiveLimit", () => {
+      const budget = makeBudget({
+        is_recurring: true,
+        period: "monthly",
+        start_date: "2026-01-01",
+        limit_amount: 1000,
+        rollover_enabled: true,
+      })
+      // Previous window (May 2026): spent 600 of 1000 → leftover 400 carries in.
+      const movements: MovementRow[] = [
+        makeMovement({ amount: 600, date: "2026-05-15" }),
+        makeMovement({ amount: 300, date: "2026-06-15" }),
+      ]
+      const p = computeBudgetProgress(budget, movements as any, ref)
+      expect(p.baseLimit).toBe(1000)
+      expect(p.carry).toBe(400)
+      expect(p.effectiveLimit).toBe(1400)
+      expect(p.limit).toBe(1400)
+      expect(p.spent).toBe(300)
+      expect(p.remaining).toBe(1100)
+    })
+
+    it("previous overspend does NOT carry as debt (carry floors at 0)", () => {
+      const budget = makeBudget({
+        is_recurring: true,
+        period: "monthly",
+        start_date: "2026-01-01",
+        limit_amount: 1000,
+        rollover_enabled: true,
+      })
+      const movements: MovementRow[] = [
+        makeMovement({ amount: 1500, date: "2026-05-15" }), // overspent previous period
+        makeMovement({ amount: 300, date: "2026-06-15" }),
+      ]
+      const p = computeBudgetProgress(budget, movements as any, ref)
+      expect(p.carry).toBe(0)
+      expect(p.effectiveLimit).toBe(1000)
+    })
+
+    it("first period (no previous window within budget lifetime) → carry=0", () => {
+      const budget = makeBudget({
+        is_recurring: true,
+        period: "monthly",
+        start_date: "2026-06-01", // June is the first period
+        limit_amount: 1000,
+        rollover_enabled: true,
+      })
+      const movements: MovementRow[] = [
+        makeMovement({ amount: 100, date: "2026-06-10" }),
+      ]
+      const p = computeBudgetProgress(budget, movements as any, ref)
+      expect(p.carry).toBe(0)
+      expect(p.effectiveLimit).toBe(1000)
+    })
+
+    it("rollover disabled → carry=0 even with a leftover previous period", () => {
+      const budget = makeBudget({
+        is_recurring: true,
+        period: "monthly",
+        start_date: "2026-01-01",
+        limit_amount: 1000,
+        rollover_enabled: false,
+      })
+      const movements: MovementRow[] = [
+        makeMovement({ amount: 200, date: "2026-05-15" }),
+        makeMovement({ amount: 300, date: "2026-06-15" }),
+      ]
+      const p = computeBudgetProgress(budget, movements as any, ref)
+      expect(p.carry).toBe(0)
+      expect(p.limit).toBe(1000)
     })
   })
 })

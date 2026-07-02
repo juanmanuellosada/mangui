@@ -45,6 +45,8 @@ export type BudgetFormValues = {
   category_ids: string[]
   account_ids: string[]
   is_recurring: boolean
+  rollover_enabled: boolean
+  alert_threshold: number
 }
 
 const budgetBaseSchema = z.object({
@@ -60,6 +62,8 @@ const budgetBaseSchema = z.object({
   category_ids: z.array(z.string()),
   account_ids: z.array(z.string()),
   is_recurring: z.boolean(),
+  rollover_enabled: z.boolean(),
+  alert_threshold: z.coerce.number().int().min(1, "Debe ser entre 1 y 100").max(100, "Debe ser entre 1 y 100"),
 })
 
 /** Build a schema that includes account-currency coherence validation.
@@ -126,6 +130,8 @@ export function budgetToFormValues(budget: Budget): BudgetFormValues {
     category_ids: budget.category_ids,
     account_ids: budget.account_ids,
     is_recurring: budget.is_recurring,
+    rollover_enabled: budget.rollover_enabled,
+    alert_threshold: budget.alert_threshold,
   }
 }
 
@@ -186,6 +192,8 @@ export function BudgetForm({
       category_ids: [],
       account_ids: [],
       is_recurring: true,
+      rollover_enabled: false,
+      alert_threshold: 80,
       ...defaultValues,
     },
   })
@@ -275,6 +283,8 @@ export function BudgetForm({
       category_ids: watchedValues.category_ids,
       account_ids: watchedValues.account_ids,
       is_recurring: watchedValues.is_recurring,
+      rollover_enabled: watchedValues.rollover_enabled,
+      alert_threshold: watchedValues.alert_threshold,
       status: "active",
       created_at: "",
       updated_at: "",
@@ -292,6 +302,8 @@ export function BudgetForm({
     watchedValues.name,
     watchedValues.icon,
     watchedValues.is_recurring,
+    watchedValues.rollover_enabled,
+    watchedValues.alert_threshold,
     movements,
     today,
   ])
@@ -511,6 +523,46 @@ export function BudgetForm({
             onCheckedChange={(v) => setValue("is_recurring", v)}
             aria-label="Renova automáticamente"
           />
+        </div>
+
+        {/* 6b. Acumular sobrante (solo si renueva automáticamente) */}
+        {watchedValues.is_recurring && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="budget-rollover" className="cursor-pointer">
+                Acumular sobrante al próximo período
+              </Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Si no gastás todo el límite, la diferencia se suma al período siguiente.
+              </p>
+            </div>
+            <Switch
+              id="budget-rollover"
+              checked={watchedValues.rollover_enabled}
+              onCheckedChange={(v) => setValue("rollover_enabled", v)}
+              aria-label="Acumular sobrante al próximo período"
+            />
+          </div>
+        )}
+
+        {/* 6c. Umbral de alerta */}
+        <div className="space-y-1.5">
+          <Label htmlFor="budget-threshold" className="text-xs text-muted-foreground font-medium">
+            Avisarme al alcanzar el %
+          </Label>
+          <Input
+            id="budget-threshold"
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            className="w-24"
+            {...register("alert_threshold")}
+            aria-invalid={!!errors.alert_threshold}
+          />
+          {errors.alert_threshold && (
+            <p className="text-xs text-destructive">{errors.alert_threshold.message}</p>
+          )}
         </div>
 
         {/* 7. Vista previa en vivo */}

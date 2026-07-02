@@ -329,6 +329,7 @@ export type Database = {
       budgets: {
         Row: {
           account_ids: string[]
+          alert_threshold: number
           category_ids: string[]
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
@@ -339,6 +340,7 @@ export type Database = {
           limit_amount: number
           name: string
           period: Database["public"]["Enums"]["budget_period"] | null
+          rollover_enabled: boolean
           start_date: string
           status: Database["public"]["Enums"]["budget_status"]
           updated_at: string
@@ -346,6 +348,7 @@ export type Database = {
         }
         Insert: {
           account_ids?: string[]
+          alert_threshold?: number
           category_ids?: string[]
           created_at?: string
           currency: Database["public"]["Enums"]["currency"]
@@ -356,6 +359,7 @@ export type Database = {
           limit_amount: number
           name: string
           period?: Database["public"]["Enums"]["budget_period"] | null
+          rollover_enabled?: boolean
           start_date?: string
           status?: Database["public"]["Enums"]["budget_status"]
           updated_at?: string
@@ -363,6 +367,7 @@ export type Database = {
         }
         Update: {
           account_ids?: string[]
+          alert_threshold?: number
           category_ids?: string[]
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
@@ -373,6 +378,7 @@ export type Database = {
           limit_amount?: number
           name?: string
           period?: Database["public"]["Enums"]["budget_period"] | null
+          rollover_enabled?: boolean
           start_date?: string
           status?: Database["public"]["Enums"]["budget_status"]
           updated_at?: string

@@ -200,7 +200,14 @@ export type BudgetProgressStatus = "on_track" | "near" | "exceeded"
 
 export interface BudgetProgress {
   spent: number
+  /** Límite efectivo (baseLimit + carry). Se mantiene por compatibilidad con consumidores existentes. */
   limit: number
+  /** Límite configurado en el presupuesto, sin sobrante acumulado. */
+  baseLimit: number
+  /** Sobrante positivo del período anterior acumulado (0 si no aplica rollover). */
+  carry: number
+  /** baseLimit + carry. */
+  effectiveLimit: number
   percent: number
   remaining: number
   status: BudgetProgressStatus
@@ -227,14 +234,12 @@ type MovementRow = {
  *   - account_id ∈ account_ids OR account_ids is empty (= all)
  *   - amount = converted_amount if present else amount (both in budget's currency assumption)
  */
-export function computeBudgetProgress(
+function spentInWindow(
   budget: Budget,
   movements: MovementRow[],
-  ref: Date = new Date()
-): BudgetProgress {
-  const window = activeBudgetWindow(budget, ref)
-
-  const spent = movements.reduce((acc, m) => {
+  window: { from: string; to: string }
+): number {
+  return movements.reduce((acc, m) => {
     if (m.type !== "expense") return acc
     if (m.is_future) return acc
     if (m.date < window.from || m.date > window.to) return acc
@@ -245,14 +250,37 @@ export function computeBudgetProgress(
     const effectiveAmount = m.converted_amount !== null ? m.converted_amount : m.amount
     return acc + effectiveAmount
   }, 0)
+}
 
-  const limit = budget.limit_amount
-  const percent = limit > 0 ? Math.min((spent / limit) * 100, 999) : 0
-  const remaining = limit - spent
+export function computeBudgetProgress(
+  budget: Budget,
+  movements: MovementRow[],
+  ref: Date = new Date()
+): BudgetProgress {
+  const window = activeBudgetWindow(budget, ref)
+  const spent = spentInWindow(budget, movements, window)
+
+  // Rollover: solo suma sobrante POSITIVO del período INMEDIATO ANTERIOR,
+  // y solo si ese período anterior existió dentro de la vida del budget
+  // (si no, es el primer período y no hay nada que arrastrar).
+  let carry = 0
+  if (budget.rollover_enabled && budget.is_recurring) {
+    const prevWindow = activeBudgetWindow(budget, addDays(parseISO(window.from), -1))
+    if (prevWindow.to >= budget.start_date) {
+      const prevSpent = spentInWindow(budget, movements, prevWindow)
+      carry = Math.max(0, budget.limit_amount - prevSpent)
+    }
+  }
+
+  const baseLimit = budget.limit_amount
+  const effectiveLimit = baseLimit + carry
+  const percent = effectiveLimit > 0 ? Math.min((spent / effectiveLimit) * 100, 999) : 0
+  const remaining = effectiveLimit - spent
+  const threshold = budget.alert_threshold ?? 80
   const status: BudgetProgressStatus =
-    percent > 100 ? "exceeded" : percent >= 80 ? "near" : "on_track"
+    percent > 100 ? "exceeded" : percent >= threshold ? "near" : "on_track"
 
-  return { spent, limit, percent, remaining, status }
+  return { spent, limit: effectiveLimit, baseLimit, carry, effectiveLimit, percent, remaining, status }
 }
 
 const PERIOD_LABELS: Record<BudgetPeriod, string> = {
