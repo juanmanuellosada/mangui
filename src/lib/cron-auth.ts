@@ -17,7 +17,11 @@ export function assertCronAuth(req: NextRequest): Response | null {
   }
 
   const authHeader = req.headers.get("authorization")
-  const provided = authHeader?.replace("Bearer ", "")
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const provided = authHeader.slice("Bearer ".length)
   if (provided !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

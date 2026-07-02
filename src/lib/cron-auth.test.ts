@@ -51,12 +51,13 @@ describe("assertCronAuth", () => {
       expect(res!.status).toBe(401)
     })
 
-    // .replace("Bearer ", "") is a no-op when the header doesn't contain that
-    // substring, so a bare secret (without the "Bearer " prefix) still matches.
-    it("treats a bare secret value (no 'Bearer ' prefix) as authorized", () => {
+    it("rejects with 401 a bare secret value (no 'Bearer ' prefix)", async () => {
       const res = assertCronAuth(makeRequest({ authorization: "super-secret-value" }))
 
-      expect(res).toBeNull()
+      expect(res).not.toBeNull()
+      expect(res!.status).toBe(401)
+      const body = await res!.json()
+      expect(body).toEqual({ error: "Unauthorized" })
     })
 
     it("allows the request through (returns null) with a correct Bearer token", () => {
