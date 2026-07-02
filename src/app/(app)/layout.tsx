@@ -5,6 +5,7 @@ import { AppBottomNav } from "@/components/app-bottom-nav";
 import { QuickAddProvider } from "@/components/quick-add-provider";
 import { DemoBanner } from "@/components/demo-banner";
 import { ShareDraftReader } from "@/components/share-draft-reader";
+import { AnalyticsIdentify } from "@/components/analytics/analytics-identify";
 
 /**
  * Protected app shell layout.
@@ -44,6 +45,7 @@ export default async function AppLayout({
 
   return (
     <QuickAddProvider>
+      <AnalyticsIdentify userId={user.id} />
       <ShareDraftReader />
       <div className="min-h-screen flex bg-background">
         {/* Desktop sidebar — active state handled client-side via usePathname */}

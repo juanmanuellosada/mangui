@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { BrandLockup } from "@/components/brand-lockup";
 import { usePathname } from "next/navigation";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useQuickAdd } from "@/components/quick-add-provider";
 import { PRIMARY_NAV, FOOTER_NAV } from "@/lib/nav-sections";
 import { usePlan } from "@/lib/use-plan";
+import { track } from "@/lib/analytics";
 
 const navItems = PRIMARY_NAV;
 
@@ -40,6 +42,11 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
   const pathname = usePathname();
   const quickAdd = useQuickAdd();
   const { isPremium: userIsPremium, isLoading: planLoading } = usePlan();
+  const showUpgradeCta = !planLoading && !userIsPremium;
+
+  useEffect(() => {
+    if (showUpgradeCta) track("paywall_shown", { feature: "sidebar", placement: "sidebar" });
+  }, [showUpgradeCta]);
 
   return (
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar z-30 shadow-sm">
@@ -97,10 +104,11 @@ export function AppSidebar({ name, email, avatarUrl }: AppSidebarProps) {
       <div className="mx-4 h-px bg-sidebar-border" />
 
       {/* Premium CTA — shown only for free users */}
-      {!planLoading && !userIsPremium && (
+      {showUpgradeCta && (
         <div className="px-4 pt-3">
           <Link
             href="/ajustes#plan"
+            onClick={() => track("upgrade_click", { feature: "sidebar", placement: "sidebar" })}
             className={cn(
               "flex items-center gap-2 w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 press-effect",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { preApproval, verifyWebhookSignature } from '@/lib/mercadopago';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { trackServer } from '@/lib/analytics-server';
 
 // ---------------------------------------------------------------------------
 // POST /api/webhooks/mercadopago
@@ -144,6 +145,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (updateError) {
     console.error('[webhook/mercadopago] Error updating profile', { userId, updateError });
     return NextResponse.json({ error: 'DB update error' }, { status: 500 });
+  }
+
+  if (statusChanged && mpStatus === 'authorized') {
+    await trackServer('subscription_activated', userId, { plan: newPlan, status: mpStatus });
   }
 
   console.info('[webhook/mercadopago] Profile updated', {

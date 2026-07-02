@@ -39,7 +39,7 @@ import { useIsDemo } from "@/lib/use-is-demo"
 import { AiFillBar, type AiExtractResult } from "@/components/movements/ai-fill-bar"
 import { usePlan } from "@/lib/use-plan"
 import { useMonthlyAttachmentCount } from "@/hooks/use-monthly-attachment-count"
-import Link from "next/link"
+import { UpgradeLink } from "@/components/ui/upgrade-link"
 import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
 import { todayAR } from "@/lib/date-utils"
 
@@ -939,9 +939,13 @@ export function MovementForm({
                     {atCap ? (
                       <p className="text-xs text-muted-foreground px-0.5">
                         Adjuntos: {Math.min(totalUsed, attachLimit)}/{attachLimit} este mes ·{" "}
-                        <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">
+                        <UpgradeLink
+                          feature="attachments"
+                          placement="list_limit"
+                          className="text-primary font-semibold hover:underline"
+                        >
                           pasá a Premium para ilimitados
-                        </Link>
+                        </UpgradeLink>
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground px-0.5">
@@ -967,9 +971,13 @@ export function MovementForm({
                     {atCap ? (
                       <p className="text-xs text-muted-foreground px-0.5">
                         Adjuntos: {Math.min(totalUsed, attachLimit)}/{attachLimit} este mes ·{" "}
-                        <Link href="/ajustes#plan" className="text-primary font-semibold hover:underline">
+                        <UpgradeLink
+                          feature="attachments"
+                          placement="list_limit"
+                          className="text-primary font-semibold hover:underline"
+                        >
                           pasá a Premium para ilimitados
-                        </Link>
+                        </UpgradeLink>
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground px-0.5">

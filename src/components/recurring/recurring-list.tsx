@@ -33,7 +33,7 @@ import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan } from "@/lib/use-plan"
-import Link from "next/link"
+import { UpgradeLink } from "@/components/ui/upgrade-link"
 import type { Account } from "@/lib/accounts"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -841,12 +841,11 @@ export function RecurringList() {
           )}
           {!ms.selectionMode && (
             atLimit ? (
-              <Link
-                href="/ajustes#plan"
+              <UpgradeLink
+                feature="recurring"
+                placement="list_limit"
                 className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
-              >
-                Mejorá a Premium
-              </Link>
+              />
             ) : (
               <Button
                 onClick={openCreate}

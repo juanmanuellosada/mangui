@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { createClient } from "@/lib/supabase/client"
 import { signOut } from "@/app/actions/auth"
 import { subscribeToPremium, cancelSubscription } from "@/app/actions/subscription"
+import { track } from "@/lib/analytics"
 import { deleteAccount } from "@/app/actions/account"
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
@@ -932,6 +933,7 @@ function PlanSection() {
     try {
       const result = await subscribeToPremium(selectedInterval)
       if (result.ok) {
+        track("checkout_started", { interval: selectedInterval })
         window.location.href = result.initPoint
       } else {
         toast.error("No se pudo iniciar el pago", { description: result.error })

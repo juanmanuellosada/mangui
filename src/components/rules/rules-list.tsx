@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan } from "@/lib/use-plan"
-import Link from "next/link"
+import { UpgradeLink } from "@/components/ui/upgrade-link"
 import {
   RULES_KEY,
   RULE_CONDITIONS_KEY,
@@ -687,12 +687,11 @@ export function RulesList() {
           )}
           {!ms.selectionMode && (
             atLimit ? (
-              <Link
-                href="/ajustes#plan"
+              <UpgradeLink
+                feature="rules"
+                placement="list_limit"
                 className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
-              >
-                Mejorá a Premium
-              </Link>
+              />
             ) : (
               <Button
                 onClick={() => openNewForm()}
@@ -760,12 +759,11 @@ export function RulesList() {
               </p>
             </div>
             {atLimit ? (
-              <Link
-                href="/ajustes#plan"
+              <UpgradeLink
+                feature="rules"
+                placement="list_limit"
                 className="mt-1 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
-              >
-                Mejorá a Premium
-              </Link>
+              />
             ) : (
               <Button type="button" onClick={() => openNewForm()} disabled={isDemo} title={isDemo ? "No disponible en el modo demo" : undefined} className="mt-1 h-9 text-sm">
                 <PlusCircle className="h-4 w-4 mr-1.5" />

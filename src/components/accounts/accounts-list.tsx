@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, Pencil, Trash2, EyeOff, Briefcase, ChevronRight, Search, X, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { UpgradeLink } from "@/components/ui/upgrade-link"
 import { useMultiSelect } from "@/hooks/use-multi-select"
 import { SelectionBar, SelectButton, RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
 import { bulkDelete } from "@/lib/bulk-delete"
@@ -155,12 +156,7 @@ function CreateAccountDialog({
   return (
     <>
       {atLimit ? (
-        <Link
-          href="/ajustes#plan"
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors duration-150 press-effect"
-        >
-          Mejorá a Premium
-        </Link>
+        <UpgradeLink feature="accounts" placement="list_limit" />
       ) : (
         <Button
           onClick={() => setOpen(true)}

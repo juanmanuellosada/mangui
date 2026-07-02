@@ -34,6 +34,7 @@ import { VoiceInputButton } from "@/components/ai/voice-input-button"
 import { PhotoInputButton } from "@/components/ai/photo-input-button"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories, type Category } from "@/lib/hooks/use-categories"
+import { UpgradeLink } from "@/components/ui/upgrade-link"
 
 // ── Name → id resolver ────────────────────────────────────────────────────────
 
@@ -666,6 +667,13 @@ export function AiChat({ initialUsed, initialUnlimited, initialLimit }: AiChatPr
               <p className="text-xs text-muted-foreground mt-0.5">
                 {rateLimitMessage || `Usaste los ${initialLimit} mensajes de hoy. Se renueva a las 00:00 hora argentina.`}
               </p>
+              <UpgradeLink
+                feature="ai"
+                placement="ai_banner"
+                className="inline-block mt-1.5 text-xs text-primary font-semibold hover:underline"
+              >
+                Mejorá a Premium para mensajes ilimitados
+              </UpgradeLink>
             </div>
           </div>
         )}
