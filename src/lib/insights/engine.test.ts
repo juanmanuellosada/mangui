@@ -185,6 +185,97 @@ describe("spend trend insights", () => {
 })
 
 // ──────────────────────────────────────────────────────────
+// Inflation insight
+// ──────────────────────────────────────────────────────────
+describe("inflation insight", () => {
+  it("produces a priority-65 insight with the month label and rate when inflation data is present", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      inflation: { monthLabel: "junio", ratePct: 3.2 },
+    }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(1)
+    expect(results[0].priority).toBe(65)
+    expect(results[0].body).toBe("La inflación de junio fue 3.2%.")
+  })
+
+  it("does NOT produce an inflation insight when inflation is null", () => {
+    const input: InsightInput = { ...emptyInput, inflation: null }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(0)
+  })
+})
+
+// ──────────────────────────────────────────────────────────
+// Dollar movement insight
+// ──────────────────────────────────────────────────────────
+describe("dollar movement insight", () => {
+  it("produces a priority-58 insight saying 'subió' when the dollar rose", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      dollar: { type: "blue", changePct: 5 },
+    }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(1)
+    expect(results[0].priority).toBe(58)
+    expect(results[0].body).toBe("El dólar blue subió 5% esta semana.")
+  })
+
+  it("says 'bajó' when the dollar fell", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      dollar: { type: "blue", changePct: -4 },
+    }
+    const results = generateInsights(input, ref)
+    expect(results[0].body).toBe("El dólar blue bajó 4% esta semana.")
+  })
+
+  it("does NOT produce a dollar insight when the change is under 1%", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      dollar: { type: "blue", changePct: 0.5 },
+    }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(0)
+  })
+})
+
+// ──────────────────────────────────────────────────────────
+// Real vs nominal spend insight
+// ──────────────────────────────────────────────────────────
+describe("real vs nominal spend insight", () => {
+  it("produces a priority-45 insight comparing nominal and real spend", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      realVsNominal: { nominalWeek: 100000, realWeek: 103000, currency: "ARS" },
+    }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(1)
+    expect(results[0].priority).toBe(45)
+    expect(results[0].body).toContain("Gastaste")
+    expect(results[0].body).toContain("en pesos de hoy son")
+  })
+
+  it("does NOT produce an insight when nominal and real are effectively the same", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      realVsNominal: { nominalWeek: 100000, realWeek: 100200, currency: "ARS" },
+    }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(0)
+  })
+
+  it("does NOT produce an insight when nominalWeek is 0", () => {
+    const input: InsightInput = {
+      ...emptyInput,
+      realVsNominal: { nominalWeek: 0, realWeek: 0, currency: "ARS" },
+    }
+    const results = generateInsights(input, ref)
+    expect(results).toHaveLength(0)
+  })
+})
+
+// ──────────────────────────────────────────────────────────
 // Ordering and cap
 // ──────────────────────────────────────────────────────────
 describe("ordering and cap", () => {

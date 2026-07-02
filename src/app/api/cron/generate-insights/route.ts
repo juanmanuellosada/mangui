@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { format, addDays, subDays, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { assertCronAuth } from "@/lib/cron-auth"
 import { sendPushToUser } from "@/lib/notifications"
@@ -9,6 +10,8 @@ import { generateInsights, type InsightInput } from "@/lib/insights/engine"
 import { currentCycleSummary } from "@/lib/cards"
 import { computeBudgetProgress } from "@/lib/budgets"
 import { todayAR } from "@/lib/date-utils"
+import { buildIpcMap, latestIpcMonth, adjustAmount } from "@/lib/inflation/adjust"
+import { summaryTotals } from "@/lib/stats"
 
 export const maxDuration = 60
 
@@ -38,6 +41,46 @@ export async function GET(req: NextRequest) {
 
   if (!prefs || prefs.length === 0) {
     return NextResponse.json({ ok: true, processed: 0, sent: 0 })
+  }
+
+  // ── ángulo AR (global, una sola vez fuera del loop de usuarios) ────────────
+  const { data: ipcRows } = await admin
+    .from("inflation_index")
+    .select("period, ipc")
+    .order("period", { ascending: true })
+  const ipcMap = buildIpcMap((ipcRows ?? []).map((r) => ({ period: r.period, ipc: r.ipc })))
+  const refMonth = latestIpcMonth(ipcMap)
+
+  let inflationInsight: InsightInput["inflation"] = null
+  if (refMonth) {
+    const months = Object.keys(ipcMap).sort()
+    const prevMonth = months.length >= 2 ? months[months.length - 2] : null
+    if (prevMonth) {
+      const ratePct = Math.round((ipcMap[refMonth] / ipcMap[prevMonth] - 1) * 1000) / 10
+      const monthLabel = format(parseISO(`${refMonth}-01`), "MMMM", { locale: es })
+      inflationInsight = { monthLabel, ratePct }
+    }
+  }
+
+  let dollarInsight: InsightInput["dollar"] = null
+  try {
+    const weekAgoStrGlobal = format(subDays(today, 7), "yyyy-MM-dd")
+    const { data: rateRows } = await admin
+      .from("exchange_rates")
+      .select("sell, rate_date")
+      .eq("rate_type", "blue")
+      .lte("rate_date", todayStr)
+      .order("rate_date", { ascending: false })
+      .limit(14)
+    const rates = rateRows ?? []
+    const todayRate = rates[0] ?? null
+    const weekAgoRate = rates.find((r) => r.rate_date <= weekAgoStrGlobal) ?? null
+    if (todayRate && weekAgoRate && weekAgoRate.sell > 0) {
+      const changePct = Math.round((todayRate.sell / weekAgoRate.sell - 1) * 1000) / 10
+      dollarInsight = { type: "blue", changePct }
+    }
+  } catch (e) {
+    console.error("[generate-insights] dollar fetch error", e)
   }
 
   let sent = 0
@@ -133,11 +176,27 @@ export async function GET(req: NextRequest) {
       .filter((m) => m.date >= twoWeeksAgoStr && m.date < weekAgoStr)
       .reduce((s, m) => s + (m.converted_amount ?? m.amount), 0)
 
+    let realVsNominal: InsightInput["realVsNominal"] = null
+    try {
+      if (refMonth && thisWeek > 0) {
+        const weekMovs = expenses.filter((m) => m.date >= weekAgoStr && m.date <= todayStr)
+        const adjust = (amount: number, dateStr: string) => adjustAmount(amount, dateStr, refMonth, ipcMap)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const real = summaryTotals(weekMovs as any, "ARS", adjust)
+        realVsNominal = { nominalWeek: thisWeek, realWeek: real.expense, currency: "ARS" }
+      }
+    } catch (e) {
+      console.error("[generate-insights] realVsNominal error", e)
+    }
+
     const input: InsightInput = {
       cards: insightCards,
       budgets: insightBudgets,
       upcomingRecurring: { count: recCount, total: recTotal },
       spend: { thisWeek, prevWeek },
+      inflation: inflationInsight,
+      dollar: dollarInsight,
+      realVsNominal,
     }
 
     const insights = generateInsights(input, today)
@@ -154,12 +213,16 @@ export async function GET(req: NextRequest) {
       continue
     }
 
-    // ── push (teaser: first insight) ────────────────────────────────────────
+    // ── push (top insights, cuerpo multi-línea) ─────────────────────────────
     try {
+      const body = insights
+        .slice(0, 3)
+        .map((i) => `${i.emoji} ${i.body}`)
+        .join("\n")
       await sendPushToUser(admin, userId, {
         title: "Tu resumen semanal 🥭",
-        body: insights[0].body,
-        url: insights[0].url,
+        body,
+        url: "/estadisticas",
       })
     } catch (e) {
       console.error("[generate-insights] push error", e)

@@ -33,6 +33,12 @@ export interface InsightInput {
   upcomingRecurring: { count: number; total: number }
   /** expense sums (ARS, converted) for the last 7 days vs the 7 before */
   spend: { thisWeek: number; prevWeek: number }
+  /** inflación del último mes cerrado (IPC), si hay datos */
+  inflation?: { monthLabel: string; ratePct: number } | null
+  /** variación del dólar (tipo elegido) en los últimos 7 días, si hay datos */
+  dollar?: { type: string; changePct: number } | null
+  /** gasto de la semana nominal vs ajustado por inflación al mes actual (ARS) */
+  realVsNominal?: { nominalWeek: number; realWeek: number; currency: string } | null
 }
 
 function pct(curr: number, base: number): number {
@@ -114,6 +120,48 @@ export function generateInsights(input: InsightInput, ref: Date, max = 3): Insig
         body: `Gastaste ${formatCurrency(thisWeek, "ARS")} en los últimos 7 días, ${Math.abs(d)}% ${d >= 0 ? "más" : "menos"} que la semana anterior.`,
         url: "/estadisticas",
         priority: 30,
+      })
+    }
+  }
+
+  // 5. Inflación del mes
+  if (input.inflation) {
+    const { monthLabel, ratePct } = input.inflation
+    out.push({
+      key: `inflation_month`,
+      emoji: "📊",
+      title: `Inflación de ${monthLabel}`,
+      body: `La inflación de ${monthLabel} fue ${ratePct}%.`,
+      url: "/estadisticas",
+      priority: 65,
+    })
+  }
+
+  // 6. Movimiento del dólar en la semana
+  if (input.dollar && Math.abs(input.dollar.changePct) >= 1) {
+    const { type, changePct } = input.dollar
+    out.push({
+      key: `dollar_move`,
+      emoji: "💵",
+      title: `Dólar ${type}`,
+      body: `El dólar ${type} ${changePct >= 0 ? "subió" : "bajó"} ${Math.abs(changePct)}% esta semana.`,
+      url: "/estadisticas",
+      priority: 58,
+    })
+  }
+
+  // 7. Gasto real vs nominal (ajustado por inflación)
+  if (input.realVsNominal) {
+    const { nominalWeek, realWeek, currency } = input.realVsNominal
+    const d = pct(realWeek, nominalWeek)
+    if (nominalWeek > 0 && d >= 1) {
+      out.push({
+        key: `real_vs_nominal`,
+        emoji: "🧾",
+        title: "Gasto real vs. nominal",
+        body: `Gastaste ${formatCurrency(nominalWeek, currency as "ARS" | "USD")} esta semana; en pesos de hoy son ${formatCurrency(realWeek, currency as "ARS" | "USD")}.`,
+        url: "/estadisticas",
+        priority: 45,
       })
     }
   }
