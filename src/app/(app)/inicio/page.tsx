@@ -17,6 +17,7 @@ import { DashboardFiltersProvider, DashboardGlobalFilters } from "@/components/d
 import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
 import { GoalsSummary } from "@/components/dashboard/goals-summary"
 import { RendirNudge } from "@/components/dashboard/rendir-nudge"
+import { WrappedNudge } from "@/components/dashboard/wrapped-nudge"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -135,6 +136,9 @@ export default async function DashboardPage() {
 
       {/* Goals summary widget */}
       {hasAccounts && <GoalsSummary />}
+
+      {/* Wrapped nudge — muestra el resumen del mes anterior, primeros 7 días del mes */}
+      {hasAccounts && <WrappedNudge />}
 
       {/* Rendir nudge — shows only when idle ARS ≥ $100.000 */}
       {hasAccounts && <RendirNudge />}
