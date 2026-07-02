@@ -44,6 +44,8 @@ import { format, parseISO, isBefore, isEqual, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan } from "@/lib/use-plan"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { QueryError } from "@/components/ui/query-error"
 
 type CardStatement = Tables<"card_statements">
 
@@ -62,16 +64,6 @@ async function fetchAllStatements(): Promise<CardStatement[]> {
     .select("*")
     .eq("status", "pendiente")
     .order("due_date", { ascending: true })
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
   if (error) throw error
   return data
 }
@@ -951,10 +943,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
   const isDemo = useIsDemo()
   const { isPremium: userIsPremium, limits } = usePlan()
 
-  const { data: accounts, isLoading: loadingAccounts } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts, isLoading: loadingAccounts, isError: accountsError, refetch: refetchAccounts } = useAccounts()
 
   const { data: balances = [] } = useQuery({
     queryKey: BALANCES_KEY,
@@ -1158,8 +1147,13 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
         </div>
       )}
 
+      {/* Error state */}
+      {!loadingAccounts && accountsError && (
+        <QueryError onRetry={() => refetchAccounts()} />
+      )}
+
       {/* Onboarding empty state — only when user has zero accounts */}
-      {!loadingAccounts && accounts?.length === 0 && (
+      {!loadingAccounts && !accountsError && accounts?.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <Briefcase className="h-8 w-8 text-primary" />

@@ -1,15 +1,11 @@
 "use client"
 
 import { createContext, useContext, useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
 import { MangoMultiSelect } from "@/components/ui/mango-multi-select"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
-import type { Tables } from "@/lib/database.types"
-
-type Account = Tables<"accounts">
-type Category = Tables<"categories">
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -46,36 +42,14 @@ export function DashboardFiltersProvider({ children }: { children: React.ReactNo
   )
 }
 
-// ─── Data fetching ────────────────────────────────────────────────────────────
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("name")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*")
-  if (error) throw error
-  return data
-}
-
 // ─── Global filter bar ────────────────────────────────────────────────────────
 
 export function DashboardGlobalFilters() {
   const { accountIds, setAccountIds, categoryIds, setCategoryIds } = useDashboardFilters()
 
-  const { data: accounts } = useQuery({
-    queryKey: ["accounts", "stats"],
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts } = useAccounts({ orderBy: "name" })
 
-  const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
+  const { data: categories } = useCategories({ orderBy: "none" })
 
   const accountOptions = useMemo(
     () =>

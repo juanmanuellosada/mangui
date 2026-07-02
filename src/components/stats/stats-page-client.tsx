@@ -39,28 +39,16 @@ import type { Tables } from "@/lib/database.types"
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns"
 import { getPreset } from "@/lib/date-ranges"
 import { es } from "date-fns/locale"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
-type Account = Tables<"accounts">
 type Budget = Tables<"budgets">
 type RecurringTransaction = Tables<"recurring_transactions">
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*").order("name")
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("name")
-  if (error) throw error
-  return data
-}
 
 async function fetchBudgets(): Promise<Budget[]> {
   const supabase = createClient()
@@ -215,20 +203,19 @@ export function StatsPageClient() {
     return { operator: "between", preset: "last_month", from: r.from, to: r.to, label: r.label }
   })
 
-  const { data: movements = [], isLoading: loadingMovements } = useQuery({
+  const {
+    data: movements = [],
+    isLoading: loadingMovements,
+    isError: movementsError,
+    refetch: refetchMovements,
+  } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchAllMovements,
   })
 
-  const { data: categories = [], isLoading: loadingCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [], isLoading: loadingCategories } = useCategories({ orderBy: "name" })
 
-  const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
-    queryKey: ["accounts", "stats"],
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts = [], isLoading: loadingAccounts } = useAccounts({ orderBy: "name" })
 
   const { data: budgets = [] } = useQuery({
     queryKey: ["budgets", "stats"],
@@ -365,8 +352,13 @@ export function StatsPageClient() {
         </div>
       )}
 
+      {/* Error state */}
+      {!isLoading && movementsError && (
+        <QueryError onRetry={() => refetchMovements()} />
+      )}
+
       {/* Resumen tab */}
-      {!isLoading && activeTab === "resumen" && (
+      {!isLoading && !movementsError && activeTab === "resumen" && (
         <div className="space-y-5">
           <SummaryCards totals={totals} currency={currency} period={periodLabel} type={filter.type} movements={filtered} />
 
@@ -495,7 +487,7 @@ export function StatsPageClient() {
       )}
 
       {/* Comparar tab */}
-      {!isLoading && activeTab === "comparar" && (
+      {!isLoading && !movementsError && activeTab === "comparar" && (
         <CompareTab
           movements={movements}
           categories={categories}

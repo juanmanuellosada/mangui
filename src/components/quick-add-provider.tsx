@@ -17,7 +17,7 @@
  */
 
 import * as React from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { MovementForm, type MovementFormValues, type PendingAttachments, type MovementMode } from "@/components/movements/movement-form"
@@ -25,14 +25,12 @@ import type { TransferFormValues } from "@/components/transfers/transfer-form"
 import type { InstallmentFormValues } from "@/components/installments/installment-form"
 import { createClient } from "@/lib/supabase/client"
 import type { Account } from "@/lib/accounts"
-import type { Tables } from "@/lib/database.types"
 import type { AiExtractResult } from "@/components/movements/ai-fill-bar"
 import {
   MOVEMENTS_KEY,
   TRANSFERS_KEY,
   ACCOUNTS_KEY,
   BALANCES_KEY,
-  CATEGORIES_KEY,
   type DollarType,
 } from "@/lib/movements"
 import { INSTALLMENTS_KEY, computeInstallmentAmounts, computeInstallmentDate, isInstallmentFuture } from "@/lib/installments"
@@ -40,8 +38,9 @@ import { isFutureDate } from "@/lib/date-utils"
 import { uploadAttachment } from "@/lib/attachments"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import { enqueueMovement } from "@/lib/offline-queue"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
 
-type Category = Tables<"categories">
 export type QuickAddMode = "movement" | "transfer"
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -62,28 +61,6 @@ export function useQuickAdd(): QuickAddContextValue {
   const ctx = React.useContext(QuickAddContext)
   if (!ctx) throw new Error("useQuickAdd must be used inside QuickAddProvider")
   return ctx
-}
-
-// ── Data fetchers (shared with movements-list, same query keys = no refetch) ──
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name")
-  if (error) throw error
-  return data
 }
 
 // ── Installment helper (same logic as movements-list) ────────────────────────
@@ -179,15 +156,9 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [pendingAiResult, setPendingAiResult] = React.useState<AiExtractResult | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts = [] } = useAccounts()
 
-  const { data: categories = [] } = useQuery({
-    queryKey: CATEGORIES_KEY,
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories()
 
   const open = React.useCallback((m: QuickAddMode = "movement", type: "income" | "expense" = "expense", p?: QuickAddPreset) => {
     // Both "movement" and "transfer" are served by the same MovementForm sheet.

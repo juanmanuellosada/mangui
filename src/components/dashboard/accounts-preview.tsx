@@ -5,11 +5,11 @@ import { useQuery } from "@tanstack/react-query"
 import { ChevronRight } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CurrencyChip } from "@/components/ui/currency-chip"
+import { QueryError } from "@/components/ui/query-error"
 import { createClient } from "@/lib/supabase/client"
 import {
   renderAccountIcon,
   ACCOUNT_TYPE_LABELS,
-  type Account,
   type AccountBalance,
 } from "@/lib/accounts"
 import { formatCurrency, cn } from "@/lib/utils"
@@ -20,6 +20,7 @@ import { fetchAllMovements } from "@/lib/movements"
 import { nextCardPayment } from "@/lib/cards"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
+import { useAccounts } from "@/lib/hooks/use-accounts"
 
 type CardStatement = Tables<"card_statements">
 
@@ -27,16 +28,6 @@ interface AccountsPreviewProps {
   rateType: RateType
   manualRate: number | null
   rates: RatesMap
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
 }
 
 async function fetchBalances(): Promise<AccountBalance[]> {
@@ -77,10 +68,12 @@ function AccountCardSkeleton() {
 
 
 export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreviewProps) {
-  const { data: accounts, isLoading: loadingAccounts } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: fetchAccounts,
-  })
+  const {
+    data: accounts,
+    isLoading: loadingAccounts,
+    isError: accountsError,
+    refetch: refetchAccounts,
+  } = useAccounts()
 
   const { data: balances, isLoading: loadingBalances } = useQuery({
     queryKey: ["account_balances"],
@@ -119,6 +112,11 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
         </Link>
       </div>
 
+      {/* Error state */}
+      {!isLoading && accountsError && (
+        <QueryError onRetry={() => refetchAccounts()} />
+      )}
+
       {/* Cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {isLoading ? (
@@ -127,7 +125,7 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
             <AccountCardSkeleton />
             <AccountCardSkeleton />
           </>
-        ) : (
+        ) : accountsError ? null : (
           visible.map((account) => {
             const bal = balanceMap.get(account.id)
             const balance = bal?.current_balance ?? account.initial_balance

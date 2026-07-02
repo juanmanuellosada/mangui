@@ -43,12 +43,15 @@ import {
   type Budget,
   type BudgetProgressStatus,
 } from "@/lib/budgets"
-import { MOVEMENTS_KEY, ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
+import { MOVEMENTS_KEY } from "@/lib/movements"
 import { formatCurrency, cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { usePlan } from "@/lib/use-plan"
 import Link from "next/link"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 import { renderCategoryIcon } from "@/lib/categories"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
@@ -82,20 +85,6 @@ async function fetchMovements(): Promise<Movement[]> {
     .select("*")
     .order("date", { ascending: false })
     .limit(500)
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*").order("name")
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("name")
   if (error) throw error
   return data
 }
@@ -953,7 +942,12 @@ export function BudgetsList() {
   const [bulkPending, setBulkPending] = useState(false)
   const [filters, setFilters] = useState<BudgetFilters>(DEFAULT_FILTERS)
 
-  const { data: budgets = [], isLoading: loadingBudgets } = useQuery({
+  const {
+    data: budgets = [],
+    isLoading: loadingBudgets,
+    isError: budgetsError,
+    refetch: refetchBudgets,
+  } = useQuery({
     queryKey: BUDGETS_KEY,
     queryFn: fetchBudgets,
   })
@@ -963,15 +957,9 @@ export function BudgetsList() {
     queryFn: fetchMovements,
   })
 
-  const { data: categories = [] } = useQuery({
-    queryKey: CATEGORIES_KEY,
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories({ orderBy: "name" })
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts = [] } = useAccounts({ orderBy: "name" })
 
   const queryClient = useQueryClient()
 
@@ -1148,8 +1136,13 @@ export function BudgetsList() {
         </div>
       )}
 
+      {/* Error state */}
+      {!loadingBudgets && budgetsError && (
+        <QueryError onRetry={() => refetchBudgets()} />
+      )}
+
       {/* Empty state */}
-      {!loadingBudgets && budgets.length === 0 && (
+      {!loadingBudgets && !budgetsError && budgets.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <Wallet className="h-8 w-8 text-primary" />

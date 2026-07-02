@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Plus, Pencil, Trash2, Tag, Search, X, ChevronUp, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,21 +22,11 @@ import { CATEGORIES_KEY, MOVEMENTS_KEY } from "@/lib/movements"
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 import type { Tables } from "@/lib/database.types"
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 
 type Category = Tables<"categories">
 type CategoryType = "income" | "expense"
-
-// ── Fetcher ───────────────────────────────────────────────────────────────────
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
-}
 
 // ── Filter helpers ────────────────────────────────────────────────────────────
 
@@ -651,10 +641,12 @@ export function CategoriesList() {
   const queryClient = useQueryClient()
   const isDemo = useIsDemo()
 
-  const { data: categories, isLoading } = useQuery({
-    queryKey: CATEGORIES_KEY,
-    queryFn: fetchCategories,
-  })
+  const {
+    data: categories,
+    isLoading,
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useCategories({ orderBy: "created_at" })
 
   const [userId, setUserId] = useState<string | undefined>(undefined)
   useEffect(() => {
@@ -787,8 +779,13 @@ export function CategoriesList() {
         </div>
       )}
 
+      {/* Error state */}
+      {!isLoading && categoriesError && (
+        <QueryError onRetry={() => refetchCategories()} />
+      )}
+
       {/* Empty state — zero categories */}
-      {!isLoading && categories?.length === 0 && (
+      {!isLoading && !categoriesError && categories?.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <Tag className="h-8 w-8 text-primary" />

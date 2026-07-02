@@ -5,20 +5,20 @@ import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronRight, ArrowUpCircle, ArrowDownCircle, PlusCircle } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { QueryError } from "@/components/ui/query-error"
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import type { Tables } from "@/lib/database.types"
-import { ACCOUNTS_KEY } from "@/lib/movements"
 import { format, isToday, isYesterday, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Account } from "@/lib/accounts"
 import { useQuickAdd } from "@/components/quick-add-provider"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { lastN } from "@/lib/date-ranges"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
 
 type Movement = Tables<"movements">
-type Category = Tables<"categories">
 
 const DAYS_OPTIONS = [
   { value: "7", label: "Últimos 7 días" },
@@ -42,26 +42,6 @@ async function fetchRecentMovements(days: string): Promise<Movement[]> {
   return data
 }
 
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name")
-  if (error) throw error
-  return data
-}
-
 function formatDateShort(dateStr: string): string {
   const d = parseISO(dateStr)
   if (isToday(d)) return "Hoy"
@@ -73,21 +53,20 @@ export function RecentMovements() {
   const quickAdd = useQuickAdd()
   const [days, setDays] = useState("30")
 
-  const { data: movements, isLoading: loadingMovements } = useQuery({
+  const {
+    data: movements,
+    isLoading: loadingMovements,
+    isError: movementsError,
+    refetch: refetchMovements,
+  } = useQuery({
     queryKey: ["movements", "recent", days],
     queryFn: () => fetchRecentMovements(days),
     staleTime: 60 * 1000,
   })
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts = [] } = useAccounts()
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories()
 
   const accountMap = new Map(accounts.map((a) => [a.id, a]))
   const categoryMap = new Map(categories.map((c) => [c.id, c]))
@@ -135,7 +114,11 @@ export function RecentMovements() {
         </div>
       )}
 
-      {!loadingMovements && (!movements || movements.length === 0) && (
+      {!loadingMovements && movementsError && (
+        <QueryError onRetry={() => refetchMovements()} />
+      )}
+
+      {!loadingMovements && !movementsError && (!movements || movements.length === 0) && (
         <div className="flex flex-col items-center justify-center h-32 gap-2 text-center">
           <p className="text-sm text-muted-foreground">
             Sin actividad en los últimos {days} días.

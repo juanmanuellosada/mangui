@@ -48,8 +48,10 @@ import {
   type Account,
   type SuggestedRule,
 } from "@/lib/rules"
-import { ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { RuleForm, type RuleFormValues, type ConditionDraft } from "./rule-form"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 
 async function fetchRules(): Promise<AutoRule[]> {
   const supabase = createClient()
@@ -61,20 +63,6 @@ async function fetchRules(): Promise<AutoRule[]> {
 async function fetchConditions(): Promise<AutoRuleCondition[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("auto_rule_conditions").select("*").order("position", { ascending: true })
-  if (error) throw error
-  return data
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("created_at")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*").order("name")
   if (error) throw error
   return data
 }
@@ -457,11 +445,16 @@ export function RulesList() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [bulkPending, setBulkPending] = useState(false)
 
-  const { data: rules = [], isLoading: rulesLoading } = useQuery({ queryKey: RULES_KEY, queryFn: fetchRules })
+  const {
+    data: rules = [],
+    isLoading: rulesLoading,
+    isError: rulesError,
+    refetch: refetchRules,
+  } = useQuery({ queryKey: RULES_KEY, queryFn: fetchRules })
   const atLimit = !userIsPremium && rules.length >= limits.rules
   const { data: conditions = [], isLoading: condsLoading } = useQuery({ queryKey: RULE_CONDITIONS_KEY, queryFn: fetchConditions })
-  const { data: categories = [] } = useQuery({ queryKey: CATEGORIES_KEY, queryFn: fetchCategories })
-  const { data: accounts = [] } = useQuery({ queryKey: ACCOUNTS_KEY, queryFn: fetchAccounts })
+  const { data: categories = [] } = useCategories()
+  const { data: accounts = [] } = useAccounts()
   const { data: movementsForSuggestions = [] } = useQuery({
     queryKey: ["movements_for_suggestions"],
     queryFn: fetchMovementsForSuggestions,
@@ -741,6 +734,8 @@ export function RulesList() {
           <div className="p-4 space-y-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
           </div>
+        ) : rulesError ? (
+          <QueryError onRetry={() => refetchRules()} />
         ) : displayRules.length === 0 && rules.length > 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-3">
             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">

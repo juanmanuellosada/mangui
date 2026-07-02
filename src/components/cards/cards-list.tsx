@@ -50,6 +50,8 @@ import { format, parseISO, isBefore, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { useQuickAdd } from "@/components/quick-add-provider"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
 
 type Account = Tables<"accounts">
 type Movement = Tables<"movements">
@@ -73,16 +75,6 @@ async function fetchCreditCardAccounts(): Promise<Account[]> {
   return data
 }
 
-async function fetchAllAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
-}
-
 async function fetchMovementsForCard(accountId: string): Promise<Movement[]> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -91,16 +83,6 @@ async function fetchMovementsForCard(accountId: string): Promise<Movement[]> {
     .eq("account_id", accountId)
     .eq("type", "expense")
     .order("date", { ascending: false })
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name")
   if (error) throw error
   return data
 }
@@ -1041,15 +1023,9 @@ export function CardsList() {
     queryFn: fetchCreditCardAccounts,
   })
 
-  const { data: allAccounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAllAccounts,
-  })
+  const { data: allAccounts = [] } = useAccounts()
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories()
 
   return (
     <div className="space-y-6 animate-fade-in">

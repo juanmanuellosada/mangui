@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
 import { Skeleton } from "@/components/ui/skeleton"
+import { QueryError } from "@/components/ui/query-error"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
 import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
@@ -14,18 +14,7 @@ import {
 } from "./chart-filter-bar"
 import { useDashboardFilters } from "./dashboard-filters"
 import { MoneyFlowSankeyChart } from "./money-flow-sankey-chart"
-import type { Tables } from "@/lib/database.types"
-
-type Category = Tables<"categories">
-
-// ─── Data fetching ────────────────────────────────────────────────────────────
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*")
-  if (error) throw error
-  return data
-}
+import { useCategories } from "@/lib/hooks/use-categories"
 
 // ─── Wrapper component ────────────────────────────────────────────────────────
 
@@ -35,17 +24,29 @@ export function MoneyFlowSankey() {
 
   const filters: ChartFilters = { date, accountIds, categoryIds }
 
-  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+  const {
+    data: allMovements,
+    isLoading: loadingMovements,
+    isError: movementsError,
+    refetch: refetchMovements,
+  } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchAllMovements,
   })
 
-  const { data: categories, isLoading: loadingCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
+  const {
+    data: categories,
+    isLoading: loadingCategories,
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useCategories({ orderBy: "none" })
 
   const isLoading = loadingMovements || loadingCategories
+  const isError = movementsError || categoriesError
+  const retry = () => {
+    refetchMovements()
+    refetchCategories()
+  }
 
   const statsFilter = useMemo(
     () => chartFiltersToStatsFilter(filters, "all"),
@@ -89,8 +90,11 @@ export function MoneyFlowSankey() {
         </div>
       )}
 
+      {/* Error state */}
+      {!isLoading && isError && <QueryError onRetry={retry} />}
+
       {/* Chart */}
-      {!isLoading && (
+      {!isLoading && !isError && (
         <MoneyFlowSankeyChart
           movements={filtered}
           categories={categories ?? []}

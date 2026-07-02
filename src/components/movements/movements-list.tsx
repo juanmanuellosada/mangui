@@ -68,7 +68,6 @@ import {
   TRANSFERS_KEY,
   ACCOUNTS_KEY,
   BALANCES_KEY,
-  CATEGORIES_KEY,
   fetchMovements,
   fetchTransfers,
   filterKey,
@@ -88,6 +87,9 @@ import { useQuickAdd } from "@/components/quick-add-provider"
 import { listAttachments, uploadAttachment } from "@/lib/attachments"
 import { isFutureDate } from "@/lib/date-utils"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 
 type Movement = Tables<"movements">
 type Transfer = Tables<"transfers">
@@ -153,28 +155,6 @@ async function deleteMovementsSavedView(id: string): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase.from("saved_views").delete().eq("id", id)
   if (error) throw error
-}
-
-// ── Accounts / categories data fetchers ──────────────────────────────────────
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name")
-  if (error) throw error
-  return data
 }
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -1464,30 +1444,45 @@ export function MovementsList() {
 
   useEffect(() => { setHydrated(true) }, [])
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const {
+    data: accounts = [],
+    isError: accountsError,
+    refetch: refetchAccounts,
+  } = useAccounts()
 
-  const { data: categories = [] } = useQuery({
-    queryKey: CATEGORIES_KEY,
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories()
 
   // Derive the stable filter key once so both queries share it
   const fKey = filterKey(filter)
 
-  const { data: movements, isLoading: loadingMovements } = useQuery({
+  const {
+    data: movements,
+    isLoading: loadingMovements,
+    isError: movementsError,
+    refetch: refetchMovements,
+  } = useQuery({
     queryKey: [...MOVEMENTS_KEY, fKey],
     queryFn: () => fetchMovements(filter, accounts, categories),
     enabled: accounts.length > 0, // wait for lookups to be loaded
   })
 
-  const { data: transfers, isLoading: loadingTransfers } = useQuery({
+  const {
+    data: transfers,
+    isLoading: loadingTransfers,
+    isError: transfersError,
+    refetch: refetchTransfers,
+  } = useQuery({
     queryKey: [...TRANSFERS_KEY, fKey],
     queryFn: () => fetchTransfers(filter, accounts),
     enabled: accounts.length > 0,
   })
+
+  const feedError = accountsError || movementsError || transfersError
+  const retryFeed = () => {
+    if (accountsError) refetchAccounts()
+    refetchMovements()
+    refetchTransfers()
+  }
 
   const accountMap = useMemo(
     () => new Map(accounts.map((a) => [a.id, a])),
@@ -1782,8 +1777,13 @@ export function MovementsList() {
         </div>
       )}
 
+      {/* Error state */}
+      {hydrated && !isLoading && feedError && (
+        <QueryError onRetry={retryFeed} />
+      )}
+
       {/* Empty state */}
-      {hydrated && !isLoading && totalItems === 0 && (
+      {hydrated && !isLoading && !feedError && totalItems === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5 animate-scale-in">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <ArrowDownCircle className="h-8 w-8 text-primary" />

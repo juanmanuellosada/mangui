@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
 import { formatCurrency } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PieChart } from "lucide-react"
@@ -13,7 +12,6 @@ import {
   Legend,
 } from "@/components/evilcharts/charts/pie-chart"
 import type { ChartConfig } from "@/components/evilcharts/ui/chart"
-import type { Tables } from "@/lib/database.types"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
 import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
@@ -23,15 +21,8 @@ import {
   type ChartFilters,
 } from "./chart-filter-bar"
 import { useDashboardFilters } from "./dashboard-filters"
-
-type Category = Tables<"categories">
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*")
-  if (error) throw error
-  return data
-}
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 
 // Accessible palette that works in both light and dark modes
 const CATEGORY_COLORS_LIGHT = [
@@ -62,17 +53,29 @@ export function CategoryPieChart() {
 
   const filters: ChartFilters = { date, accountIds, categoryIds }
 
-  const { data: allMovements, isLoading: loadingMovements } = useQuery({
+  const {
+    data: allMovements,
+    isLoading: loadingMovements,
+    isError: movementsError,
+    refetch: refetchMovements,
+  } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchAllMovements,
   })
 
-  const { data: categories, isLoading: loadingCategories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: fetchCategories,
-  })
+  const {
+    data: categories,
+    isLoading: loadingCategories,
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useCategories({ orderBy: "none" })
 
   const isLoading = loadingMovements || loadingCategories
+  const isError = movementsError || categoriesError
+  const retry = () => {
+    refetchMovements()
+    refetchCategories()
+  }
 
   const statsFilter = useMemo(
     () => chartFiltersToStatsFilter(filters, "expense"),
@@ -166,7 +169,9 @@ export function CategoryPieChart() {
         </div>
       )}
 
-      {!isLoading && chartData.length === 0 && (
+      {!isLoading && isError && <QueryError onRetry={retry} />}
+
+      {!isLoading && !isError && chartData.length === 0 && (
         <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
           <PieChart className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">

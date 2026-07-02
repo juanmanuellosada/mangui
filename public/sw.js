@@ -1,19 +1,64 @@
-// Service Worker para Mangui — sin caché (passthrough).
-// Gestiona notificaciones push y el criterio de instalabilidad PWA.
-// No intercepta ni cachea assets — evita bugs con los hashes de Next.js.
+// Service Worker para Mangui — passthrough para assets de Next.js.
+// Gestiona notificaciones push, el criterio de instalabilidad PWA y un
+// fallback mínimo de "offline en frío" (ver bloque fetch más abajo).
+// NO intercepta ni cachea assets de la app (chunks con hash, datos, API) —
+// evita bugs con los hashes de Next.js. Solo precachea el shell estático
+// necesario para mostrar /offline cuando no hay red y no hay nada cargado.
+
+// Subir este número fuerza que los clientes existentes descarten el cache
+// viejo en `activate` (ver más abajo).
+const SHELL_CACHE = "mangui-shell-v1"
+const OFFLINE_URL = "/offline"
+const SHELL_ASSETS = [OFFLINE_URL, "/manifest.json", "/icon-192.png"]
 
 // ---------------------------------------------------------------------------
-// Install: activarse de inmediato sin esperar a que cierren las pestañas.
+// Install: precachear el shell mínimo para el fallback offline y activarse
+// de inmediato sin esperar a que cierren las pestañas.
 // ---------------------------------------------------------------------------
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
   self.skipWaiting()
+  event.waitUntil(
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .catch(() => {
+        // Si el precache falla (ej. red inestable durante el install), no
+        // rompemos el resto del SW (push, sync) por esto.
+      })
+  )
 })
 
 // ---------------------------------------------------------------------------
-// Activate: tomar control de todos los clientes abiertos.
+// Activate: borrar caches de versiones anteriores y tomar control de todos
+// los clientes abiertos.
 // ---------------------------------------------------------------------------
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== SHELL_CACHE).map((key) => caches.delete(key)))
+      )
+      .then(() => self.clients.claim())
+  )
+})
+
+// ---------------------------------------------------------------------------
+// Fetch: red de seguridad conservadora. Solo interviene en navegaciones
+// (carga de documento HTML). Estrategia network-first: si la red responde,
+// se usa esa respuesta tal cual; si la red falla (offline), se sirve la
+// página /offline precacheada. Todo lo demás (chunks de Next, API, datos)
+// pasa de largo sin tocar — así no se rompen los hashes de assets.
+// ---------------------------------------------------------------------------
+self.addEventListener("fetch", (event) => {
+  const { request } = event
+  if (request.mode !== "navigate") return
+
+  event.respondWith(
+    fetch(request).catch(() =>
+      caches.match(OFFLINE_URL, { cacheName: SHELL_CACHE }).then((cached) => cached || Response.error())
+    )
+  )
 })
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useState, useCallback } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useChat } from "@ai-sdk/react"
 import {
@@ -24,19 +24,16 @@ import { MovementForm, type MovementFormValues } from "@/components/movements/mo
 import { createClient } from "@/lib/supabase/client"
 import { formatCurrency, cn } from "@/lib/utils"
 import type { Account } from "@/lib/accounts"
-import type { Tables } from "@/lib/database.types"
 import {
   MOVEMENTS_KEY,
   BALANCES_KEY,
   ACCOUNTS_KEY,
-  CATEGORIES_KEY,
 } from "@/lib/movements"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { VoiceInputButton } from "@/components/ai/voice-input-button"
 import { PhotoInputButton } from "@/components/ai/photo-input-button"
-
-type Category = Tables<"categories">
-
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories, type Category } from "@/lib/hooks/use-categories"
 
 // ── Name → id resolver ────────────────────────────────────────────────────────
 
@@ -54,22 +51,6 @@ function findIdByName(name: string, items: Array<{ id: string; name: string }>):
       target.includes(normalizeStr(i.name))
   )
   return fuzzy?.id
-}
-
-// ── Data fetchers ─────────────────────────────────────────────────────────────
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("accounts").select("*").order("created_at")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("categories").select("*").order("name")
-  if (error) throw error
-  return data
 }
 
 // ── Read-tool indicator ───────────────────────────────────────────────────────
@@ -531,15 +512,9 @@ export function AiChat({ initialUsed, initialUnlimited, initialLimit }: AiChatPr
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isDemo = useIsDemo()
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts = [] } = useAccounts()
 
-  const { data: categories = [] } = useQuery({
-    queryKey: CATEGORIES_KEY,
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories()
 
   const { messages, sendMessage, addToolOutput, status } = useChat({
     transport: new DefaultChatTransport({ api: "/api/ai/chat" }),

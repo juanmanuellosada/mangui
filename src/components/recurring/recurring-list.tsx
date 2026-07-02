@@ -47,9 +47,11 @@ import {
   type RecurringTransaction,
   type RecurringFilter,
 } from "@/lib/recurring"
-import { ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { PendingInbox, type OccurrenceWithRec } from "./pending-inbox"
 import { RecurringForm, recurringToFormValues, type RecurringFormValues } from "./recurring-form"
+import { useAccounts } from "@/lib/hooks/use-accounts"
+import { useCategories } from "@/lib/hooks/use-categories"
+import { QueryError } from "@/components/ui/query-error"
 
 type Category = Tables<"categories">
 
@@ -78,26 +80,6 @@ async function fetchPendingOccurrences(): Promise<OccurrenceWithRec[]> {
     .order("scheduled_date", { ascending: true })
   if (error) throw error
   return (data ?? []) as OccurrenceWithRec[]
-}
-
-async function fetchAccounts(): Promise<Account[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("accounts")
-    .select("*")
-    .order("created_at")
-  if (error) throw error
-  return data
-}
-
-async function fetchCategories(): Promise<Category[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name")
-  if (error) throw error
-  return data
 }
 
 // ── Recurring row ─────────────────────────────────────────────────────────────
@@ -738,7 +720,12 @@ export function RecurringList() {
   const [bulkPending, setBulkPending] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: recurring = [], isLoading: loadingRec } = useQuery({
+  const {
+    data: recurring = [],
+    isLoading: loadingRec,
+    isError: recurringError,
+    refetch: refetchRecurring,
+  } = useQuery({
     queryKey: RECURRING_KEY,
     queryFn: fetchRecurring,
   })
@@ -748,15 +735,9 @@ export function RecurringList() {
     queryFn: fetchPendingOccurrences,
   })
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn: fetchAccounts,
-  })
+  const { data: accounts = [] } = useAccounts()
 
-  const { data: categories = [] } = useQuery({
-    queryKey: CATEGORIES_KEY,
-    queryFn: fetchCategories,
-  })
+  const { data: categories = [] } = useCategories()
 
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
@@ -912,8 +893,13 @@ export function RecurringList() {
         </div>
       )}
 
+      {/* Error state */}
+      {!loadingRec && recurringError && (
+        <QueryError onRetry={() => refetchRecurring()} />
+      )}
+
       {/* Empty state */}
-      {!loadingRec && filtered.length === 0 && (
+      {!loadingRec && !recurringError && filtered.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <Repeat className="h-8 w-8 text-primary" />
