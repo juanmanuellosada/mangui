@@ -52,6 +52,7 @@ import { useQuickAdd } from "@/components/quick-add-provider"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
+import { ImportStatementFlow } from "@/components/cards/import-statement-flow"
 
 type Account = Tables<"accounts">
 type Movement = Tables<"movements">
@@ -1030,18 +1031,21 @@ export function CardsList() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between pt-1">
-        <h1
-          className="text-2xl md:text-3xl tracking-tight font-bold"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Tarjetas
-        </h1>
-        {cards && cards.length > 1 && (
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
-            {cards.length} tarjetas
-          </span>
-        )}
+      <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <h1
+            className="text-2xl md:text-3xl tracking-tight font-bold truncate"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Tarjetas
+          </h1>
+          {cards && cards.length > 1 && (
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+              {cards.length} tarjetas
+            </span>
+          )}
+        </div>
+        <ImportStatementFlow cardAccounts={cards ?? []} categories={categories} />
       </div>
 
       {/* Loading */}

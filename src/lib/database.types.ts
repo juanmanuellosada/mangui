@@ -807,6 +807,7 @@ export type Database = {
           date: string
           dollar_type: string | null
           id: string
+          import_statement_id: string | null
           installment_number: number | null
           installment_purchase_id: string | null
           installment_total: number | null
@@ -827,6 +828,7 @@ export type Database = {
           date?: string
           dollar_type?: string | null
           id?: string
+          import_statement_id?: string | null
           installment_number?: number | null
           installment_purchase_id?: string | null
           installment_total?: number | null
@@ -847,6 +849,7 @@ export type Database = {
           date?: string
           dollar_type?: string | null
           id?: string
+          import_statement_id?: string | null
           installment_number?: number | null
           installment_purchase_id?: string | null
           installment_total?: number | null
@@ -885,6 +888,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movements_import_statement_id_fkey"
+            columns: ["import_statement_id"]
+            isOneToOne: false
+            referencedRelation: "card_statements"
             referencedColumns: ["id"]
           },
           {
@@ -1462,6 +1472,10 @@ export type Database = {
       check_and_increment_ai_usage: {
         Args: { p_user_id: string; p_limit: number | null; p_model: string | null }
         Returns: boolean
+      }
+      import_card_statement: {
+        Args: { p_payload: Json }
+        Returns: Json
       }
       seed_default_categories: {
         Args: { p_user_id: string }
