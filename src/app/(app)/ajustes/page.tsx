@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -8,7 +8,7 @@ import { z } from "zod"
 import { useTheme } from "next-themes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { User, Settings2, Palette, Database, LogOut, Sun, Moon, Monitor, Info, Download, ShieldCheck, Check, Crown, Sparkles, TriangleAlert } from "lucide-react"
+import { User, Settings2, Palette, Database, LogOut, Sun, Moon, Monitor, Info, Download, ShieldCheck, Check, Crown, Sparkles, TriangleAlert, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
+import { uploadAvatar, avatarPathFromPublicUrl } from "@/lib/avatar"
 import { signOut } from "@/app/actions/auth"
 import { subscribeToPremium, cancelSubscription } from "@/app/actions/subscription"
 import { track } from "@/lib/analytics"
@@ -180,6 +181,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>
 function ProfileSection({ profile }: { profile: Profile | null }) {
   const queryClient = useQueryClient()
   const isDemo = useIsDemo()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -217,23 +219,124 @@ function ProfileSection({ profile }: { profile: Profile | null }) {
     },
   })
 
+  const avatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+      const avatarUrl = await uploadAvatar(supabase, user.id, file)
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+        .eq("id", user.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] })
+      toast.success("Foto de perfil actualizada")
+    },
+    onError: (err: Error) => {
+      toast.error("Error al subir la foto", { description: err.message })
+    },
+  })
+
+  const removeAvatarMutation = useMutation({
+    mutationFn: async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("No autenticado")
+      if (profile?.avatar_url) {
+        const path = avatarPathFromPublicUrl(profile.avatar_url)
+        if (path) await supabase.storage.from("icons").remove([path])
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null, updated_at: new Date().toISOString() })
+        .eq("id", user.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] })
+      toast.success("Foto de perfil eliminada")
+    },
+    onError: (err: Error) => {
+      toast.error("Error al quitar la foto", { description: err.message })
+    },
+  })
+
+  function handleAvatarFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (file) avatarMutation.mutate(file)
+  }
+
+  const avatarBusy = avatarMutation.isPending || removeAvatarMutation.isPending
+
   return (
     <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
-      {/* Avatar (initials) */}
+      {/* Avatar */}
       <div className="flex items-center gap-4">
-        <Avatar className="h-16 w-16">
-          {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.name ?? ""} />}
-          <AvatarFallback className="text-xl bg-primary text-primary-foreground font-semibold">
-            {getInitials(profile?.name ?? null)}
-          </AvatarFallback>
-        </Avatar>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={isDemo || avatarBusy}
+          onChange={handleAvatarFileChange}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isDemo || avatarBusy}
+          title={isDemo ? "No disponible en el modo demo" : "Cambiar foto"}
+          className={cn(
+            "relative rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            isDemo || avatarBusy ? "cursor-not-allowed" : "cursor-pointer group"
+          )}
+        >
+          <Avatar className="h-16 w-16">
+            {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.name ?? ""} />}
+            <AvatarFallback className="text-xl bg-primary text-primary-foreground font-semibold">
+              {getInitials(profile?.name ?? null)}
+            </AvatarFallback>
+          </Avatar>
+          {!isDemo && (
+            <span className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <Camera className="h-5 w-5 text-white" />
+            </span>
+          )}
+        </button>
         <div>
           <p className="text-sm font-medium">{profile?.name ?? "Usuario"}</p>
           <p className="text-xs text-muted-foreground">{profile?.email ?? ""}</p>
-          {/* TODO: subir avatar — upload de imagen pendiente */}
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Cambio de foto: próximamente
-          </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isDemo || avatarBusy}
+              title={isDemo ? "No disponible en el modo demo" : undefined}
+              className={cn(
+                "text-[11px] font-medium text-primary hover:underline",
+                (isDemo || avatarBusy) && "opacity-50 cursor-not-allowed hover:no-underline"
+              )}
+            >
+              {avatarMutation.isPending ? "Subiendo…" : "Cambiar foto"}
+            </button>
+            {profile?.avatar_url && (
+              <button
+                type="button"
+                onClick={() => removeAvatarMutation.mutate()}
+                disabled={isDemo || avatarBusy}
+                title={isDemo ? "No disponible en el modo demo" : undefined}
+                className={cn(
+                  "text-[11px] font-medium text-muted-foreground hover:text-destructive hover:underline",
+                  (isDemo || avatarBusy) && "opacity-50 cursor-not-allowed hover:no-underline"
+                )}
+              >
+                {removeAvatarMutation.isPending ? "Quitando…" : "Quitar foto"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
