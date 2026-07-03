@@ -743,21 +743,23 @@ function EditTransferDialog({
     onMutate: async ({ values }) => {
       await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
       const previousAll = queryClient.getQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY })
-      queryClient.setQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY }, (old = []) =>
-        old.map((t) =>
-          t.id === transfer.id
-            ? {
-                ...t,
-                from_account_id: values.from_account_id,
-                to_account_id: values.to_account_id,
-                from_amount: values.from_amount,
-                to_amount: values.to_amount,
-                date: values.date,
-                note: values.note || null,
-                is_future: isFutureDate(values.date),
-              }
-            : t
-        )
+      queryClient.setQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY }, (old) =>
+        Array.isArray(old)
+          ? old.map((t) =>
+              t.id === transfer.id
+                ? {
+                    ...t,
+                    from_account_id: values.from_account_id,
+                    to_account_id: values.to_account_id,
+                    from_amount: values.from_amount,
+                    to_amount: values.to_amount,
+                    date: values.date,
+                    note: values.note || null,
+                    is_future: isFutureDate(values.date),
+                  }
+                : t
+            )
+          : old
       )
       return { previousAll }
     },
@@ -826,8 +828,8 @@ function DeleteTransferDialog({
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: TRANSFERS_KEY })
       const previousAll = queryClient.getQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY })
-      queryClient.setQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY }, (old = []) =>
-        old.filter((t) => t.id !== transfer.id)
+      queryClient.setQueriesData<Transfer[]>({ queryKey: TRANSFERS_KEY }, (old) =>
+        Array.isArray(old) ? old.filter((t) => t.id !== transfer.id) : old
       )
       return { previousAll }
     },
@@ -960,22 +962,24 @@ export function EditMovementDialog({
     onMutate: async ({ values }) => {
       await queryClient.cancelQueries({ queryKey: MOVEMENTS_KEY })
       const previousAll = queryClient.getQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY })
-      queryClient.setQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY }, (old = []) =>
-        old.map((m) =>
-          m.id === movement.id
-            ? {
-                ...m,
-                type: values.type,
-                amount: values.amount,
-                original_currency: values.original_currency,
-                account_id: values.account_id,
-                category_id: values.category_id,
-                date: values.date,
-                note: values.note || null,
-                is_future: isFutureDate(values.date),
-              }
-            : m
-        )
+      queryClient.setQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY }, (old) =>
+        Array.isArray(old)
+          ? old.map((m) =>
+              m.id === movement.id
+                ? {
+                    ...m,
+                    type: values.type,
+                    amount: values.amount,
+                    original_currency: values.original_currency,
+                    account_id: values.account_id,
+                    category_id: values.category_id,
+                    date: values.date,
+                    note: values.note || null,
+                    is_future: isFutureDate(values.date),
+                  }
+                : m
+            )
+          : old
       )
       return { previousAll }
     },
@@ -1050,8 +1054,8 @@ function DeleteMovementDialog({
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: MOVEMENTS_KEY })
       const previousAll = queryClient.getQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY })
-      queryClient.setQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY }, (old = []) =>
-        old.filter((m) => m.id !== movement.id)
+      queryClient.setQueriesData<Movement[]>({ queryKey: MOVEMENTS_KEY }, (old) =>
+        Array.isArray(old) ? old.filter((m) => m.id !== movement.id) : old
       )
       return { previousAll }
     },
