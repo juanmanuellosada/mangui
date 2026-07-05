@@ -16,9 +16,19 @@ import { amountInCurrency } from "@/lib/money"
 
 // Minimal shape needed by nextCardPayment — avoids importing full DB types here.
 interface CardPaymentAccount {
-  closing_day: number | null
-  due_day?: number | null
+  closing_date: string | null
+  due_date?: string | null
   currency: string
+}
+
+/**
+ * Extracts the day-of-month (1-31) from a stored closing_date/due_date.
+ * The cycle repeats monthly anchored on that day — only the day matters
+ * for projecting other months (nextCloseDate/computeDueDate/currentCycleRange
+ * below), the month/year of the anchor date itself is irrelevant.
+ */
+export function dayOfMonth(dateStr: string): number {
+  return parseISO(dateStr).getDate()
 }
 
 interface CardPaymentStatement {
@@ -65,7 +75,7 @@ function towardAccountCurrency(
  *  2. If none, sum the last closed cycle's expense movements as a fallback.
  *
  * @param accountId   The account's UUID.
- * @param account     The account row (needs closing_day / due_day).
+ * @param account     The account row (needs closing_date / due_date).
  * @param statements  All pending card_statements (pre-filtered to "pendiente").
  * @param movements   All movements (e.g. from fetchAllMovements).
  * @param ref         Optional reference date (defaults to today).
@@ -95,10 +105,11 @@ export function nextCardPayment(
   }
 
   // 2. Fallback: sum the last CLOSED cycle from movements (not the open cycle)
-  const closingDay = account.closing_day
-  if (closingDay == null) {
+  const closingDate = account.closing_date
+  if (closingDate == null) {
     return { amount: 0, dueDate: null }
   }
+  const closingDay = dayOfMonth(closingDate)
 
   // Determine the last closed cycle: go one day before the current open cycle start
   const open = currentCycleRange(closingDay, refDate)
@@ -114,7 +125,7 @@ export function nextCardPayment(
     )
     .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
 
-  const dueDay = account.due_day
+  const dueDay = account.due_date != null ? dayOfMonth(account.due_date) : null
   // Use the current open cycle's end date (the upcoming close) so the due date
   // points to the next payment deadline, not the already-past closed cycle's.
   const dueDate =
@@ -130,7 +141,7 @@ export function nextCardPayment(
  * "Resumen en curso" = the cycle that is still accumulating (not yet closed).
  *
  * @param accountId   The account's UUID.
- * @param account     The account row (needs closing_day / due_day).
+ * @param account     The account row (needs closing_date / due_date).
  * @param movements   All movements for this account (expense type).
  * @param ref         Optional reference date (defaults to today).
  * @returns           { amount, closeDate, dueDate } — ISO strings or null.
@@ -141,10 +152,11 @@ export function currentCycleSummary(
   movements: CardPaymentMovement[],
   ref?: Date
 ): { amount: number; closeDate: string | null; dueDate: string | null } {
-  const closingDay = account.closing_day
-  if (closingDay == null) {
+  const closingDate = account.closing_date
+  if (closingDate == null) {
     return { amount: 0, closeDate: null, dueDate: null }
   }
+  const closingDay = dayOfMonth(closingDate)
 
   const refDate = ref ?? new Date()
   const { cycleStart, cycleEnd } = currentCycleRange(closingDay, refDate)
@@ -160,7 +172,7 @@ export function currentCycleSummary(
 
   const closeDate = toDateString(cycleEnd)
 
-  const dueDay = account.due_day
+  const dueDay = account.due_date != null ? dayOfMonth(account.due_date) : null
   const dueDate =
     dueDay != null
       ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay))
@@ -311,8 +323,8 @@ export function formatStatementLabel(closeDate: Date): string {
 
 // Minimal shapes for listCardCycles inputs — subsets of the DB row types.
 interface CycleAccount {
-  closing_day: number | null
-  due_day?: number | null
+  closing_date: string | null
+  due_date?: string | null
   currency: string
 }
 
@@ -387,7 +399,7 @@ export interface CardCycle {
  *    landing in the future).
  *
  * @param accountId   The credit-card account's UUID.
- * @param account     The account row (needs closing_day / due_day).
+ * @param account     The account row (needs closing_date / due_date).
  * @param movements   All movements for the user (filtered internally to this account).
  * @param statements  All card_statements for this account (may be a superset).
  * @param ref         Optional reference date for "today" (defaults to now).
@@ -399,8 +411,10 @@ export function listCardCycles(
   statements: CycleStatement[],
   ref?: Date
 ): CardCycle[] {
-  const closingDay = account.closing_day
-  if (closingDay == null) return []
+  const closingDate = account.closing_date
+  if (closingDate == null) return []
+  const closingDay = dayOfMonth(closingDate)
+  const dueDay = account.due_date != null ? dayOfMonth(account.due_date) : null
 
   const today = startOfDay(ref ?? new Date())
 
@@ -410,7 +424,6 @@ export function listCardCycles(
   if (accountMovements.length === 0) {
     // No movements: return only the current open cycle (empty)
     const { cycleStart, cycleEnd } = currentCycleRange(closingDay, today)
-    const dueDay = account.due_day
     const dueDate =
       dueDay != null ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay)) : null
     const stmt = statements.find(
@@ -477,7 +490,6 @@ export function listCardCycles(
     }
 
     const closeDateStr = toDateString(cycleEnd)
-    const dueDay = account.due_day
     const dueDate =
       dueDay != null ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay)) : null
 

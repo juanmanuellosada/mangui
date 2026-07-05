@@ -281,7 +281,7 @@ export async function pagosFuturos(
         .select("*"),
       supabase
         .from("accounts")
-        .select("id, name, type, currency, closing_day, due_day")
+        .select("id, name, type, currency, closing_date, due_date")
         .eq("is_hidden", false),
       supabase
         .from("card_statements")
@@ -346,7 +346,7 @@ export async function pagosFuturos(
   for (const card of creditCards) {
     const payment = nextCardPayment(
       card.id,
-      { closing_day: card.closing_day, due_day: card.due_day, currency: card.currency },
+      { closing_date: card.closing_date, due_date: card.due_date, currency: card.currency },
       statements as Parameters<typeof nextCardPayment>[2],
       movements as Parameters<typeof nextCardPayment>[3]
     )
@@ -384,7 +384,7 @@ export async function resumenesTarjeta(
   const [accountsRes, movsRes, statementsRes] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id, name, type, currency, closing_day, due_day")
+      .select("id, name, type, currency, closing_date, due_date")
       .eq("type", "tarjeta_credito")
       .eq("is_hidden", false),
     supabase.from("movements").select("id, account_id, type, date, amount, converted_amount, original_currency"),
@@ -407,7 +407,7 @@ export async function resumenesTarjeta(
   for (const card of creditCards) {
     const cycles = listCardCycles(
       card.id,
-      { closing_day: card.closing_day, due_day: card.due_day, currency: card.currency },
+      { closing_date: card.closing_date, due_date: card.due_date, currency: card.currency },
       allMovements as Parameters<typeof listCardCycles>[2],
       allStatements as Parameters<typeof listCardCycles>[3]
     )

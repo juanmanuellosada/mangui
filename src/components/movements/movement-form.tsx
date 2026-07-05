@@ -42,7 +42,7 @@ import { AiFillBar, type AiExtractResult } from "@/components/movements/ai-fill-
 import { usePlan } from "@/lib/use-plan"
 import { useMonthlyAttachmentCount } from "@/hooks/use-monthly-attachment-count"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
-import { nextCloseDate, computeDueDate, formatStatementLabel } from "@/lib/cards"
+import { nextCloseDate, computeDueDate, formatStatementLabel, dayOfMonth } from "@/lib/cards"
 import { todayAR } from "@/lib/date-utils"
 
 type Category = Tables<"categories">
@@ -251,12 +251,13 @@ export function MovementForm({
 
   const resumenSummary = useMemo(() => {
     if (!showCuotas) return null
-    if (!selectedAccount?.closing_day) return { type: "no_closing_day" as const }
+    if (!selectedAccount?.closing_date) return { type: "no_closing_day" as const }
 
+    const closingDay = dayOfMonth(selectedAccount.closing_date)
     const purchaseDate = dateStr ? parseISO(dateStr) : new Date()
-    const firstClose = nextCloseDate(selectedAccount.closing_day, purchaseDate)
-    const dueDay = selectedAccount.due_day ?? selectedAccount.closing_day
-    const firstDue = computeDueDate(firstClose, dueDay, selectedAccount.closing_day)
+    const firstClose = nextCloseDate(closingDay, purchaseDate)
+    const dueDay = selectedAccount.due_date ? dayOfMonth(selectedAccount.due_date) : closingDay
+    const firstDue = computeDueDate(firstClose, dueDay, closingDay)
 
     const fmt = (d: Date) => {
       const dd = String(d.getDate()).padStart(2, "0")
@@ -271,7 +272,7 @@ export function MovementForm({
       closeStr: fmt(firstClose),
       dueStr: fmt(firstDue),
     }
-  }, [showCuotas, dateStr, selectedAccount?.closing_day, selectedAccount?.due_day])
+  }, [showCuotas, dateStr, selectedAccount?.closing_date, selectedAccount?.due_date])
 
 
   // When account changes and it's not a credit card, force the currency to account's currency

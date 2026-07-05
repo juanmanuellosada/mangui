@@ -111,8 +111,8 @@ export function OnboardingWizard({ userId, firstName, defaultCurrency }: Onboard
             values.type !== "tarjeta_credito" && values.account_number
               ? values.account_number
               : null,
-          closing_day: values.type === "tarjeta_credito" ? (values.closing_day ?? null) : null,
-          due_day: values.type === "tarjeta_credito" ? (values.due_day ?? null) : null,
+          closing_date: values.type === "tarjeta_credito" ? (values.closing_date ?? null) : null,
+          due_date: values.type === "tarjeta_credito" ? (values.due_date ?? null) : null,
         })
         .select()
         .single()

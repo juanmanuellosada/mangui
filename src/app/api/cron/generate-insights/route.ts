@@ -92,11 +92,11 @@ export async function GET(req: NextRequest) {
     // ── fetch accounts ──────────────────────────────────────────────────────
     const { data: accounts } = await admin
       .from("accounts")
-      .select("id, name, type, currency, closing_day, due_day")
+      .select("id, name, type, currency, closing_date, due_date")
       .eq("user_id", userId)
 
     const cards = (accounts ?? []).filter(
-      (a) => a.type === "tarjeta_credito" && a.closing_day != null
+      (a) => a.type === "tarjeta_credito" && a.closing_date != null
     )
 
     // ── fetch movements ─────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
     const insightCards = cards.map((c) => {
       const summary = currentCycleSummary(
         c.id,
-        { closing_day: c.closing_day, due_day: c.due_day, currency: c.currency },
+        { closing_date: c.closing_date, due_date: c.due_date, currency: c.currency },
         movements,
         today
       )

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { assertCronAuth } from "@/lib/cron-auth"
 import { sendPushToUser, tryNotify } from "@/lib/notifications"
-import { nextCloseDate, computeDueDate, toDateString, currentCycleSummary } from "@/lib/cards"
+import { nextCloseDate, computeDueDate, toDateString, currentCycleSummary, dayOfMonth } from "@/lib/cards"
 import { computeBudgetProgress, activeBudgetWindow } from "@/lib/budgets"
 import { detectUnusualCharge } from "@/lib/insights/unusual"
 import { formatCurrency } from "@/lib/utils"
@@ -116,18 +116,20 @@ export async function GET(req: NextRequest) {
       try {
         const { data: cards } = await admin
           .from("accounts")
-          .select("id, name, closing_day, due_day, currency")
+          .select("id, name, closing_date, due_date, currency")
           .eq("user_id", userId)
           .eq("type", "tarjeta_credito")
-          .not("closing_day", "is", null)
-          .not("due_day", "is", null)
+          .not("closing_date", "is", null)
+          .not("due_date", "is", null)
 
         for (const card of cards ?? []) {
-          if (!card.closing_day || !card.due_day) continue
+          if (!card.closing_date || !card.due_date) continue
 
-          const closeDate = nextCloseDate(card.closing_day, today)
+          const closingDay = dayOfMonth(card.closing_date)
+          const dueDay = dayOfMonth(card.due_date)
+          const closeDate = nextCloseDate(closingDay, today)
           const closeDateStr = toDateString(closeDate)
-          const dueDate = computeDueDate(closeDate, card.due_day, card.closing_day)
+          const dueDate = computeDueDate(closeDate, dueDay, closingDay)
           const dueDateStr = toDateString(dueDate)
 
           // Close reminder: 48hs window, enriched with the projected amount.
@@ -140,7 +142,7 @@ export async function GET(req: NextRequest) {
 
             const summary = currentCycleSummary(
               card.id,
-              { closing_day: card.closing_day, due_day: card.due_day, currency: card.currency },
+              { closing_date: card.closing_date, due_date: card.due_date, currency: card.currency },
               movements,
               today
             )

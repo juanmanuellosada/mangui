@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { parseISO } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,7 +20,7 @@ import {
   renderAccountIcon,
   type Account,
 } from "@/lib/accounts"
-import { nextCloseDate, computeDueDate } from "@/lib/cards"
+import { toDateString } from "@/lib/cards"
 import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 
@@ -40,8 +41,8 @@ export type AccountFormValues = {
   color: string
   is_hidden: boolean
   account_number?: string | null
-  closing_day?: number | null
-  due_day?: number | null
+  closing_date?: string | null
+  due_date?: string | null
 }
 
 const accountSchema = z
@@ -62,35 +63,23 @@ const accountSchema = z
     color: z.string(),
     is_hidden: z.boolean(),
     account_number: z.string().max(120).nullable().optional(),
-    closing_day: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(31)
-      .nullable()
-      .optional(),
-    due_day: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(31)
-      .nullable()
-      .optional(),
+    closing_date: z.string().nullable().optional(),
+    due_date: z.string().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.type === "tarjeta_credito") {
-      if (!data.closing_day) {
+      if (!data.closing_date) {
         ctx.addIssue({
-          path: ["closing_day"],
+          path: ["closing_date"],
           code: z.ZodIssueCode.custom,
-          message: "Seleccioná el próximo cierre",
+          message: "Seleccioná la fecha de cierre",
         })
       }
-      if (!data.due_day) {
+      if (!data.due_date) {
         ctx.addIssue({
-          path: ["due_day"],
+          path: ["due_date"],
           code: z.ZodIssueCode.custom,
-          message: "Seleccioná el próximo vencimiento",
+          message: "Seleccioná la fecha de vencimiento",
         })
       }
     }
@@ -110,26 +99,10 @@ const ACCOUNT_TYPE_OPTIONS = Object.entries(ACCOUNT_TYPE_LABELS).map(([value, la
   }
 })
 
-/**
- * Compute the default "next close date" from a stored closing_day.
- * Returns today if no closing_day is set.
- */
-function defaultCloseDate(closingDay: number | null | undefined): Date | null {
-  if (!closingDay) return null
-  return nextCloseDate(closingDay)
-}
-
-/**
- * Compute the default "next due date" from stored closing_day + due_day.
- * Returns null if either is missing.
- */
-function defaultDueDate(
-  closingDay: number | null | undefined,
-  dueDay: number | null | undefined
-): Date | null {
-  if (!closingDay || !dueDay) return null
-  const close = nextCloseDate(closingDay)
-  return computeDueDate(close, dueDay, closingDay)
+/** Parse a stored closing_date/due_date (yyyy-MM-dd) into a Date for the picker. */
+function parseStoredDate(dateStr: string | null | undefined): Date | null {
+  if (!dateStr) return null
+  return parseISO(dateStr)
 }
 
 interface AccountFormProps {
@@ -169,8 +142,8 @@ export function AccountForm({
       color: "#65a30d",
       is_hidden: false,
       account_number: null,
-      closing_day: null,
-      due_day: null,
+      closing_date: null,
+      due_date: null,
       ...defaultValues,
     },
   })
@@ -179,26 +152,17 @@ export function AccountForm({
   const selectedIcon = watch("icon")
   const selectedCurrency = watch("currency")
   const isHidden = watch("is_hidden")
-  const closingDay = watch("closing_day")
-  const dueDay = watch("due_day")
   const isCreditCard = selectedType === "tarjeta_credito"
 
-  // Local Date state for the two calendar pickers (derived from form day-of-month fields)
+  // Local Date state for the two calendar pickers, parsed from the stored
+  // closing_date/due_date — shows exactly the date the user picked/saved,
+  // not a projected "next occurrence".
   const [closeDate, setCloseDate] = useState<Date | null>(
-    () => defaultCloseDate(defaultValues?.closing_day)
+    () => parseStoredDate(defaultValues?.closing_date)
   )
   const [dueDate, setDueDate] = useState<Date | null>(
-    () => defaultDueDate(defaultValues?.closing_day, defaultValues?.due_day)
+    () => parseStoredDate(defaultValues?.due_date)
   )
-
-  // Sync closingDay → closeDate picker when the stored closing_day changes (edit mode)
-  // This only runs on mount for edit; user picks replace it afterwards.
-  useEffect(() => {
-    if (defaultValues?.closing_day && closeDate === null) {
-      setCloseDate(defaultCloseDate(defaultValues.closing_day))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // Force ARS when credit card is selected; restore toggle when switching away
   useEffect(() => {
@@ -210,16 +174,16 @@ export function AccountForm({
   // Dynamic currency prefix for the balance input — credit cards are always ARS ($)
   const currencyPrefix = !isCreditCard && selectedCurrency === "USD" ? "US$" : "$"
 
-  // When user picks a close date, store day-of-month in form
+  // When user picks a close date, store the exact date in the form
   function handleCloseDate(date: Date) {
     setCloseDate(date)
-    setValue("closing_day", date.getDate(), { shouldValidate: true })
+    setValue("closing_date", toDateString(date), { shouldValidate: true })
   }
 
-  // When user picks a due date, store day-of-month in form
+  // When user picks a due date, store the exact date in the form
   function handleDueDate(date: Date) {
     setDueDate(date)
-    setValue("due_day", date.getDate(), { shouldValidate: true })
+    setValue("due_date", toDateString(date), { shouldValidate: true })
   }
 
   // Validate due is after close if both are set
@@ -231,10 +195,6 @@ export function AccountForm({
     }
     return null
   })()
-
-  // Suppress unused warning — closingDay/dueDay are watched to trigger re-renders via setValue
-  void closingDay
-  void dueDay
 
   return (
     <>
@@ -346,10 +306,10 @@ export function AccountForm({
                 value={closeDate}
                 onChange={handleCloseDate}
                 placeholder="Seleccionar fecha"
-                aria-invalid={!!errors.closing_day}
+                aria-invalid={!!errors.closing_date}
               />
-              {errors.closing_day && (
-                <p className="text-xs text-destructive">{errors.closing_day.message}</p>
+              {errors.closing_date && (
+                <p className="text-xs text-destructive">{errors.closing_date.message}</p>
               )}
             </div>
             <div className="space-y-1.5">
@@ -359,12 +319,12 @@ export function AccountForm({
                 value={dueDate}
                 onChange={handleDueDate}
                 placeholder="Seleccionar fecha"
-                aria-invalid={!!errors.due_day}
+                aria-invalid={!!errors.due_date}
               />
-              {errors.due_day && (
-                <p className="text-xs text-destructive">{errors.due_day.message}</p>
+              {errors.due_date && (
+                <p className="text-xs text-destructive">{errors.due_date.message}</p>
               )}
-              {!errors.due_day && dueDateWarning && (
+              {!errors.due_date && dueDateWarning && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">{dueDateWarning}</p>
               )}
             </div>
@@ -425,7 +385,7 @@ export function accountToFormValues(account: Account): AccountFormValues {
     color: account.color ?? "#65a30d",
     is_hidden: account.is_hidden,
     account_number: account.account_number ?? null,
-    closing_day: account.closing_day ?? null,
-    due_day: account.due_day ?? null,
+    closing_date: account.closing_date ?? null,
+    due_date: account.due_date ?? null,
   }
 }

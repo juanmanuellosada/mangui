@@ -17,10 +17,15 @@ export type Database = {
       accounts: {
         Row: {
           account_number: string | null
+          closing_date: string | null
+          // GENERATED ALWAYS AS (EXTRACT(DAY FROM closing_date)) — read-only,
+          // kept for display-only consumers (see 0054 migration).
           closing_day: number | null
           color: string | null
           created_at: string
           currency: Database["public"]["Enums"]["currency"]
+          due_date: string | null
+          // GENERATED ALWAYS AS (EXTRACT(DAY FROM due_date)) — read-only.
           due_day: number | null
           icon: string | null
           id: string
@@ -33,11 +38,11 @@ export type Database = {
         }
         Insert: {
           account_number?: string | null
-          closing_day?: number | null
+          closing_date?: string | null
           color?: string | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
-          due_day?: number | null
+          due_date?: string | null
           icon?: string | null
           id?: string
           initial_balance?: number
@@ -49,11 +54,11 @@ export type Database = {
         }
         Update: {
           account_number?: string | null
-          closing_day?: number | null
+          closing_date?: string | null
           color?: string | null
           created_at?: string
           currency?: Database["public"]["Enums"]["currency"]
-          due_day?: number | null
+          due_date?: string | null
           icon?: string | null
           id?: string
           initial_balance?: number

@@ -131,8 +131,8 @@ function CreateAccountDialog({
           color: values.color,
           is_hidden: values.is_hidden,
           account_number: values.type !== "tarjeta_credito" && values.account_number ? values.account_number : null,
-          closing_day: values.type === "tarjeta_credito" ? (values.closing_day ?? null) : null,
-          due_day: values.type === "tarjeta_credito" ? (values.due_day ?? null) : null,
+          closing_date: values.type === "tarjeta_credito" ? (values.closing_date ?? null) : null,
+          due_date: values.type === "tarjeta_credito" ? (values.due_date ?? null) : null,
         })
         .select()
         .single()
@@ -203,8 +203,8 @@ function EditAccountDialog({ account, userId, open, onOpenChange }: { account: A
           color: values.color,
           is_hidden: values.is_hidden,
           account_number: values.type !== "tarjeta_credito" && values.account_number ? values.account_number : null,
-          closing_day: values.type === "tarjeta_credito" ? (values.closing_day ?? null) : null,
-          due_day: values.type === "tarjeta_credito" ? (values.due_day ?? null) : null,
+          closing_date: values.type === "tarjeta_credito" ? (values.closing_date ?? null) : null,
+          due_date: values.type === "tarjeta_credito" ? (values.due_date ?? null) : null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", account.id)
@@ -229,8 +229,13 @@ function EditAccountDialog({ account, userId, open, onOpenChange }: { account: A
                 color: values.color ?? a.color,
                 is_hidden: values.is_hidden,
                 account_number: values.type !== "tarjeta_credito" && values.account_number ? values.account_number : null,
-                closing_day: values.closing_day ?? null,
-                due_day: values.due_day ?? null,
+                closing_date: values.closing_date ?? null,
+                due_date: values.due_date ?? null,
+                // closing_day/due_day are DB-generated from closing_date/due_date;
+                // derive them here too so the optimistic patch stays consistent
+                // until the post-mutation invalidateQueries refetch lands.
+                closing_day: values.closing_date ? parseISO(values.closing_date).getDate() : null,
+                due_day: values.due_date ? parseISO(values.due_date).getDate() : null,
               }
             : a
         )

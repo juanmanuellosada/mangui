@@ -254,7 +254,9 @@ describe("formatStatementLabel", () => {
 // currentCycleSummary / listCardCycles — "USD puro" (ver src/lib/money.ts)
 // ---------------------------------------------------------------------------
 describe("currentCycleSummary — USD puro", () => {
-  const account = { closing_day: 20, due_day: 10, currency: "ARS" }
+  // Solo el día del mes de closing_date/due_date importa para proyectar el
+  // ciclo (el año/mes del ancla en sí es irrelevante — ver dayOfMonth en cards.ts).
+  const account = { closing_date: "2020-01-20", due_date: "2020-01-10", currency: "ARS" }
   const ref = new Date(2026, 5, 10) // June 10 2026 → cycle May 21 – June 20
 
   it("does not count a USD movement with no converted_amount toward the ARS total", () => {
@@ -278,7 +280,7 @@ describe("currentCycleSummary — USD puro", () => {
 
 describe("listCardCycles — edge de fechas: el cierre del ciclo más viejo cae después de ref", () => {
   it("incluye el ciclo del movimiento más viejo aunque su cierre sea posterior a ref (ciclo abierto)", () => {
-    const account = { closing_day: 20, due_day: 10, currency: "ARS" }
+    const account = { closing_date: "2020-01-20", due_date: "2020-01-10", currency: "ARS" }
     // Único movimiento, dentro del ciclo abierto (cierra 2026-06-20).
     const movements = [
       { id: "m1", account_id: "card-1", type: "expense", date: "2026-06-05", amount: 100, converted_amount: null, original_currency: "ARS" },
@@ -295,7 +297,7 @@ describe("listCardCycles — edge de fechas: el cierre del ciclo más viejo cae 
 
 describe("listCardCycles — totalsByCurrency vs. ARS total", () => {
   it("USD-puro expenses stay out of `total` (ARS) but still show up in totalsByCurrency.USD", () => {
-    const account = { closing_day: 20, due_day: 10, currency: "ARS" }
+    const account = { closing_date: "2020-01-20", due_date: "2020-01-10", currency: "ARS" }
     const movements = [
       { id: "m1", account_id: "card-1", type: "expense", date: "2026-06-05", amount: 200, converted_amount: null, original_currency: "ARS" },
       { id: "m2", account_id: "card-1", type: "expense", date: "2026-06-06", amount: 50, converted_amount: null, original_currency: "USD" },
@@ -307,5 +309,33 @@ describe("listCardCycles — totalsByCurrency vs. ARS total", () => {
     const cycle = cycles[cycles.length - 1]
     expect(cycle.total).toBe(200)
     expect(cycle.totalsByCurrency).toEqual({ ARS: 200, USD: 50 })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Anclaje en closing_date/due_date (fecha completa, no solo día del mes) —
+// el ciclo se ancla en la fecha guardada y se proyecta mes a mes (Tarea 0054).
+// ---------------------------------------------------------------------------
+describe("currentCycleSummary — ancla en closing_date/due_date", () => {
+  it("el ciclo actual cierra exactamente en la fecha guardada cuando ref cae ese mismo día", () => {
+    const account = { closing_date: "2026-06-20", due_date: "2026-06-10", currency: "ARS" }
+    const ref = new Date(2026, 5, 20) // 20 de junio 2026, mismo día que closing_date
+    const { closeDate } = currentCycleSummary("card-1", account, [], ref)
+    expect(closeDate).toBe("2026-06-20")
+  })
+
+  it("el ciclo siguiente se proyecta +1 mes desde la fecha guardada", () => {
+    // Ancla en enero (2026-01-15); parado en febrero, el próximo cierre cae el 15/2.
+    const account = { closing_date: "2026-01-15", due_date: null, currency: "ARS" }
+    const ref = new Date(2026, 1, 1) // 1 de febrero 2026
+    const { closeDate } = currentCycleSummary("card-1", account, [], ref)
+    expect(closeDate).toBe("2026-02-15")
+  })
+
+  it("borde fin de mes: un cierre anclado el día 31 se clampea a 28 en febrero (no bisiesto)", () => {
+    const account = { closing_date: "2026-01-31", due_date: null, currency: "ARS" }
+    const ref = new Date(2026, 1, 1) // 1 de febrero 2026
+    const { closeDate } = currentCycleSummary("card-1", account, [], ref)
+    expect(closeDate).toBe("2026-02-28")
   })
 })

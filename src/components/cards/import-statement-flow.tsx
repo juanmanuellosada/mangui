@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
 import { createClient } from "@/lib/supabase/client"
 import { uploadAttachment } from "@/lib/attachments"
-import { toDateString, nextCloseDate, computeDueDate } from "@/lib/cards"
+import { toDateString, nextCloseDate, computeDueDate, dayOfMonth } from "@/lib/cards"
 import { amountInCurrency } from "@/lib/money"
 import { todayAR } from "@/lib/date-utils"
 import { AccountIconChip } from "@/lib/accounts"
@@ -357,7 +357,7 @@ export function ImportStatementFlow({
 
   // Review step state
   // Fechas de cierre/vencimiento del resumen. Se precargan al analizar el PDF
-  // con el valor derivado del ciclo de la tarjeta (closing_day/due_day, ver
+  // con el valor derivado del ciclo de la tarjeta (closing_date/due_date, ver
   // initReviewFromParsed), pero son editables: si la IA interpretó mal a qué
   // ciclo pertenece el resumen, el usuario puede corregirlas a mano. El
   // close_date que termina en el payload es el que edite el usuario (card_statements
@@ -415,12 +415,12 @@ export function ImportStatementFlow({
     parsedTotalArs > 0 &&
     Math.abs(computedArsTotal - parsedTotalArs) > Math.max(100, parsedTotalArs * 0.02)
 
-  // Si la tarjeta tiene el ciclo cargado (closing_day/due_day), el default de
+  // Si la tarjeta tiene el ciclo cargado (closing_date/due_date), el default de
   // cierre/vencimiento se derivó de ahí (ver initReviewFromParsed); si no,
   // se usó como fallback lo que trajo el PDF. Sólo determina qué hint mostrar
   // — las fechas siempre quedan editables por si el usuario necesita corregirlas.
-  const closeFromCycle = selectedAccount?.closing_day != null
-  const dueFromCycle = selectedAccount?.due_day != null
+  const closeFromCycle = selectedAccount?.closing_date != null
+  const dueFromCycle = selectedAccount?.due_date != null
   const cycleFallbackActive = !closeFromCycle || !dueFromCycle
 
   // Preview agrupada por resumen/ciclo (Tarea 4.1): se re-deriva en cada
@@ -492,11 +492,11 @@ export function ImportStatementFlow({
 
   function initReviewFromParsed(parsed: ParsedStatement) {
     // Default de cierre/vencimiento: derivado del ciclo de la tarjeta
-    // (closing_day/due_day) para que coincida con lo que tiene cargado. Si la
+    // (closing_date/due_date) para que coincida con lo que tiene cargado. Si la
     // tarjeta no tiene el ciclo cargado, cae a las fechas que trajo el PDF
     // (fallback ya existente). En ambos casos el usuario puede editarlo después.
-    const closingDay = selectedAccount?.closing_day ?? null
-    const dueDay = selectedAccount?.due_day ?? null
+    const closingDay = selectedAccount?.closing_date ? dayOfMonth(selectedAccount.closing_date) : null
+    const dueDay = selectedAccount?.due_date ? dayOfMonth(selectedAccount.due_date) : null
     let defaultClose = parsed.close_date
     let defaultDue = parsed.due_date
     if (closingDay != null) {
