@@ -16,7 +16,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { CalendarDays, Check, Clock, FileText, FileUp, Loader2, Sparkles, X } from "lucide-react"
+import { Check, Clock, FileText, FileUp, Loader2, Sparkles, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
+import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Switch } from "@/components/ui/switch"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
@@ -335,10 +336,14 @@ export function ImportStatementFlow({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Review step state
-  // Fechas crudas parseadas del PDF (solo referencia para derivar el ciclo real —
-  // ver `cycleDates` más abajo). El usuario ya no las edita a mano.
-  const [parsedCloseDate, setParsedCloseDate] = useState<string | null>(null)
-  const [parsedDueDate, setParsedDueDate] = useState<string | null>(null)
+  // Fechas de cierre/vencimiento del resumen. Se precargan al analizar el PDF
+  // con el valor derivado del ciclo de la tarjeta (closing_day/due_day, ver
+  // initReviewFromParsed), pero son editables: si la IA interpretó mal a qué
+  // ciclo pertenece el resumen, el usuario puede corregirlas a mano. El
+  // close_date que termina en el payload es el que edite el usuario (card_statements
+  // matchea por close_date).
+  const [closeDate, setCloseDate] = useState<string | null>(null)
+  const [dueDate, setDueDate] = useState<string | null>(null)
   const [totalArs, setTotalArs] = useState("")
   const [totalUsd, setTotalUsd] = useState("")
   const [stampTax, setStampTax] = useState("0")
@@ -390,62 +395,31 @@ export function ImportStatementFlow({
     parsedTotalArs > 0 &&
     Math.abs(computedArsTotal - parsedTotalArs) > Math.max(100, parsedTotalArs * 0.02)
 
-  // Fechas de cierre/vencimiento derivadas del ciclo configurado en la tarjeta
-  // (closing_day/due_day), NO elegidas a mano. El close_date del PDF sólo se
-  // usa como referencia para ubicar el mes/período; el cierre real siempre
-  // sale de `nextCloseDate` para que matchee el ciclo virtual de la tarjeta
-  // (card_statements matchea por close_date). Si la tarjeta no tiene el
-  // ciclo cargado, se cae a las fechas que trajo el PDF.
-  const cycleDates = useMemo(() => {
-    const closingDay = selectedAccount?.closing_day ?? null
-    const dueDay = selectedAccount?.due_day ?? null
-
-    if (closingDay != null) {
-      const ref = parsedCloseDate ? parseISO(parsedCloseDate) : parseISO(todayAR())
-      const closeDateStr = toDateString(nextCloseDate(closingDay, ref))
-      const adjusted = parsedCloseDate != null && parsedCloseDate !== closeDateStr
-      const dueDateStr =
-        dueDay != null
-          ? toDateString(computeDueDate(parseISO(closeDateStr), dueDay, closingDay))
-          : parsedDueDate
-
-      return {
-        closeDate: closeDateStr,
-        dueDate: dueDateStr,
-        closeFromCycle: true,
-        dueFromCycle: dueDay != null,
-        adjusted,
-      }
-    }
-
-    return {
-      closeDate: parsedCloseDate,
-      dueDate: parsedDueDate,
-      closeFromCycle: false,
-      dueFromCycle: false,
-      adjusted: false,
-    }
-  }, [selectedAccount, parsedCloseDate, parsedDueDate])
-
-  const cycleFallbackActive = !cycleDates.closeFromCycle || !cycleDates.dueFromCycle
+  // Si la tarjeta tiene el ciclo cargado (closing_day/due_day), el default de
+  // cierre/vencimiento se derivó de ahí (ver initReviewFromParsed); si no,
+  // se usó como fallback lo que trajo el PDF. Sólo determina qué hint mostrar
+  // — las fechas siempre quedan editables por si el usuario necesita corregirlas.
+  const closeFromCycle = selectedAccount?.closing_day != null
+  const dueFromCycle = selectedAccount?.due_day != null
+  const cycleFallbackActive = !closeFromCycle || !dueFromCycle
 
   // Preview agrupada por resumen/ciclo (Tarea 4.1): se re-deriva en cada
   // render a partir de `lines` (la fuente), así que editar una línea de cuota
   // propaga sola a sus cuotas futuras proyectadas (Tarea 4.3).
   const groups: StatementPreviewGroup[] = useMemo(() => {
-    if (!cycleDates.closeDate || !cycleDates.dueDate) return []
+    if (!closeDate || !dueDate) return []
     const reviewLines: StatementReviewLine[] = lines.map(toStatementReviewLine)
     return groupStatementPreviewByCycle({
       account_id: selectedAccountId,
       account_currency: accountCurrency,
-      close_date: cycleDates.closeDate,
-      due_date: cycleDates.dueDate,
+      close_date: closeDate,
+      due_date: dueDate,
       total_amount: parsedTotalArs,
       total_amount_usd: parseFloat(totalUsd) || 0,
       stamp_tax: parseFloat(stampTax) || 0,
       lines: reviewLines,
     })
-  }, [cycleDates, lines, selectedAccountId, accountCurrency, parsedTotalArs, totalUsd, stampTax])
+  }, [closeDate, dueDate, lines, selectedAccountId, accountCurrency, parsedTotalArs, totalUsd, stampTax])
 
   const allGroupsApproved = groups.length > 0 && groups.every((g) => approvedOffsets.has(g.cycleOffset))
   const totalItemsToCreate = groups.reduce((sum, g) => sum + g.lines.length, 0)
@@ -457,8 +431,8 @@ export function ImportStatementFlow({
     setAnalyzing(false)
     setRateLimited(false)
     setErrorMsg(null)
-    setParsedCloseDate(null)
-    setParsedDueDate(null)
+    setCloseDate(null)
+    setDueDate(null)
     setTotalArs("")
     setTotalUsd("")
     setStampTax("0")
@@ -492,8 +466,24 @@ export function ImportStatementFlow({
   }
 
   function initReviewFromParsed(parsed: ParsedStatement) {
-    setParsedCloseDate(parsed.close_date)
-    setParsedDueDate(parsed.due_date)
+    // Default de cierre/vencimiento: derivado del ciclo de la tarjeta
+    // (closing_day/due_day) para que coincida con lo que tiene cargado. Si la
+    // tarjeta no tiene el ciclo cargado, cae a las fechas que trajo el PDF
+    // (fallback ya existente). En ambos casos el usuario puede editarlo después.
+    const closingDay = selectedAccount?.closing_day ?? null
+    const dueDay = selectedAccount?.due_day ?? null
+    let defaultClose = parsed.close_date
+    let defaultDue = parsed.due_date
+    if (closingDay != null) {
+      const ref = parsed.close_date ? parseISO(parsed.close_date) : parseISO(todayAR())
+      defaultClose = toDateString(nextCloseDate(closingDay, ref))
+      defaultDue =
+        dueDay != null
+          ? toDateString(computeDueDate(parseISO(defaultClose), dueDay, closingDay))
+          : parsed.due_date
+    }
+    setCloseDate(defaultClose)
+    setDueDate(defaultDue)
     setTotalArs(parsed.total_ars != null ? String(parsed.total_ars) : "")
     setTotalUsd(parsed.total_usd != null ? String(parsed.total_usd) : "")
     setStampTax(parsed.stamp_tax != null ? String(parsed.stamp_tax) : "0")
@@ -569,7 +559,7 @@ export function ImportStatementFlow({
   }
 
   async function handleSave() {
-    if (!selectedAccount || !cycleDates.closeDate || !cycleDates.dueDate) return
+    if (!selectedAccount || !closeDate || !dueDate) return
     setSaving(true)
     try {
       const reviewLines: StatementReviewLine[] = lines.map(toStatementReviewLine)
@@ -578,8 +568,8 @@ export function ImportStatementFlow({
         payload = buildStatementPayload({
           account_id: selectedAccount.id,
           account_currency: accountCurrency,
-          close_date: cycleDates.closeDate,
-          due_date: cycleDates.dueDate,
+          close_date: closeDate,
+          due_date: dueDate,
           total_amount: parseFloat(totalArs) || 0,
           total_amount_usd: parseFloat(totalUsd) || 0,
           stamp_tax: parseFloat(stampTax) || 0,
@@ -656,8 +646,8 @@ export function ImportStatementFlow({
                 disabled={
                   saving ||
                   selectedCount === 0 ||
-                  !cycleDates.closeDate ||
-                  !cycleDates.dueDate ||
+                  !closeDate ||
+                  !dueDate ||
                   !allGroupsApproved
                 }
                 className="w-full press-effect font-semibold"
@@ -772,47 +762,45 @@ export function ImportStatementFlow({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground font-medium">Cierre</Label>
-                <div className="flex min-h-[44px] items-center gap-2.5 rounded-md border border-input bg-muted/30 px-3 text-sm">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <span className="tabular-nums font-medium">
-                    {cycleDates.closeDate
-                      ? format(parseISO(cycleDates.closeDate), "d MMM yyyy", { locale: es })
-                      : "Sin datos"}
-                  </span>
-                </div>
+                <MangoDatePicker
+                  value={closeDate ? parseISO(closeDate) : null}
+                  onChange={(d) => setCloseDate(toDateString(d))}
+                  placeholder="Elegí la fecha de cierre"
+                  aria-invalid={!closeDate}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground font-medium">Vencimiento</Label>
-                <div className="flex min-h-[44px] items-center gap-2.5 rounded-md border border-input bg-muted/30 px-3 text-sm">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                  <span className="tabular-nums font-medium">
-                    {cycleDates.dueDate
-                      ? format(parseISO(cycleDates.dueDate), "d MMM yyyy", { locale: es })
-                      : "Sin datos"}
-                  </span>
-                </div>
+                <MangoDatePicker
+                  value={dueDate ? parseISO(dueDate) : null}
+                  onChange={(d) => setDueDate(toDateString(d))}
+                  placeholder="Elegí la fecha de vencimiento"
+                  aria-invalid={!dueDate}
+                />
               </div>
             </div>
-            {cycleDates.adjusted && (
-              <p className="text-[11px] text-amber-600">
-                Ajustamos el cierre al ciclo de tu tarjeta (día {selectedAccount?.closing_day}).
+            {cycleFallbackActive ? (
+              (closeDate || dueDate) && (
+                <p className="text-[11px] text-amber-600">
+                  Tu tarjeta no tiene el ciclo cargado (día de cierre/vencimiento) — usamos las fechas
+                  del PDF. Cargalo en la tarjeta para que se calculen solas la próxima vez.
+                </p>
+              )
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Precargamos el cierre y el vencimiento según el ciclo de tu tarjeta — editalos si
+                este resumen corresponde a otro período.
               </p>
             )}
-            {cycleFallbackActive && (cycleDates.closeDate || cycleDates.dueDate) && (
-              <p className="text-[11px] text-amber-600">
-                Tu tarjeta no tiene el ciclo cargado (día de cierre/vencimiento) — usamos las fechas
-                del PDF. Cargalo en la tarjeta para que se calculen solas la próxima vez.
-              </p>
-            )}
-            {(!cycleDates.closeDate || !cycleDates.dueDate) && (
+            {(!closeDate || !dueDate) && (
               <p className="text-[11px] text-destructive">
                 Nos falta la fecha de{" "}
-                {!cycleDates.closeDate && !cycleDates.dueDate
+                {!closeDate && !dueDate
                   ? "cierre y de vencimiento"
-                  : !cycleDates.closeDate
+                  : !closeDate
                     ? "cierre"
                     : "vencimiento"}{" "}
-                de este resumen. Completá el ciclo de la tarjeta o revisá el PDF importado.
+                de este resumen. Elegí las fechas manualmente para continuar.
               </p>
             )}
 
