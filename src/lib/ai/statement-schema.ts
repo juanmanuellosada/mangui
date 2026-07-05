@@ -11,6 +11,8 @@ export const parsedStatementLineSchema = z.object({
   amount_ars: z.number().nullable(),
   installment_number: z.number().int().nullable(),
   installment_total: z.number().int().nullable(),
+  /** true si es un cargo mensual recurrente de un servicio (Netflix, Spotify, etc.) sin cuotas. */
+  is_subscription: z.boolean(),
   category_hint: z.string().nullable(),
 })
 

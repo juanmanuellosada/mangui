@@ -32,16 +32,19 @@ Datos del encabezado del resumen:
 - "total_usd": total a pagar en DÓLARES (resúmenes bimonetarios tienen un total separado en USD); null si no aplica.
 - "stamp_tax": impuesto de sellos/percepciones/impuestos provinciales del resumen (monto en pesos); null si no figura o es 0.
 
-Por cada consumo/línea del detalle (ítems de compras, NO el total ni los pagos/saldos anteriores):
+Por cada consumo/línea del detalle (ítems de compras; NO el total, ni las líneas descartadas más abajo):
 - "description": el comercio o concepto tal como figura.
-- "date": fecha del consumo, formato YYYY-MM-DD.
+- "date": fecha del consumo o, si es una compra en cuotas, la fecha de la compra original tal como figura en el resumen, formato YYYY-MM-DD.
 - "amount": monto de la línea, numérico sin símbolos ni separadores de miles.
 - "currency": "USD" si la línea está en dólares; si no, "ARS".
 - "amount_ars": si la línea está en USD Y el resumen muestra el equivalente en pesos para esa línea, ese monto; si no aplica o no se muestra, null.
-- "installment_number" / "installment_total": si el concepto indica "cuota X/N" (o similar, ej. "3/12"), extraé X como installment_number y N como installment_total; si no es una compra en cuotas, ambos null.
+- "installment_number" / "installment_total": si el concepto indica "cuota X/N" (o similar, ej. "3/12", "04/06"), extraé X como installment_number y N como installment_total; si no es una compra en cuotas, ambos null.
+- "is_subscription": true si el concepto es un cargo mensual recurrente de un servicio de suscripción (p. ej. Claude, Netflix, Spotify, Disney+, gimnasio) SIN indicador de cuotas; false en cualquier otro caso. Una línea con installment_number/installment_total no nulos NUNCA es una suscripción (is_subscription debe ser false en ese caso).
 - "category_hint": el nombre EXACTO de la lista de categorías de gasto del usuario que mejor coincida con el consumo; si ninguna coincide, null.
 
-No incluyas como línea el total del resumen, saldos anteriores, ni pagos realizados a la tarjeta. Devolvé SOLO los campos del esquema.`
+NO incluyas como línea de consumo el total del resumen ni las siguientes, que no son consumos: el saldo anterior (ej. "SALDO ANTERIOR"), pagos realizados a la tarjeta (ej. "SU PAGO", "PAGO SU CUENTA", "PAGO MINIMO"), ni devoluciones o reintegros (ej. "DEV.IMP.", "DEVOLUCION", "REINTEGRO"). Estas líneas nunca deben aparecer en el resultado, sin importar el signo de su monto.
+
+Devolvé SOLO los campos del esquema.`
 
   const { object } = await generateObject({
     model,

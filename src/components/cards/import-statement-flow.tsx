@@ -5,14 +5,18 @@
  * tarjeta desde un PDF (interpretado por IA en el backend, fase 1 ya hecha).
  *
  * Paso 1 (upload): elegir tarjeta + PDF, llamar a importStatementPdf.
- * Paso 2 (review): revisar/editar el resumen parseado y guardar con
- * buildStatementPayload + saveImportedStatement.
+ * Paso 2 (review): preview AGRUPADA POR RESUMEN (el ciclo leído + cada ciclo
+ * futuro que recibe cuotas proyectadas), con aprobación resumen por resumen.
+ * Las cuotas futuras se derivan en vivo de la línea fuente (misma
+ * StatementReviewLine): editarla en el grupo del resumen leído propaga el
+ * cambio automáticamente a sus cuotas proyectadas, porque groupStatementPreviewByCycle
+ * siempre re-deriva la preview a partir de esa única fuente.
  */
 
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { FileText, FileUp, Loader2, X } from "lucide-react"
+import { Check, Clock, FileText, FileUp, Loader2, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -22,6 +26,7 @@ import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { MangoSheet } from "@/components/ui/mango-sheet"
+import { Switch } from "@/components/ui/switch"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
 import { createClient } from "@/lib/supabase/client"
 import { uploadAttachment } from "@/lib/attachments"
@@ -34,10 +39,13 @@ import { formatCurrency, cn } from "@/lib/utils"
 import {
   importStatementPdf,
   buildStatementPayload,
+  groupStatementPreviewByCycle,
   saveImportedStatement,
   StatementImportError,
   type ParsedStatement,
   type StatementReviewLine,
+  type StatementPreviewGroup,
+  type StatementPreviewLine,
 } from "@/lib/statement-import"
 import type { Tables } from "@/lib/database.types"
 
@@ -63,7 +71,39 @@ function matchCategoryId(hint: string | null, expenseCategories: Category[]): st
   return expenseCategories.find((c) => normalizeText(c.name) === normHint)?.id ?? null
 }
 
-// ── Line row ───────────────────────────────────────────────────────────────────
+/** Despoja el `id` local (sólo para React keys) antes de pasarle la línea a la lógica pura. */
+function toStatementReviewLine(l: ReviewLine): StatementReviewLine {
+  return {
+    description: l.description,
+    date: l.date,
+    amount: l.amount,
+    currency: l.currency,
+    amount_ars: l.amount_ars,
+    installment_number: l.installment_number,
+    installment_total: l.installment_total,
+    is_subscription: l.is_subscription,
+    category_id: l.category_id,
+    selected: l.selected,
+    createRecurring: l.createRecurring,
+  }
+}
+
+/** Título/subtítulo de cabecera de grupo: el ciclo leído vs. un ciclo futuro proyectado. */
+function groupPeriodLabel(offset: number, closeDate: string, dueDate: string): { title: string; subtitle: string } {
+  if (offset === 0) {
+    return {
+      title: "Este resumen",
+      subtitle: `Cierra ${format(parseISO(closeDate), "d MMM", { locale: es })} · Vence ${format(parseISO(dueDate), "d MMM", { locale: es })}`,
+    }
+  }
+  const monthLabel = format(parseISO(closeDate), "MMMM yyyy", { locale: es })
+  return {
+    title: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+    subtitle: "Cuotas proyectadas de este import",
+  }
+}
+
+// ── Line row (editable — sólo grupo del resumen leído) ──────────────────────────
 
 function LineRow({
   line,
@@ -83,6 +123,7 @@ function LineRow({
   const convertedAmount = isCrossCurrency
     ? line.amount_ars ?? (parsedRate > 0 ? line.amount * parsedRate : null)
     : null
+  const isInstallment = line.installment_number != null && line.installment_total != null
 
   return (
     <div className={cn("flex items-start gap-2 p-3", !line.selected && "opacity-50")}>
@@ -107,7 +148,7 @@ function LineRow({
         </div>
         <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
           <span className="tabular-nums">{format(parseISO(line.date), "d MMM", { locale: es })}</span>
-          {line.installment_number != null && line.installment_total != null && (
+          {isInstallment && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted font-semibold">
               cuota {line.installment_number}/{line.installment_total}
             </span>
@@ -128,7 +169,146 @@ function LineRow({
           showSearch
           aria-label="Categoría"
         />
+        {isInstallment && line.installment_total! > line.installment_number! && (
+          <p className="text-[10.5px] text-muted-foreground">
+            Los cambios se aplican a esta y a las {line.installment_total! - line.installment_number!} cuotas
+            futuras proyectadas.
+          </p>
+        )}
+        {line.is_subscription && (
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">Crear como recurrente</p>
+              <p className="text-[10.5px] text-muted-foreground">Transacción mensual, sólo si confirmás.</p>
+            </div>
+            <Switch
+              checked={line.createRecurring === true}
+              onCheckedChange={(v) => onChange({ createRecurring: v })}
+              aria-label="Crear como recurrente"
+            />
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+// ── Línea proyectada (grupos futuros — sólo lectura) ─────────────────────────────
+
+function ProjectedLineRow({ line, categories }: { line: StatementPreviewLine; categories: Category[] }) {
+  const category = categories.find((c) => c.id === line.category_id) ?? null
+  return (
+    <div className="flex items-start gap-2 p-3">
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium truncate">{line.description}</span>
+          <span className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
+            − {formatCurrency(line.amount, line.currency)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+          <span className="tabular-nums">{format(parseISO(line.date), "d MMM", { locale: es })}</span>
+          {line.installment_number != null && line.installment_total != null && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted font-semibold">
+              cuota {line.installment_number}/{line.installment_total} · proyectada
+            </span>
+          )}
+          {category && (
+            <span className="inline-flex items-center gap-1">
+              <CategoryIconChip icon={category.icon} />
+              {category.name}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Subtotal del grupo por moneda (sin convertir, mismo criterio que el pago de resúmenes) ──
+
+function GroupTotal({ totalsByCurrency }: { totalsByCurrency: { ARS: number; USD: number } }) {
+  const { ARS: arsTotal, USD: usdTotal } = totalsByCurrency
+  if (arsTotal > 0 && usdTotal > 0) {
+    return (
+      <span className="text-sm font-bold tabular-nums flex items-baseline gap-1">
+        <span>{formatCurrency(arsTotal, "ARS")}</span>
+        <span className="text-muted-foreground font-normal">·</span>
+        <span>{formatCurrency(usdTotal, "USD")}</span>
+      </span>
+    )
+  }
+  const currency = usdTotal > 0 ? "USD" : "ARS"
+  const amount = usdTotal > 0 ? usdTotal : arsTotal
+  return <span className="text-sm font-bold tabular-nums">{formatCurrency(amount, currency)}</span>
+}
+
+// ── Tarjeta de grupo (por resumen/ciclo) con aprobación ──────────────────────────
+
+function StatementGroupCard({
+  group,
+  expanded,
+  approved,
+  onToggleExpand,
+  onToggleApprove,
+  children,
+}: {
+  group: StatementPreviewGroup
+  expanded: boolean
+  approved: boolean
+  onToggleExpand: () => void
+  onToggleApprove: () => void
+  children: React.ReactNode
+}) {
+  const { title, subtitle } = groupPeriodLabel(group.cycleOffset, group.closeDate, group.dueDate)
+  return (
+    <div
+      className={cn(
+        "rounded-xl border overflow-hidden transition-colors duration-150",
+        approved ? "border-primary/40" : "border-border/60"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onToggleExpand}
+        aria-expanded={expanded}
+        className={cn(
+          "flex w-full items-center justify-between gap-3 p-3 text-left",
+          "hover:bg-muted/30 transition-colors duration-150",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        )}
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-semibold truncate">{title}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <GroupTotal totalsByCurrency={group.totalsByCurrency} />
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide",
+              approved ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+            )}
+          >
+            {approved ? <Check className="h-3 w-3" aria-hidden /> : <Clock className="h-3 w-3" aria-hidden />}
+            {approved ? "Aprobado" : "Pendiente"}
+          </span>
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t border-border/60 p-3 space-y-3">
+          {children}
+          <Button
+            type="button"
+            variant={approved ? "outline" : "default"}
+            size="sm"
+            className="w-full press-effect font-semibold"
+            onClick={onToggleApprove}
+          >
+            {approved ? "Marcar como pendiente" : `Aprobar este resumen · ${group.lines.length} gasto${group.lines.length === 1 ? "" : "s"}`}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -167,6 +347,12 @@ export function ImportStatementFlow({
   const [rateInput, setRateInput] = useState("")
   const [lines, setLines] = useState<ReviewLine[]>([])
   const [saving, setSaving] = useState(false)
+
+  // Aprobación por resumen: qué grupos (por cycleOffset) ya revisó/aprobó el
+  // usuario, y cuál está expandido. El Confirm final sólo se habilita cuando
+  // todos los grupos están aprobados (Tarea 4.2).
+  const [approvedOffsets, setApprovedOffsets] = useState<Set<number>>(new Set())
+  const [expandedOffset, setExpandedOffset] = useState<number | null>(0)
 
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === "expense"),
@@ -213,6 +399,39 @@ export function ImportStatementFlow({
     parsedTotalArs > 0 &&
     Math.abs(computedArsTotal - parsedTotalArs) > Math.max(100, parsedTotalArs * 0.02)
 
+  // Preview agrupada por resumen/ciclo (Tarea 4.1): se re-deriva en cada
+  // render a partir de `lines` (la fuente), así que editar una línea de cuota
+  // propaga sola a sus cuotas futuras proyectadas (Tarea 4.3).
+  const groups: StatementPreviewGroup[] = useMemo(() => {
+    if (!closeDate || !dueDate) return []
+    const reviewLines: StatementReviewLine[] = lines.map(toStatementReviewLine)
+    return groupStatementPreviewByCycle({
+      account_id: selectedAccountId,
+      account_currency: accountCurrency,
+      close_date: toDateString(closeDate),
+      due_date: toDateString(dueDate),
+      total_amount: parsedTotalArs,
+      total_amount_usd: parseFloat(totalUsd) || 0,
+      stamp_tax: parseFloat(stampTax) || 0,
+      lines: reviewLines,
+      rate: needsRate ? parseFloat(rateInput) || null : null,
+    })
+  }, [
+    closeDate,
+    dueDate,
+    lines,
+    selectedAccountId,
+    accountCurrency,
+    parsedTotalArs,
+    totalUsd,
+    stampTax,
+    needsRate,
+    rateInput,
+  ])
+
+  const allGroupsApproved = groups.length > 0 && groups.every((g) => approvedOffsets.has(g.cycleOffset))
+  const totalItemsToCreate = groups.reduce((sum, g) => sum + g.lines.length, 0)
+
   const resetAll = useCallback(() => {
     setStep("upload")
     setSelectedAccountId(cardAccounts.length === 1 ? cardAccounts[0].id : "")
@@ -228,6 +447,8 @@ export function ImportStatementFlow({
     setRateInput("")
     setLines([])
     setSaving(false)
+    setApprovedOffsets(new Set())
+    setExpandedOffset(0)
   }, [cardAccounts])
 
   const handleOpenChange = useCallback(
@@ -269,10 +490,14 @@ export function ImportStatementFlow({
         amount_ars: l.amount_ars,
         installment_number: l.installment_number,
         installment_total: l.installment_total,
+        is_subscription: l.is_subscription,
         category_id: matchCategoryId(l.category_hint, expenseCategories),
         selected: true,
+        createRecurring: false,
       }))
     )
+    setApprovedOffsets(new Set())
+    setExpandedOffset(0)
     setStep("review")
   }
 
@@ -305,21 +530,32 @@ export function ImportStatementFlow({
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   }, [])
 
+  function handleToggleExpand(offset: number) {
+    setExpandedOffset((prev) => (prev === offset ? null : offset))
+  }
+
+  function handleToggleApprove(offset: number) {
+    const wasApproved = approvedOffsets.has(offset)
+    setApprovedOffsets((prev) => {
+      const next = new Set(prev)
+      if (wasApproved) next.delete(offset)
+      else next.add(offset)
+      return next
+    })
+    if (!wasApproved) {
+      // "Aprobar y siguiente": avanza al próximo grupo pendiente sin forzar
+      // a revisar todos de una sola vez (Tarea 4.2).
+      const idx = groups.findIndex((g) => g.cycleOffset === offset)
+      const next = groups.slice(idx + 1).find((g) => !approvedOffsets.has(g.cycleOffset))
+      setExpandedOffset(next ? next.cycleOffset : null)
+    }
+  }
+
   async function handleSave() {
     if (!selectedAccount || !closeDate || !dueDate) return
     setSaving(true)
     try {
-      const reviewLines: StatementReviewLine[] = lines.map((l) => ({
-        description: l.description,
-        date: l.date,
-        amount: l.amount,
-        currency: l.currency,
-        amount_ars: l.amount_ars,
-        installment_number: l.installment_number,
-        installment_total: l.installment_total,
-        category_id: l.category_id,
-        selected: l.selected,
-      }))
+      const reviewLines: StatementReviewLine[] = lines.map(toStatementReviewLine)
       let payload
       try {
         payload = buildStatementPayload({
@@ -398,15 +634,22 @@ export function ImportStatementFlow({
         title={step === "upload" ? "Importar resumen PDF" : "Revisar resumen"}
         footer={
           step === "review" ? (
-            <Button
-              onClick={handleSave}
-              disabled={saving || selectedCount === 0 || !rateIsValid || !closeDate || !dueDate}
-              className="w-full press-effect font-semibold"
-            >
-              {saving
-                ? "Guardando…"
-                : `Confirmar y guardar ${selectedCount} movimiento${selectedCount === 1 ? "" : "s"}`}
-            </Button>
+            <div className="space-y-1.5">
+              <Button
+                onClick={handleSave}
+                disabled={saving || selectedCount === 0 || !rateIsValid || !closeDate || !dueDate || !allGroupsApproved}
+                className="w-full press-effect font-semibold"
+              >
+                {saving
+                  ? "Guardando…"
+                  : `Confirmar y guardar ${totalItemsToCreate} movimiento${totalItemsToCreate === 1 ? "" : "s"}`}
+              </Button>
+              {!allGroupsApproved && groups.length > 0 && (
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Aprobá los {groups.length - approvedOffsets.size} resúmenes pendientes para confirmar
+                </p>
+              )}
+            </div>
           ) : undefined
         }
       >
@@ -580,16 +823,38 @@ export function ImportStatementFlow({
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 {selectedCount} de {lines.length} gastos incluidos
               </p>
-              <div className="rounded-xl border border-border/60 divide-y divide-border/40 overflow-hidden">
-                {lines.map((line) => (
-                  <LineRow
-                    key={line.id}
-                    line={line}
-                    accountCurrency={accountCurrency}
-                    rate={rateInput}
-                    categoryOptions={categoryOptions}
-                    onChange={(patch) => updateLine(line.id, patch)}
-                  />
+
+              <div className="space-y-2">
+                {groups.map((group) => (
+                  <StatementGroupCard
+                    key={group.cycleOffset}
+                    group={group}
+                    expanded={expandedOffset === group.cycleOffset}
+                    approved={approvedOffsets.has(group.cycleOffset)}
+                    onToggleExpand={() => handleToggleExpand(group.cycleOffset)}
+                    onToggleApprove={() => handleToggleApprove(group.cycleOffset)}
+                  >
+                    {group.cycleOffset === 0 ? (
+                      <div className="rounded-xl border border-border/60 divide-y divide-border/40 overflow-hidden">
+                        {lines.map((line) => (
+                          <LineRow
+                            key={line.id}
+                            line={line}
+                            accountCurrency={accountCurrency}
+                            rate={rateInput}
+                            categoryOptions={categoryOptions}
+                            onChange={(patch) => updateLine(line.id, patch)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-border/60 divide-y divide-border/40 overflow-hidden">
+                        {group.lines.map((line, idx) => (
+                          <ProjectedLineRow key={idx} line={line} categories={expenseCategories} />
+                        ))}
+                      </div>
+                    )}
+                  </StatementGroupCard>
                 ))}
               </div>
             </div>
