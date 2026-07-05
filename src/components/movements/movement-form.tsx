@@ -5,6 +5,7 @@ import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { Zap, X, ArrowLeftRight, Brain } from "lucide-react"
 import { parseISO } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -434,9 +435,13 @@ export function MovementForm({
   // Submit handler — wraps pending files + defense-in-depth checks
   const handleFormSubmit = handleSubmit(async (values) => {
     // 3.4 — Reject currency ≠ account currency when account is not tarjeta_credito
+    // (un gasto/ingreso en USD sólo puede ir a tarjeta de crédito o a una cuenta en dólares)
     if (selectedAccount && selectedAccount.type !== "tarjeta_credito") {
       if (values.original_currency !== selectedAccount.currency) {
-        // Force the correct currency and abort (the UI should have prevented this already)
+        toast.error("Moneda inválida para esta cuenta", {
+          description: `Un movimiento en ${values.original_currency} solo se puede cargar a una tarjeta de crédito o a una cuenta en ${values.original_currency}.`,
+        })
+        // Force the correct currency so the form matches what will be submitted next time
         setValue("original_currency", selectedAccount.currency as "ARS" | "USD")
         return
       }

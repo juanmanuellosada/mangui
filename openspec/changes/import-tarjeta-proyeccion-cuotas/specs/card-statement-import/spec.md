@@ -104,30 +104,40 @@ Cada cuota creada por el import SHALL guardar la identidad de su compra (comerci
 - **WHEN** un resumen posterior trae una compra en cuotas que no fue proyectada antes
 - **THEN** el sistema la reconstruye y proyecta sus cuotas futuras como una compra nueva
 
-### Requirement: Sugerencia de suscripción como recurrente
+### Requirement: Marcar cualquier gasto simple como recurrente
 
-Para cada línea clasificada como suscripción, la preview SHALL mostrar un toggle "crear como recurrente". La transacción recurrente SHALL crearse **solo si el usuario activa el toggle y confirma**; por defecto SHALL estar en un estado que no crea nada automáticamente.
+Para cada línea de **gasto simple** (suscripción detectada por la IA o no), la preview SHALL mostrar un toggle "crear como recurrente" para que el usuario decida. Las líneas de **cuota** NO SHALL mostrar este toggle (una compra en cuotas no es una recurrente). La transacción recurrente SHALL crearse **solo si el usuario activa el toggle y confirma**; por defecto SHALL estar en un estado que no crea nada automáticamente, independientemente de si la IA clasificó la línea como suscripción. Cuando la IA sí clasificó la línea como suscripción, la preview SHALL mostrar un hint que lo indique, sin activar el toggle automáticamente.
 
-#### Scenario: Aceptar crear recurrente
+#### Scenario: Aceptar crear recurrente en una suscripción detectada por la IA
 
-- **WHEN** el usuario activa "crear como recurrente" en una línea de suscripción y confirma el import
+- **WHEN** el usuario activa "crear como recurrente" en una línea que la IA clasificó como suscripción y confirma el import
 - **THEN** se crea una transacción recurrente para esa suscripción además del movimiento del período
+
+#### Scenario: Marcar como recurrente un gasto que la IA no detectó como suscripción
+
+- **WHEN** el usuario activa "crear como recurrente" en una línea de gasto simple que la IA NO clasificó como suscripción (p. ej. una membresía que la IA no reconoció) y confirma el import
+- **THEN** se crea una transacción recurrente para ese gasto además del movimiento del período, igual que si la IA la hubiera detectado
 
 #### Scenario: No crear recurrente
 
-- **WHEN** el usuario deja el toggle desactivado en una línea de suscripción
+- **WHEN** el usuario deja el toggle desactivado en una línea de gasto simple
 - **THEN** la línea se importa como gasto del período pero no se crea ninguna transacción recurrente
+
+#### Scenario: Las cuotas no son marcables como recurrentes
+
+- **WHEN** la preview muestra una línea clasificada como cuota
+- **THEN** no se muestra el toggle "crear como recurrente" para esa línea
 
 ### Requirement: Manejo de líneas en dólares
 
-Las líneas en moneda extranjera SHALL persistirse con su `original_currency`, el `dollar_type` correspondiente y un `converted_amount` no nulo. Cuando el PDF no traiga el equivalente en pesos de una línea USD, el flujo SHALL pedir la cotización manualmente antes de guardar (no hay cotización "tarjeta" en vivo en la app).
+Las líneas en moneda extranjera SHALL persistirse con su `original_currency` y su `dollar_type`, tratándose por moneda (USD puro): NO se convierten a pesos ni se pide una cotización al importar. El flujo NUNCA SHALL pedir una cotización manual. `converted_amount` SHALL quedar siempre nulo para estas líneas, incluso si el PDF trae un equivalente en pesos — ese equivalente se ignora, porque el usuario paga la línea en dólares y guardarlo mezclaría ese monto en los totales en pesos. Al pagar el resumen, la parte en dólares se salda con una cuenta en dólares y la parte en pesos con una cuenta en pesos.
 
 #### Scenario: Línea USD con equivalente en el PDF
 
 - **WHEN** una línea en USD trae su monto en pesos en el resumen
-- **THEN** se persiste con `original_currency = 'USD'` y `converted_amount` = el monto en pesos del PDF
+- **THEN** se persiste con `original_currency = 'USD'` y `converted_amount` nulo (se ignora el equivalente en pesos del PDF)
 
 #### Scenario: Línea USD sin equivalente en el PDF
 
 - **WHEN** una línea en USD no trae su monto en pesos en el resumen
-- **THEN** el flujo pide la cotización manual y calcula `converted_amount` antes de guardar, sin dejarlo nulo
+- **THEN** se persiste con `original_currency = 'USD'` y `converted_amount` nulo, sin pedir cotización, y no se suma a los totales en pesos (aparece aparte por moneda)

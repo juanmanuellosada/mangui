@@ -16,7 +16,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Check, Clock, FileText, FileUp, Loader2, X } from "lucide-react"
+import { CalendarDays, Check, Clock, FileText, FileUp, Loader2, Sparkles, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -24,13 +24,14 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect, type MangoSelectOption } from "@/components/ui/mango-select"
-import { MangoDatePicker } from "@/components/ui/mango-date-picker"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Switch } from "@/components/ui/switch"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
 import { createClient } from "@/lib/supabase/client"
 import { uploadAttachment } from "@/lib/attachments"
-import { toDateString } from "@/lib/cards"
+import { toDateString, nextCloseDate, computeDueDate } from "@/lib/cards"
+import { amountInCurrency } from "@/lib/money"
+import { todayAR } from "@/lib/date-utils"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { useIsDemo } from "@/lib/use-is-demo"
@@ -108,21 +109,15 @@ function groupPeriodLabel(offset: number, closeDate: string, dueDate: string): {
 function LineRow({
   line,
   accountCurrency,
-  rate,
   categoryOptions,
   onChange,
 }: {
   line: ReviewLine
   accountCurrency: "ARS" | "USD"
-  rate: string
   categoryOptions: MangoSelectOption[]
   onChange: (patch: Partial<ReviewLine>) => void
 }) {
   const isCrossCurrency = line.currency !== accountCurrency
-  const parsedRate = parseFloat(rate)
-  const convertedAmount = isCrossCurrency
-    ? line.amount_ars ?? (parsedRate > 0 ? line.amount * parsedRate : null)
-    : null
   const isInstallment = line.installment_number != null && line.installment_total != null
 
   return (
@@ -153,12 +148,8 @@ function LineRow({
               cuota {line.installment_number}/{line.installment_total}
             </span>
           )}
-          {isCrossCurrency && (
-            <span>
-              {convertedAmount != null
-                ? `≈ ${formatCurrency(convertedAmount, accountCurrency)}`
-                : "Falta cotización para convertir"}
-            </span>
+          {isCrossCurrency && line.amount_ars != null && (
+            <span>≈ {formatCurrency(line.amount_ars, accountCurrency)}</span>
           )}
         </div>
         <MangoSelect
@@ -175,11 +166,16 @@ function LineRow({
             futuras proyectadas.
           </p>
         )}
-        {line.is_subscription && (
+        {!isInstallment && (
           <div className="flex items-center justify-between gap-2 pt-0.5">
-            <div className="min-w-0">
-              <p className="text-xs font-medium">Crear como recurrente</p>
-              <p className="text-[10.5px] text-muted-foreground">Transacción mensual, sólo si confirmás.</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-medium">Crear como recurrente</span>
+              {line.is_subscription && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary flex-shrink-0">
+                  <Sparkles className="h-2.5 w-2.5" aria-hidden />
+                  Manguito la detectó
+                </span>
+              )}
             </div>
             <Switch
               checked={line.createRecurring === true}
@@ -339,12 +335,13 @@ export function ImportStatementFlow({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Review step state
-  const [closeDate, setCloseDate] = useState<Date | null>(null)
-  const [dueDate, setDueDate] = useState<Date | null>(null)
+  // Fechas crudas parseadas del PDF (solo referencia para derivar el ciclo real —
+  // ver `cycleDates` más abajo). El usuario ya no las edita a mano.
+  const [parsedCloseDate, setParsedCloseDate] = useState<string | null>(null)
+  const [parsedDueDate, setParsedDueDate] = useState<string | null>(null)
   const [totalArs, setTotalArs] = useState("")
   const [totalUsd, setTotalUsd] = useState("")
   const [stampTax, setStampTax] = useState("0")
-  const [rateInput, setRateInput] = useState("")
   const [lines, setLines] = useState<ReviewLine[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -375,23 +372,17 @@ export function ImportStatementFlow({
   const accountCurrency: "ARS" | "USD" = (selectedAccount?.currency as "ARS" | "USD") ?? "ARS"
 
   const selectedCount = lines.filter((l) => l.selected).length
-  const needsRate = lines.some(
-    (l) => l.selected && l.currency !== accountCurrency && l.amount_ars == null
-  )
-  const rateIsValid = !needsRate || parseFloat(rateInput) > 0
 
   const computedArsTotal = useMemo(() => {
     if (accountCurrency !== "ARS") return null
-    const r = parseFloat(rateInput)
     return lines
       .filter((l) => l.selected)
-      .reduce((sum, l) => {
-        if (l.currency === "ARS") return sum + l.amount
-        if (l.amount_ars != null) return sum + l.amount_ars
-        if (r > 0) return sum + l.amount * r
-        return sum
-      }, 0)
-  }, [lines, rateInput, accountCurrency])
+      .reduce(
+        (sum, l) =>
+          sum + amountInCurrency({ amount: l.amount, converted_amount: l.amount_ars, original_currency: l.currency }, accountCurrency),
+        0
+      )
+  }, [lines, accountCurrency])
 
   const parsedTotalArs = parseFloat(totalArs) || 0
   const totalMismatch =
@@ -399,35 +390,62 @@ export function ImportStatementFlow({
     parsedTotalArs > 0 &&
     Math.abs(computedArsTotal - parsedTotalArs) > Math.max(100, parsedTotalArs * 0.02)
 
+  // Fechas de cierre/vencimiento derivadas del ciclo configurado en la tarjeta
+  // (closing_day/due_day), NO elegidas a mano. El close_date del PDF sólo se
+  // usa como referencia para ubicar el mes/período; el cierre real siempre
+  // sale de `nextCloseDate` para que matchee el ciclo virtual de la tarjeta
+  // (card_statements matchea por close_date). Si la tarjeta no tiene el
+  // ciclo cargado, se cae a las fechas que trajo el PDF.
+  const cycleDates = useMemo(() => {
+    const closingDay = selectedAccount?.closing_day ?? null
+    const dueDay = selectedAccount?.due_day ?? null
+
+    if (closingDay != null) {
+      const ref = parsedCloseDate ? parseISO(parsedCloseDate) : parseISO(todayAR())
+      const closeDateStr = toDateString(nextCloseDate(closingDay, ref))
+      const adjusted = parsedCloseDate != null && parsedCloseDate !== closeDateStr
+      const dueDateStr =
+        dueDay != null
+          ? toDateString(computeDueDate(parseISO(closeDateStr), dueDay, closingDay))
+          : parsedDueDate
+
+      return {
+        closeDate: closeDateStr,
+        dueDate: dueDateStr,
+        closeFromCycle: true,
+        dueFromCycle: dueDay != null,
+        adjusted,
+      }
+    }
+
+    return {
+      closeDate: parsedCloseDate,
+      dueDate: parsedDueDate,
+      closeFromCycle: false,
+      dueFromCycle: false,
+      adjusted: false,
+    }
+  }, [selectedAccount, parsedCloseDate, parsedDueDate])
+
+  const cycleFallbackActive = !cycleDates.closeFromCycle || !cycleDates.dueFromCycle
+
   // Preview agrupada por resumen/ciclo (Tarea 4.1): se re-deriva en cada
   // render a partir de `lines` (la fuente), así que editar una línea de cuota
   // propaga sola a sus cuotas futuras proyectadas (Tarea 4.3).
   const groups: StatementPreviewGroup[] = useMemo(() => {
-    if (!closeDate || !dueDate) return []
+    if (!cycleDates.closeDate || !cycleDates.dueDate) return []
     const reviewLines: StatementReviewLine[] = lines.map(toStatementReviewLine)
     return groupStatementPreviewByCycle({
       account_id: selectedAccountId,
       account_currency: accountCurrency,
-      close_date: toDateString(closeDate),
-      due_date: toDateString(dueDate),
+      close_date: cycleDates.closeDate,
+      due_date: cycleDates.dueDate,
       total_amount: parsedTotalArs,
       total_amount_usd: parseFloat(totalUsd) || 0,
       stamp_tax: parseFloat(stampTax) || 0,
       lines: reviewLines,
-      rate: needsRate ? parseFloat(rateInput) || null : null,
     })
-  }, [
-    closeDate,
-    dueDate,
-    lines,
-    selectedAccountId,
-    accountCurrency,
-    parsedTotalArs,
-    totalUsd,
-    stampTax,
-    needsRate,
-    rateInput,
-  ])
+  }, [cycleDates, lines, selectedAccountId, accountCurrency, parsedTotalArs, totalUsd, stampTax])
 
   const allGroupsApproved = groups.length > 0 && groups.every((g) => approvedOffsets.has(g.cycleOffset))
   const totalItemsToCreate = groups.reduce((sum, g) => sum + g.lines.length, 0)
@@ -439,12 +457,11 @@ export function ImportStatementFlow({
     setAnalyzing(false)
     setRateLimited(false)
     setErrorMsg(null)
-    setCloseDate(null)
-    setDueDate(null)
+    setParsedCloseDate(null)
+    setParsedDueDate(null)
     setTotalArs("")
     setTotalUsd("")
     setStampTax("0")
-    setRateInput("")
     setLines([])
     setSaving(false)
     setApprovedOffsets(new Set())
@@ -475,8 +492,8 @@ export function ImportStatementFlow({
   }
 
   function initReviewFromParsed(parsed: ParsedStatement) {
-    setCloseDate(parsed.close_date ? parseISO(parsed.close_date) : null)
-    setDueDate(parsed.due_date ? parseISO(parsed.due_date) : null)
+    setParsedCloseDate(parsed.close_date)
+    setParsedDueDate(parsed.due_date)
     setTotalArs(parsed.total_ars != null ? String(parsed.total_ars) : "")
     setTotalUsd(parsed.total_usd != null ? String(parsed.total_usd) : "")
     setStampTax(parsed.stamp_tax != null ? String(parsed.stamp_tax) : "0")
@@ -552,7 +569,7 @@ export function ImportStatementFlow({
   }
 
   async function handleSave() {
-    if (!selectedAccount || !closeDate || !dueDate) return
+    if (!selectedAccount || !cycleDates.closeDate || !cycleDates.dueDate) return
     setSaving(true)
     try {
       const reviewLines: StatementReviewLine[] = lines.map(toStatementReviewLine)
@@ -561,13 +578,12 @@ export function ImportStatementFlow({
         payload = buildStatementPayload({
           account_id: selectedAccount.id,
           account_currency: accountCurrency,
-          close_date: toDateString(closeDate),
-          due_date: toDateString(dueDate),
+          close_date: cycleDates.closeDate,
+          due_date: cycleDates.dueDate,
           total_amount: parseFloat(totalArs) || 0,
           total_amount_usd: parseFloat(totalUsd) || 0,
           stamp_tax: parseFloat(stampTax) || 0,
           lines: reviewLines,
-          rate: needsRate ? parseFloat(rateInput) || null : null,
         })
       } catch (err) {
         toast.error("No se pudo armar el resumen", {
@@ -637,7 +653,13 @@ export function ImportStatementFlow({
             <div className="space-y-1.5">
               <Button
                 onClick={handleSave}
-                disabled={saving || selectedCount === 0 || !rateIsValid || !closeDate || !dueDate || !allGroupsApproved}
+                disabled={
+                  saving ||
+                  selectedCount === 0 ||
+                  !cycleDates.closeDate ||
+                  !cycleDates.dueDate ||
+                  !allGroupsApproved
+                }
                 className="w-full press-effect font-semibold"
               >
                 {saving
@@ -750,13 +772,49 @@ export function ImportStatementFlow({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground font-medium">Cierre</Label>
-                <MangoDatePicker value={closeDate} onChange={setCloseDate} />
+                <div className="flex min-h-[44px] items-center gap-2.5 rounded-md border border-input bg-muted/30 px-3 text-sm">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <span className="tabular-nums font-medium">
+                    {cycleDates.closeDate
+                      ? format(parseISO(cycleDates.closeDate), "d MMM yyyy", { locale: es })
+                      : "Sin datos"}
+                  </span>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground font-medium">Vencimiento</Label>
-                <MangoDatePicker value={dueDate} onChange={setDueDate} />
+                <div className="flex min-h-[44px] items-center gap-2.5 rounded-md border border-input bg-muted/30 px-3 text-sm">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
+                  <span className="tabular-nums font-medium">
+                    {cycleDates.dueDate
+                      ? format(parseISO(cycleDates.dueDate), "d MMM yyyy", { locale: es })
+                      : "Sin datos"}
+                  </span>
+                </div>
               </div>
             </div>
+            {cycleDates.adjusted && (
+              <p className="text-[11px] text-amber-600">
+                Ajustamos el cierre al ciclo de tu tarjeta (día {selectedAccount?.closing_day}).
+              </p>
+            )}
+            {cycleFallbackActive && (cycleDates.closeDate || cycleDates.dueDate) && (
+              <p className="text-[11px] text-amber-600">
+                Tu tarjeta no tiene el ciclo cargado (día de cierre/vencimiento) — usamos las fechas
+                del PDF. Cargalo en la tarjeta para que se calculen solas la próxima vez.
+              </p>
+            )}
+            {(!cycleDates.closeDate || !cycleDates.dueDate) && (
+              <p className="text-[11px] text-destructive">
+                Nos falta la fecha de{" "}
+                {!cycleDates.closeDate && !cycleDates.dueDate
+                  ? "cierre y de vencimiento"
+                  : !cycleDates.closeDate
+                    ? "cierre"
+                    : "vencimiento"}{" "}
+                de este resumen. Completá el ciclo de la tarjeta o revisá el PDF importado.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -792,26 +850,6 @@ export function ImportStatementFlow({
               />
             </div>
 
-            {needsRate && (
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground font-medium">
-                  Cotización dólar (ARS por USD)
-                </Label>
-                <MoneyInput
-                  currency="ARS"
-                  step="0.01"
-                  value={rateInput}
-                  onChange={(e) => setRateInput(e.target.value)}
-                  placeholder="Ej: 1350"
-                  className="tabular-nums"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Algunas líneas en dólares no traen el equivalente en pesos del resumen — usamos
-                  esta cotización para convertirlas.
-                </p>
-              </div>
-            )}
-
             {totalMismatch && (
               <p className="text-[11px] text-amber-600">
                 El total declarado ({formatCurrency(parsedTotalArs, "ARS")}) difiere de la suma de
@@ -841,7 +879,6 @@ export function ImportStatementFlow({
                             key={line.id}
                             line={line}
                             accountCurrency={accountCurrency}
-                            rate={rateInput}
                             categoryOptions={categoryOptions}
                             onChange={(patch) => updateLine(line.id, patch)}
                           />

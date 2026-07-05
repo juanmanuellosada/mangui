@@ -12,6 +12,7 @@ import { computeBudgetProgress } from "@/lib/budgets"
 import { todayAR } from "@/lib/date-utils"
 import { buildIpcMap, latestIpcMonth, adjustAmount } from "@/lib/inflation/adjust"
 import { summaryTotals } from "@/lib/stats"
+import { amountInCurrency } from "@/lib/money"
 
 export const maxDuration = 60
 
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
     // ── fetch movements ─────────────────────────────────────────────────────
     const { data: allMovs } = await admin
       .from("movements")
-      .select("id, type, amount, converted_amount, date, account_id, is_future")
+      .select("id, type, amount, converted_amount, date, account_id, is_future, original_currency")
       .eq("user_id", userId)
 
     const movements = allMovs ?? []
@@ -144,7 +145,7 @@ export async function GET(req: NextRequest) {
     const insightCards = cards.map((c) => {
       const summary = currentCycleSummary(
         c.id,
-        { closing_day: c.closing_day, due_day: c.due_day },
+        { closing_day: c.closing_day, due_day: c.due_day, currency: c.currency },
         movements,
         today
       )
@@ -171,10 +172,10 @@ export async function GET(req: NextRequest) {
     const expenses = movements.filter((m) => m.type === "expense" && !m.is_future)
     const thisWeek = expenses
       .filter((m) => m.date >= weekAgoStr && m.date <= todayStr)
-      .reduce((s, m) => s + (m.converted_amount ?? m.amount), 0)
+      .reduce((s, m) => s + amountInCurrency(m, "ARS"), 0)
     const prevWeek = expenses
       .filter((m) => m.date >= twoWeeksAgoStr && m.date < weekAgoStr)
-      .reduce((s, m) => s + (m.converted_amount ?? m.amount), 0)
+      .reduce((s, m) => s + amountInCurrency(m, "ARS"), 0)
 
     let realVsNominal: InsightInput["realVsNominal"] = null
     try {

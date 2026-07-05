@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import { formatCurrency } from "@/lib/utils"
 import { AccountIconChip } from "@/lib/accounts"
+import { amountInCurrency } from "@/lib/money"
 import type { Tables } from "@/lib/database.types"
 
 type Movement = Tables<"movements">
@@ -15,10 +16,7 @@ interface ExpenseByAccountProps {
 }
 
 function effectiveAmount(m: Movement, currency: "ARS" | "USD"): number {
-  if (m.original_currency !== currency && m.converted_amount !== null) {
-    return m.converted_amount
-  }
-  return m.amount
+  return amountInCurrency(m, currency)
 }
 
 export function ExpenseByAccount({ movements, accounts, currency }: ExpenseByAccountProps) {

@@ -65,9 +65,10 @@ export interface StatementReviewLine {
   /** false = el usuario deseleccionó esta línea (y, si es cuota, todas sus cuotas futuras); se excluye del payload. */
   selected: boolean
   /**
-   * Toggle "crear como recurrente" (Grupo 4, D5). Sólo tiene efecto en líneas
-   * de suscripción confirmadas por el usuario; se ignora en cuota/simple.
-   * Opcional/aditivo; default false (no crea nada, D5: nada automático).
+   * Toggle "crear como recurrente" (Grupo 4, D5). Tiene efecto en cualquier
+   * línea de gasto simple (suscripción detectada por IA o no); se ignora en
+   * cuota, donde no aplica. Opcional/aditivo; default false (no crea nada,
+   * D5: nada automático).
    */
   createRecurring?: boolean
 }
@@ -82,12 +83,6 @@ export interface BuildStatementPayloadInput {
   total_amount_usd: number
   stamp_tax: number
   lines: StatementReviewLine[]
-  /**
-   * Cotización ARS por 1 USD a usar cuando una línea en moneda distinta de la
-   * cuenta no trae `amount_ars` del PDF. Requerida en ese caso (el trigger de
-   * integridad 0041 rechaza converted_amount NULL en líneas cross-currency).
-   */
-  rate?: number | null
 }
 
 export interface StatementImportPayloadLine {
@@ -152,19 +147,20 @@ function classifyLine(line: StatementReviewLine): LineKind {
   return "simple"
 }
 
+/**
+ * "USD puro": una línea en moneda distinta de la cuenta (siempre una tarjeta
+ * de crédito acá) siempre queda con converted_amount null, ignorando
+ * `amount_ars` aunque el PDF lo traiga — el usuario paga esa línea en
+ * dólares, así que el equivalente en pesos del resumen no debe sumar a los
+ * totales en pesos de la app (rompería "USD puro", ver @/lib/money). No hay
+ * cotización manual que pedir.
+ */
 function resolveConversion(
-  line: Pick<StatementReviewLine, "currency" | "amount" | "amount_ars" | "description">,
-  accountCurrency: "ARS" | "USD",
-  rate: number | null | undefined
+  line: Pick<StatementReviewLine, "currency" | "amount" | "amount_ars">,
+  accountCurrency: "ARS" | "USD"
 ): { converted_amount: number | null; dollar_type: "tarjeta" | null } {
   if (line.currency === accountCurrency) return { converted_amount: null, dollar_type: null }
-  if (line.amount_ars != null) return { converted_amount: line.amount_ars, dollar_type: "tarjeta" }
-  if (rate != null) {
-    return { converted_amount: Math.round(line.amount * rate * 100) / 100, dollar_type: "tarjeta" }
-  }
-  throw new Error(
-    `No se pudo determinar converted_amount para la línea "${line.description}" (moneda ${line.currency} distinta de la cuenta): falta amount_ars y rate.`
-  )
+  return { converted_amount: null, dollar_type: "tarjeta" }
 }
 
 function normalizeMerchant(description: string): string {
@@ -260,12 +256,14 @@ function expandReviewLines(input: BuildStatementPayloadInput): ExpandedLine[] {
  * Función pura: arma el payload que espera la RPC import_card_statement a
  * partir del resumen revisado por el usuario. Excluye las líneas
  * deseleccionadas; las líneas simples/suscripción van a `lines` (con
- * create_recurring cuando el usuario confirmó el toggle en una suscripción);
- * las líneas en cuotas se reconstruyen como `installment_purchases`,
- * proyectando desde la cuota leída hasta la última (Tareas 3.1-3.2).
+ * create_recurring cuando el usuario confirmó el toggle, sin importar si la
+ * IA la clasificó como suscripción o no); las líneas en cuotas se
+ * reconstruyen como `installment_purchases`, proyectando desde la cuota
+ * leída hasta la última (Tareas 3.1-3.2).
  *
- * Lanza si una línea cross-currency no trae `amount_ars` y no se pasó `rate`
- * (nunca deja converted_amount null en ese caso).
+ * "USD puro" (ver resolveConversion): una línea cross-currency siempre queda
+ * con converted_amount null, ignorando `amount_ars` del PDF — no lanza, no
+ * requiere cotización manual.
  */
 export function buildStatementPayload(input: BuildStatementPayloadInput): StatementImportPayload {
   const expanded = expandReviewLines(input)
@@ -273,9 +271,9 @@ export function buildStatementPayload(input: BuildStatementPayloadInput): Statem
   const lines: StatementImportPayloadLine[] = expanded
     .filter((e) => e.kind !== "installment")
     .map((e) => {
-      const { converted_amount, dollar_type } = resolveConversion(e.line, input.account_currency, input.rate)
+      const { converted_amount, dollar_type } = resolveConversion(e.line, input.account_currency)
       const create_recurring =
-        e.kind === "subscription" && e.line.createRecurring === true
+        e.line.createRecurring === true
           ? {
               day_of_month: dayOfMonthFromISODate(e.line.date),
               subscription_key: buildSubscriptionKey(e.line.description, input.account_id),
@@ -296,7 +294,7 @@ export function buildStatementPayload(input: BuildStatementPayloadInput): Statem
   const purchasesByKey = new Map<string, StatementImportPayloadPurchase>()
   for (const e of expanded) {
     if (e.kind !== "installment") continue
-    const { converted_amount, dollar_type } = resolveConversion(e.line, input.account_currency, input.rate)
+    const { converted_amount, dollar_type } = resolveConversion(e.line, input.account_currency)
 
     let purchase = purchasesByKey.get(e.purchaseKey!)
     if (!purchase) {

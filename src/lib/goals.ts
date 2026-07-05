@@ -12,6 +12,7 @@ import {
   isAfter,
 } from "date-fns"
 import type { Tables, Enums, TablesInsert } from "@/lib/database.types"
+import { amountInCurrency } from "@/lib/money"
 
 // ── Re-exported DB types ──────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ type MovementRow = {
   account_id: string
   amount: number
   converted_amount: number | null
+  original_currency: string
 }
 
 // ── Progress types ────────────────────────────────────────────────────────────
@@ -156,8 +158,8 @@ function filterMovements(
   })
 }
 
-function effectiveAmount(m: MovementRow): number {
-  return m.converted_amount !== null ? m.converted_amount : m.amount
+function effectiveAmount(m: MovementRow, currency: string): number {
+  return amountInCurrency(m, currency)
 }
 
 // ── Unified progress computation (task 2.3) ───────────────────────────────────
@@ -197,7 +199,7 @@ export function computeGoalProgress(
     case "income": {
       const value = inScope
         .filter((m) => m.type === "income")
-        .reduce((acc, m) => acc + effectiveAmount(m), 0)
+        .reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
 
       const target = goal.target_amount ?? 0
       const percent = target > 0 ? (value / target) * 100 : 0
@@ -211,10 +213,10 @@ export function computeGoalProgress(
       // Net = income − expenses; percent may be negative if net < 0
       const incomeSum = inScope
         .filter((m) => m.type === "income")
-        .reduce((acc, m) => acc + effectiveAmount(m), 0)
+        .reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
       const expenseSum = inScope
         .filter((m) => m.type === "expense")
-        .reduce((acc, m) => acc + effectiveAmount(m), 0)
+        .reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
       const value = incomeSum - expenseSum
 
       const target = goal.target_amount ?? 0
@@ -236,7 +238,7 @@ export function computeGoalProgress(
     case "reduction": {
       const expenseSum = inScope
         .filter((m) => m.type === "expense")
-        .reduce((acc, m) => acc + effectiveAmount(m), 0)
+        .reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
       const value = expenseSum
 
       // target = baseline × (1 − target_percent/100); or target_amount if directly stored
@@ -282,6 +284,7 @@ export function computeGoalProgress(
 export function suggestBaseline(
   scope: { categoryIds: string[]; accountIds?: string[]; isGlobal?: boolean },
   movements: MovementRow[],
+  currency: string,
   ref: Date = new Date(),
   lookback = 3
 ): number {
@@ -306,7 +309,7 @@ export function suggestBaseline(
         if (!scope.accountIds.includes(m.account_id)) return acc
       }
 
-      return acc + effectiveAmount(m)
+      return acc + effectiveAmount(m, currency)
     }, 0)
 
     months.push(spend)
@@ -448,16 +451,16 @@ export function monthlySeries(
     if (goal.type === "income") {
       amount = inPeriod
         .filter((m) => m.type === "income")
-        .reduce((acc, m) => acc + effectiveAmount(m), 0)
+        .reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
     } else if (goal.type === "saving") {
-      const inc = inPeriod.filter((m) => m.type === "income").reduce((acc, m) => acc + effectiveAmount(m), 0)
-      const exp = inPeriod.filter((m) => m.type === "expense").reduce((acc, m) => acc + effectiveAmount(m), 0)
+      const inc = inPeriod.filter((m) => m.type === "income").reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
+      const exp = inPeriod.filter((m) => m.type === "expense").reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
       amount = inc - exp
     } else {
       // reduction: per-month expense
       amount = inPeriod
         .filter((m) => m.type === "expense")
-        .reduce((acc, m) => acc + effectiveAmount(m), 0)
+        .reduce((acc, m) => acc + effectiveAmount(m, goal.currency), 0)
     }
 
     result.push({ month: label, amount })

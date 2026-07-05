@@ -15,6 +15,7 @@ import {
 } from "date-fns"
 import { es } from "date-fns/locale"
 import type { Tables, Enums } from "@/lib/database.types"
+import { amountInCurrency } from "@/lib/money"
 
 export type Budget = Tables<"budgets">
 export type BudgetPeriod = Enums<"budget_period">
@@ -232,7 +233,7 @@ type MovementRow = {
  *   - date ∈ currentWindow(period, start_date)
  *   - category_id ∈ category_ids OR category_ids is empty (= all)
  *   - account_id ∈ account_ids OR account_ids is empty (= all)
- *   - amount = converted_amount if present else amount (both in budget's currency assumption)
+ *   - amount = movement's contribution toward budget.currency (see amountInCurrency en @/lib/money)
  */
 function spentInWindow(
   budget: Budget,
@@ -246,9 +247,7 @@ function spentInWindow(
     if (budget.category_ids.length > 0 && !budget.category_ids.includes(m.category_id ?? "")) return acc
     if (budget.account_ids.length > 0 && !budget.account_ids.includes(m.account_id)) return acc
 
-    // Prefer converted_amount (already in account currency) otherwise use raw amount
-    const effectiveAmount = m.converted_amount !== null ? m.converted_amount : m.amount
-    return acc + effectiveAmount
+    return acc + amountInCurrency(m, budget.currency)
   }, 0)
 }
 

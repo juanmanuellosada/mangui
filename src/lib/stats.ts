@@ -8,6 +8,7 @@ import {
 import { es } from "date-fns/locale"
 import type { Tables, Enums } from "@/lib/database.types"
 import type { RecurringTransaction } from "@/lib/recurring"
+import { amountInCurrency } from "@/lib/money"
 
 export type Movement = Tables<"movements">
 export type Currency = Enums<"currency">
@@ -44,11 +45,9 @@ export function filterMovements(movements: Movement[], filter: StatsFilter): Mov
 }
 
 function effectiveAmount(m: Movement, currency?: Currency): number {
-  // When a currency is set, prefer converted_amount if available, else use amount
-  if (currency && m.original_currency !== currency && m.converted_amount !== null) {
-    return m.converted_amount
-  }
-  return m.amount
+  // Sin moneda objetivo ("todas"): comportamiento preexistente, suma el monto crudo.
+  if (!currency) return m.amount
+  return amountInCurrency(m, currency)
 }
 
 export interface SummaryTotals {

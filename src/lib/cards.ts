@@ -12,11 +12,13 @@ import {
   format,
 } from "date-fns"
 import { es } from "date-fns/locale"
+import { amountInCurrency } from "@/lib/money"
 
 // Minimal shape needed by nextCardPayment — avoids importing full DB types here.
 interface CardPaymentAccount {
   closing_day: number | null
   due_day?: number | null
+  currency: string
 }
 
 interface CardPaymentStatement {
@@ -32,6 +34,26 @@ interface CardPaymentMovement {
   date: string
   amount: number
   converted_amount?: number | null
+  original_currency?: string | null
+}
+
+/**
+ * Suma un movimiento hacia la moneda de la cuenta (amountInCurrency de
+ * @/lib/money), con original_currency ausente asumido igual a la cuenta
+ * (movimientos legacy sin el campo cargado).
+ */
+function towardAccountCurrency(
+  m: { amount: number; converted_amount?: number | null; original_currency?: string | null },
+  accountCurrency: string
+): number {
+  return amountInCurrency(
+    {
+      amount: m.amount,
+      converted_amount: m.converted_amount ?? null,
+      original_currency: m.original_currency ?? accountCurrency,
+    },
+    accountCurrency
+  )
 }
 
 /**
@@ -90,7 +112,7 @@ export function nextCardPayment(
         m.type === "expense" &&
         isInCycle(m.date, closed.cycleStart, closed.cycleEnd)
     )
-    .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+    .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
 
   const dueDay = account.due_day
   // Use the current open cycle's end date (the upcoming close) so the due date
@@ -134,7 +156,7 @@ export function currentCycleSummary(
         m.type === "expense" &&
         isInCycle(m.date, cycleStart, cycleEnd)
     )
-    .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+    .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
 
   const closeDate = toDateString(cycleEnd)
 
@@ -291,6 +313,7 @@ export function formatStatementLabel(closeDate: Date): string {
 interface CycleAccount {
   closing_day: number | null
   due_day?: number | null
+  currency: string
 }
 
 interface CycleMovement {
@@ -331,8 +354,10 @@ export interface CardCycle {
   /** Movements whose date falls within this cycle */
   movements: CycleMovement[]
   /**
-   * Sum of `converted_amount ?? amount` for expense movements in the cycle.
-   * This is the autocalculated total; for paid cycles prefer statement.total_amount.
+   * Suma en la moneda de la cuenta (amountInCurrency de @/lib/money) de los
+   * movimientos de gasto del ciclo — un gasto USD sin converted_amount ("USD
+   * puro") no se cuenta acá, aparece aparte en totalsByCurrency. Total
+   * autocalculado; para ciclos pagados preferir statement.total_amount.
    */
   total: number
   /**
@@ -410,10 +435,20 @@ export function listCardCycles(
     .map((m) => startOfDay(parseISO(m.date)))
     .reduce((latest, d) => (isAfter(d, latest) ? d : latest), today)
 
+  // The walk must always reach at least the cycle containing the oldest
+  // movement (firstCycleRange.cycleEnd) — if that cycle hasn't closed yet
+  // relative to "today" (e.g. the oldest movement is the only one and it's
+  // still within the current open cycle), latestMovementDate alone could be
+  // before it, which would make the loop below exit before its first
+  // iteration and return an empty cycle list.
+  const coverageEnd = isAfter(firstCycleRange.cycleEnd, latestMovementDate)
+    ? firstCycleRange.cycleEnd
+    : latestMovementDate
+
   const cycles: CardCycle[] = []
 
   // Walk month by month until we've passed the latest date we need to cover
-  while (!isAfter(cursor, latestMovementDate)) {
+  while (!isAfter(cursor, coverageEnd)) {
     const cycleEnd = cursor
     // cycleStart = day after previous close
     const prevClose = new Date(cycleEnd)
@@ -433,7 +468,7 @@ export function listCardCycles(
     const expenseMovements = cycleMovements.filter((m) => m.type === "expense")
 
     const total = expenseMovements
-      .reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0)
+      .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
 
     const totalsByCurrency: { ARS: number; USD: number } = { ARS: 0, USD: 0 }
     for (const m of expenseMovements) {

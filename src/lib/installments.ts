@@ -1,11 +1,65 @@
 import type { Tables } from "@/lib/database.types"
 import { addMonths, parseISO, isAfter, startOfDay } from "date-fns"
+import { createClient } from "@/lib/supabase/client"
+import { isInCycle, type CardCycle } from "@/lib/cards"
 
 export type InstallmentPurchase = Tables<"installment_purchases">
 export type Movement = Tables<"movements">
+export type CardStatement = Tables<"card_statements">
 
 /** Query key for installment purchases */
 export const INSTALLMENTS_KEY = ["installments"] as const
+
+/**
+ * Given a date string and the list of cycles for the card, returns whether that date
+ * falls in a cycle whose statement has status "pagado".
+ */
+export function isDateInPaidCycle(dateStr: string, cycles: CardCycle[]): boolean {
+  for (const cycle of cycles) {
+    if (
+      cycle.statement?.status === "pagado" &&
+      isInCycle(dateStr, cycle.cycleStart, cycle.cycleEnd)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/** All movements (cuotas) belonging to an installment purchase, ordered by installment number. */
+export async function fetchInstallmentMovements(purchaseId: string): Promise<Movement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .eq("installment_purchase_id", purchaseId)
+    .order("installment_number")
+  if (error) throw error
+  return data
+}
+
+/** All expense movements for a card account — used to compute its billing cycles. */
+export async function fetchAllMovementsForAccount(accountId: string): Promise<Movement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("movements")
+    .select("*")
+    .eq("account_id", accountId)
+    .eq("type", "expense")
+  if (error) throw error
+  return data
+}
+
+/** Card statements for an account — used to compute its billing cycles. */
+export async function fetchStatementsForAccount(accountId: string): Promise<CardStatement[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("card_statements")
+    .select("*")
+    .eq("account_id", accountId)
+  if (error) throw error
+  return data
+}
 
 /**
  * Compute per-installment amount and the last installment amount

@@ -359,7 +359,7 @@ export function GoalForm({
       accountIds: isGlobal ? [] : v.account_ids,
       isGlobal,
     }
-    const suggested = suggestBaseline(scope, movements)
+    const suggested = suggestBaseline(scope, movements, v.currency)
     setValue("baseline_amount", suggested > 0 ? suggested : null)
     setSuggesting(false)
   }

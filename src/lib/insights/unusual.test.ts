@@ -10,6 +10,7 @@ function makeMovement(overrides: Partial<UnusualChargeMovement>): UnusualChargeM
     category_id: "cat-1",
     amount: 1000,
     converted_amount: null,
+    original_currency: "ARS",
     ...overrides,
   }
 }
@@ -66,19 +67,33 @@ describe("detectUnusualCharge", () => {
     expect(result!.isUnusual).toBe(false)
   })
 
-  it("prefers converted_amount over amount for both the average and the candidate", () => {
+  it("prefers converted_amount over amount for cross-currency movements (USD with ARS equivalent)", () => {
     const candidate = makeMovement({
       id: "candidate",
       date: "2026-04-01",
-      amount: 1000, // USD-ish native amount, should be ignored
+      amount: 1000, // native USD amount, should be ignored in favor of converted_amount
       converted_amount: 48000,
+      original_currency: "USD",
     })
-    const historical = makeHistory(5, 1000, { converted_amount: 8000 })
+    const historical = makeHistory(5, 1000, { converted_amount: 8000, original_currency: "USD" })
     const result = detectUnusualCharge(candidate, historical)
     expect(result).not.toBeNull()
     expect(result!.avg).toBe(8000)
     expect(result!.ratio).toBe(6)
     expect(result!.isUnusual).toBe(true)
+  })
+
+  it("does not count a USD charge with no converted_amount ('USD puro') toward the ARS average or candidate", () => {
+    // Historical: mostly ARS, plus one USD-puro (converted_amount null) that must be excluded (counts as 0).
+    const historical = [
+      ...makeHistory(5, 2000),
+      makeMovement({ id: "usd-puro", date: "2026-02-05", amount: 999999, converted_amount: null, original_currency: "USD" }),
+    ]
+    const candidate = makeMovement({ id: "candidate", date: "2026-04-01", amount: 10000 })
+    const result = detectUnusualCharge(candidate, historical)
+    expect(result).not.toBeNull()
+    // avg over 6 history rows: (2000*5 + 0) / 6, not skewed by the USD-puro amount
+    expect(result!.avg).toBeCloseTo((2000 * 5) / 6)
   })
 
   it("returns null for non-expense movements", () => {

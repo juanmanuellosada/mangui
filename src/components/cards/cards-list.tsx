@@ -160,9 +160,14 @@ function CreditCardVisual({
 
   // Determine whether to show dual-currency subtotals or a single total.
   // Dual: when the live cycle has both ARS and USD non-zero expenses.
+  // USD-puro: el ciclo sólo tiene gastos en USD (sin equivalente en pesos) —
+  // se muestra en USD, no en account.currency (que sería ARS con total 0).
   // For paid cycles we show the stored totals instead.
   const { ARS: arsTotal, USD: usdTotal } = cycle.totalsByCurrency
   const isMultiCurrency = !isPaid && arsTotal > 0 && usdTotal > 0
+  const isUsdOnly = !isPaid && arsTotal === 0 && usdTotal > 0
+  const singleCurrency = isUsdOnly ? "USD" : account.currency
+  const singleTotal = isUsdOnly ? usdTotal : isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total
 
   return (
     <div
@@ -199,10 +204,7 @@ function CreditCardVisual({
               className="text-white text-2xl sm:text-3xl font-bold tabular-nums leading-none"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {formatCurrency(
-                isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total,
-                account.currency
-              )}
+              {formatCurrency(singleTotal, singleCurrency)}
             </p>
           )}
         </div>
@@ -718,7 +720,11 @@ function CardBlock({
 
   const { ARS: arsTotal, USD: usdTotal } = cycle.totalsByCurrency
   const isMultiCurrency = !isPaid && arsTotal > 0 && usdTotal > 0
-  const displayTotal = isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total
+  // USD-puro: el ciclo sólo tiene gastos en USD sin equivalente en pesos —
+  // se muestra en USD (account.currency sería ARS con total 0).
+  const isUsdOnly = !isPaid && arsTotal === 0 && usdTotal > 0
+  const displayCurrency = isUsdOnly ? "USD" : account.currency
+  const displayTotal = isUsdOnly ? usdTotal : isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm">
@@ -796,7 +802,7 @@ function CardBlock({
                 )}
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {formatCurrency(displayTotal, account.currency)}
+                {formatCurrency(displayTotal, displayCurrency)}
               </p>
             )}
             {isPaid && cycle.statement?.paid_date && (
@@ -872,7 +878,7 @@ function CardBlock({
                       </p>
                     </div>
                     <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
-                      − {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
+                      − {formatCurrency(mv.amount, mv.original_currency)}
                     </p>
                   </button>
                 ) : (
@@ -897,7 +903,7 @@ function CardBlock({
                       </p>
                     </div>
                     <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
-                      − {formatCurrency(mv.converted_amount ?? mv.amount, account.currency)}
+                      − {formatCurrency(mv.amount, mv.original_currency)}
                     </p>
                   </button>
                 )

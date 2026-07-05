@@ -23,6 +23,7 @@ import {
 import { es } from "date-fns/locale"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
+import { amountInCurrency } from "@/lib/money"
 import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
 import {
   chartFiltersToStatsFilter,
@@ -101,7 +102,7 @@ export function IncomeExpenseChart() {
       let gastos = 0
       for (const m of filtered) {
         if (m.date < from || m.date > to) continue
-        const amount = m.converted_amount ?? m.amount
+        const amount = amountInCurrency(m, "ARS")
         if (m.type === "income") ingresos += amount
         else gastos += amount
       }

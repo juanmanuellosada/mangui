@@ -8,6 +8,7 @@ import { ArrowRightLeft } from "lucide-react"
 import { Sankey, Tooltip, ResponsiveContainer, Layer, Rectangle } from "recharts"
 import type { NodeProps, LinkProps, SankeyData } from "recharts/types/chart/Sankey"
 import type { Tables } from "@/lib/database.types"
+import { amountInCurrency } from "@/lib/money"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -339,7 +340,7 @@ function buildSankeyData(
   let expenseTotal = 0
 
   for (const m of movements) {
-    const amount = m.converted_amount ?? m.amount
+    const amount = amountInCurrency(m, "ARS")
     const key = m.category_id ?? "__none__"
 
     if (m.type === "income") {

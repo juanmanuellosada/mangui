@@ -7,6 +7,8 @@ import {
   isInCycle,
   toDateString,
   formatStatementLabel,
+  currentCycleSummary,
+  listCardCycles,
 } from "./cards"
 
 // ---------------------------------------------------------------------------
@@ -245,5 +247,65 @@ describe("formatStatementLabel", () => {
   it("December in Spanish", () => {
     const closeDate = new Date(2025, 11, 31)
     expect(formatStatementLabel(closeDate)).toBe("diciembre 2025")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// currentCycleSummary / listCardCycles — "USD puro" (ver src/lib/money.ts)
+// ---------------------------------------------------------------------------
+describe("currentCycleSummary — USD puro", () => {
+  const account = { closing_day: 20, due_day: 10, currency: "ARS" }
+  const ref = new Date(2026, 5, 10) // June 10 2026 → cycle May 21 – June 20
+
+  it("does not count a USD movement with no converted_amount toward the ARS total", () => {
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-05", amount: 200, converted_amount: null, original_currency: "ARS" },
+      { account_id: "card-1", type: "expense", date: "2026-06-06", amount: 50, converted_amount: null, original_currency: "USD" },
+    ]
+    const { amount } = currentCycleSummary("card-1", account, movements, ref)
+    expect(amount).toBe(200)
+  })
+
+  it("counts a USD movement's converted_amount when present", () => {
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-05", amount: 200, converted_amount: null, original_currency: "ARS" },
+      { account_id: "card-1", type: "expense", date: "2026-06-06", amount: 50, converted_amount: 67500, original_currency: "USD" },
+    ]
+    const { amount } = currentCycleSummary("card-1", account, movements, ref)
+    expect(amount).toBe(67700)
+  })
+})
+
+describe("listCardCycles — edge de fechas: el cierre del ciclo más viejo cae después de ref", () => {
+  it("incluye el ciclo del movimiento más viejo aunque su cierre sea posterior a ref (ciclo abierto)", () => {
+    const account = { closing_day: 20, due_day: 10, currency: "ARS" }
+    // Único movimiento, dentro del ciclo abierto (cierra 2026-06-20).
+    const movements = [
+      { id: "m1", account_id: "card-1", type: "expense", date: "2026-06-05", amount: 100, converted_amount: null, original_currency: "ARS" },
+    ]
+    // ref cae estrictamente antes del cierre del ciclo que contiene el movimiento más viejo.
+    const ref = new Date(2026, 5, 10) // June 10 2026
+    const cycles = listCardCycles("card-1", account, movements, [], ref)
+    expect(cycles.length).toBeGreaterThan(0)
+    const cycle = cycles[cycles.length - 1]
+    expect(cycle.closeDate).toBe("2026-06-20")
+    expect(cycle.total).toBe(100)
+  })
+})
+
+describe("listCardCycles — totalsByCurrency vs. ARS total", () => {
+  it("USD-puro expenses stay out of `total` (ARS) but still show up in totalsByCurrency.USD", () => {
+    const account = { closing_day: 20, due_day: 10, currency: "ARS" }
+    const movements = [
+      { id: "m1", account_id: "card-1", type: "expense", date: "2026-06-05", amount: 200, converted_amount: null, original_currency: "ARS" },
+      { id: "m2", account_id: "card-1", type: "expense", date: "2026-06-06", amount: 50, converted_amount: null, original_currency: "USD" },
+    ]
+    // ref = cierre del ciclo que contiene los movimientos (2026-06-20), para
+    // evitar que quede fuera del rango cubierto por listCardCycles.
+    const ref = new Date(2026, 5, 20)
+    const cycles = listCardCycles("card-1", account, movements, [], ref)
+    const cycle = cycles[cycles.length - 1]
+    expect(cycle.total).toBe(200)
+    expect(cycle.totalsByCurrency).toEqual({ ARS: 200, USD: 50 })
   })
 })

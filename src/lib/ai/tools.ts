@@ -289,7 +289,7 @@ export async function pagosFuturos(
         .eq("status", "pendiente"),
       supabase
         .from("movements")
-        .select("account_id, type, date, amount, converted_amount")
+        .select("account_id, type, date, amount, converted_amount, original_currency")
         .eq("type", "expense"),
     ])
 
@@ -346,7 +346,7 @@ export async function pagosFuturos(
   for (const card of creditCards) {
     const payment = nextCardPayment(
       card.id,
-      { closing_day: card.closing_day, due_day: card.due_day },
+      { closing_day: card.closing_day, due_day: card.due_day, currency: card.currency },
       statements as Parameters<typeof nextCardPayment>[2],
       movements as Parameters<typeof nextCardPayment>[3]
     )
@@ -407,7 +407,7 @@ export async function resumenesTarjeta(
   for (const card of creditCards) {
     const cycles = listCardCycles(
       card.id,
-      { closing_day: card.closing_day, due_day: card.due_day },
+      { closing_day: card.closing_day, due_day: card.due_day, currency: card.currency },
       allMovements as Parameters<typeof listCardCycles>[2],
       allStatements as Parameters<typeof listCardCycles>[3]
     )
@@ -512,7 +512,7 @@ export async function estadoMetas(
     supabase.from("goal_categories").select("goal_id, category_id"),
     supabase
       .from("movements")
-      .select("type, is_future, date, category_id, account_id, amount, converted_amount")
+      .select("type, is_future, date, category_id, account_id, amount, converted_amount, original_currency")
       .eq("is_future", false),
   ])
 

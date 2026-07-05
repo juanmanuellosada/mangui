@@ -6,6 +6,7 @@ import { nextCloseDate, computeDueDate, toDateString, currentCycleSummary } from
 import { computeBudgetProgress, activeBudgetWindow } from "@/lib/budgets"
 import { detectUnusualCharge } from "@/lib/insights/unusual"
 import { formatCurrency } from "@/lib/utils"
+import { amountInCurrency } from "@/lib/money"
 import type { Tables } from "@/lib/database.types"
 import { format, addDays, subDays, subMonths, parseISO, startOfDay } from "date-fns"
 
@@ -139,7 +140,7 @@ export async function GET(req: NextRequest) {
 
             const summary = currentCycleSummary(
               card.id,
-              { closing_day: card.closing_day, due_day: card.due_day },
+              { closing_day: card.closing_day, due_day: card.due_day, currency: card.currency },
               movements,
               today
             )
@@ -265,14 +266,17 @@ export async function GET(req: NextRequest) {
             .eq("id", best.movement.category_id as string)
             .maybeSingle()
 
-          const amount = best.movement.converted_amount ?? best.movement.amount
+          // detectUnusualCharge compara todo en ARS (ver @/lib/insights/unusual),
+          // así que el monto mostrado tiene que ser el mismo equivalente en ARS
+          // para no rotular un monto convertido con la moneda original (o viceversa).
+          const amount = amountInCurrency(best.movement, "ARS")
           const catName = category?.name ?? "sin categoría"
           const eventKey = `unusual_charge:${best.movement.id}`
 
           const sent = await tryNotify(admin, userId, eventKey, async () => {
             await sendPushToUser(admin, userId, {
               title: "Cargo inusual",
-              body: `Cargo inusual: ${formatCurrency(amount, best!.movement.original_currency)} en ${catName}, ~${Math.round(best!.ratio)}x tu promedio.`,
+              body: `Cargo inusual: ${formatCurrency(amount, "ARS")} en ${catName}, ~${Math.round(best!.ratio)}x tu promedio.`,
               url: "/movimientos",
             })
           })

@@ -15,6 +15,7 @@ import type { ChartConfig } from "@/components/evilcharts/ui/chart"
 import { renderCategoryIcon } from "@/lib/categories"
 import { filterMovements } from "@/lib/stats"
 import { fetchAllMovements } from "@/lib/movements"
+import { amountInCurrency } from "@/lib/money"
 import { DateRangeFilter, type DateRangeValue } from "@/components/ui/date-range-filter"
 import {
   chartFiltersToStatsFilter,
@@ -98,7 +99,7 @@ export function CategoryPieChart() {
     const totals = new Map<string, number>()
     let total = 0
     for (const m of filtered) {
-      const amount = m.converted_amount ?? m.amount
+      const amount = amountInCurrency(m, "ARS")
       total += amount
       const key = m.category_id ?? "__none__"
       totals.set(key, (totals.get(key) ?? 0) + amount)

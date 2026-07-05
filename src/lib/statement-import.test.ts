@@ -77,7 +77,7 @@ describe("buildStatementPayload", () => {
     expect(payload.lines[0].dollar_type).toBeNull()
   })
 
-  it("uses amount_ars from the PDF as converted_amount for a USD line on an ARS card", () => {
+  it("ignores amount_ars from the PDF and leaves converted_amount null for a USD line on an ARS card (USD puro)", () => {
     const payload = buildStatementPayload(
       makeInput({
         account_currency: "ARS",
@@ -85,32 +85,20 @@ describe("buildStatementPayload", () => {
       })
     )
     expect(payload.lines[0].original_currency).toBe("USD")
-    expect(payload.lines[0].converted_amount).toBe(13500)
+    expect(payload.lines[0].converted_amount).toBeNull()
     expect(payload.lines[0].dollar_type).toBe("tarjeta")
   })
 
-  it("computes converted_amount from rate when amount_ars is missing", () => {
+  it("leaves converted_amount null for a USD line with no amount_ars ('USD puro') — no rate needed, doesn't throw", () => {
     const payload = buildStatementPayload(
       makeInput({
         account_currency: "ARS",
-        rate: 1350,
         lines: [makeLine({ currency: "USD", amount: 10, amount_ars: null })],
       })
     )
-    expect(payload.lines[0].converted_amount).toBe(13500)
+    expect(payload.lines[0].original_currency).toBe("USD")
+    expect(payload.lines[0].converted_amount).toBeNull()
     expect(payload.lines[0].dollar_type).toBe("tarjeta")
-  })
-
-  it("throws when a cross-currency line has neither amount_ars nor rate", () => {
-    expect(() =>
-      buildStatementPayload(
-        makeInput({
-          account_currency: "ARS",
-          rate: null,
-          lines: [makeLine({ currency: "USD", amount: 10, amount_ars: null })],
-        })
-      )
-    ).toThrow()
   })
 
   it("excludes deselected lines from the payload", () => {
@@ -123,7 +111,7 @@ describe("buildStatementPayload", () => {
     expect(payload.lines[0].note).toBe("Incluida")
   })
 
-  it("creates a recurring transaction only when a subscription line has createRecurring confirmed", () => {
+  it("creates a recurring transaction only when the line has createRecurring confirmed", () => {
     const confirmed = buildStatementPayload(
       makeInput({
         lines: [makeLine({ description: "Netflix", is_subscription: true, createRecurring: true, date: "2026-06-05" })],
@@ -138,11 +126,25 @@ describe("buildStatementPayload", () => {
       makeInput({ lines: [makeLine({ description: "Netflix", is_subscription: true, createRecurring: false })] })
     )
     expect(notConfirmed.lines[0].create_recurring).toBeNull()
+  })
 
-    const notSubscription = buildStatementPayload(
-      makeInput({ lines: [makeLine({ description: "Super Chino", is_subscription: false, createRecurring: true })] })
+  it("creates a recurring transaction for a simple line the user marked as recurrent, even if the AI didn't flag it as a subscription", () => {
+    const payload = buildStatementPayload(
+      makeInput({
+        lines: [
+          makeLine({
+            description: "Cine Fan Black",
+            is_subscription: false,
+            createRecurring: true,
+            date: "2026-06-05",
+          }),
+        ],
+      })
     )
-    expect(notSubscription.lines[0].create_recurring).toBeNull()
+    expect(payload.lines[0].create_recurring).toEqual({
+      day_of_month: 5,
+      subscription_key: buildSubscriptionKey("Cine Fan Black", "acc-1"),
+    })
   })
 
   it("reimportar el mismo resumen produce el mismo subscription_key (idempotencia de la recurrente)", () => {

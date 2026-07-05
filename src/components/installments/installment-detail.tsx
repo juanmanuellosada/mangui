@@ -39,9 +39,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { INSTALLMENTS_KEY, computeInstallmentAmounts } from "@/lib/installments"
+import {
+  INSTALLMENTS_KEY,
+  computeInstallmentAmounts,
+  isDateInPaidCycle,
+  fetchInstallmentMovements,
+  fetchAllMovementsForAccount,
+  fetchStatementsForAccount,
+} from "@/lib/installments"
 import { MOVEMENTS_KEY, BALANCES_KEY, ACCOUNTS_KEY, DOLLAR_TYPE_LABELS, type DollarType } from "@/lib/movements"
-import { isInCycle, listCardCycles, type CardCycle } from "@/lib/cards"
+import { listCardCycles, type CardCycle } from "@/lib/cards"
 import { isFutureDate } from "@/lib/date-utils"
 import { addMonths, parseISO } from "date-fns"
 import type { Tables } from "@/lib/database.types"
@@ -70,17 +77,6 @@ async function fetchPurchase(id: string): Promise<InstallmentPurchase> {
   return data
 }
 
-async function fetchInstallmentMovements(purchaseId: string): Promise<Movement[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("movements")
-    .select("*")
-    .eq("installment_purchase_id", purchaseId)
-    .order("installment_number")
-  if (error) throw error
-  return data
-}
-
 async function fetchAccount(id: string): Promise<Account> {
   const supabase = createClient()
   const { data, error } = await supabase
@@ -99,27 +95,6 @@ async function fetchCategory(id: string): Promise<Category> {
     .select("*")
     .eq("id", id)
     .single()
-  if (error) throw error
-  return data
-}
-
-async function fetchAllMovementsForAccount(accountId: string): Promise<Movement[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("movements")
-    .select("*")
-    .eq("account_id", accountId)
-    .eq("type", "expense")
-  if (error) throw error
-  return data
-}
-
-async function fetchStatementsForAccount(accountId: string): Promise<CardStatement[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("card_statements")
-    .select("*")
-    .eq("account_id", accountId)
   if (error) throw error
   return data
 }
@@ -172,27 +147,6 @@ const STATUS_ICONS: Record<CuotaStatus, typeof CheckCircle2> = {
   pagada: CheckCircle2,
   proxima: Clock,
   futura: Circle,
-}
-
-// ── Helpers: paid-cycle detection ──────────────────────────────────────────────
-
-/**
- * Given a date string and the list of cycles for the card, returns whether that date
- * falls in a cycle whose statement has status "pagado".
- */
-function isDateInPaidCycle(
-  dateStr: string,
-  cycles: CardCycle[]
-): boolean {
-  for (const cycle of cycles) {
-    if (
-      cycle.statement?.status === "pagado" &&
-      isInCycle(dateStr, cycle.cycleStart, cycle.cycleEnd)
-    ) {
-      return true
-    }
-  }
-  return false
 }
 
 // ── Delete purchase dialog ─────────────────────────────────────────────────────

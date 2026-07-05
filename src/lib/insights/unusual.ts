@@ -1,4 +1,14 @@
 import { parseISO, subDays, format } from "date-fns"
+import { amountInCurrency } from "@/lib/money"
+
+/**
+ * Moneda objetivo asumida para el baseline histórico y el candidato: la app
+ * no tiene una noción de "moneda de la detección de gastos inusuales", así
+ * que se asume ARS (moneda de cuenta por defecto). Un gasto USD sin
+ * converted_amount ("USD puro") no se cuenta ni en el promedio histórico ni
+ * como candidato — no se mezcla con la comparación en ARS.
+ */
+const UNUSUAL_CHARGE_CURRENCY = "ARS"
 
 /** Minimum number of prior same-category expenses required to have a baseline. */
 export const MIN_HISTORY = 5
@@ -10,7 +20,7 @@ export const UNUSUAL_FACTOR = 3
 export const HISTORY_DAYS = 90
 
 /**
- * Minimum amount (ARS-equivalent, i.e. converted_amount ?? amount) the candidate
+ * Minimum amount (ARS-equivalent, ver UNUSUAL_CHARGE_CURRENCY) the candidate
  * itself must reach to qualify as unusual — avoids flagging categories where even
  * a 3x jump is still a trivially small sum (noise).
  */
@@ -24,6 +34,7 @@ export interface UnusualChargeMovement {
   category_id: string | null
   amount: number
   converted_amount: number | null
+  original_currency: string
 }
 
 export interface UnusualChargeResult {
@@ -76,11 +87,11 @@ export function detectUnusualCharge(
   if (sameCategory.length < minHistory) return null
 
   const avg =
-    sameCategory.reduce((sum, m) => sum + (m.converted_amount ?? m.amount), 0) /
+    sameCategory.reduce((sum, m) => sum + amountInCurrency(m, UNUSUAL_CHARGE_CURRENCY), 0) /
     sameCategory.length
   if (avg <= 0) return null
 
-  const candidateAmount = candidate.converted_amount ?? candidate.amount
+  const candidateAmount = amountInCurrency(candidate, UNUSUAL_CHARGE_CURRENCY)
   const ratio = candidateAmount / avg
   const isUnusual = ratio > unusualFactor && candidateAmount >= minAmount
 

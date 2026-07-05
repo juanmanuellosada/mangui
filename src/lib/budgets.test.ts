@@ -299,20 +299,29 @@ describe("computeBudgetProgress", () => {
     expect(p.spent).toBe(200)
   })
 
-  it("prefers converted_amount when present", () => {
+  it("prefers converted_amount when present for a cross-currency movement", () => {
     const movements: MovementRow[] = [
-      makeMovement({ amount: 100, converted_amount: 150 }),
+      makeMovement({ amount: 100, converted_amount: 150, original_currency: "USD" }),
     ]
     const p = computeBudgetProgress(globalBudget, movements as any, ref)
     expect(p.spent).toBe(150)
   })
 
-  it("uses raw amount when converted_amount is null", () => {
+  it("uses raw amount when converted_amount is null (same currency as budget)", () => {
     const movements: MovementRow[] = [
       makeMovement({ amount: 250, converted_amount: null }),
     ]
     const p = computeBudgetProgress(globalBudget, movements as any, ref)
     expect(p.spent).toBe(250)
+  })
+
+  it("does not count a USD movement with no converted_amount ('USD puro') toward an ARS budget", () => {
+    const movements: MovementRow[] = [
+      makeMovement({ amount: 300, converted_amount: null, original_currency: "USD" }),
+      makeMovement({ amount: 200 }), // ARS, counted normally
+    ]
+    const p = computeBudgetProgress(globalBudget, movements as any, ref)
+    expect(p.spent).toBe(200)
   })
 
   it("filters by category_ids when non-empty", () => {
