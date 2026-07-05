@@ -352,6 +352,14 @@ export interface StatementPreviewLine {
   installment_number?: number
   installment_total?: number
   purchase_key?: string
+  /**
+   * true si esta fila es una proyección informativa de una recurrente
+   * confirmada (`createRecurring`) mostrada en un ciclo futuro para
+   * visualizar cómo va a quedar el resumen. NO se persiste en el import (el
+   * cron de recurrentes la genera sola cada mes): incluirla en
+   * buildStatementPayload la duplicaría. No cuenta como "ítem a crear".
+   */
+  projectedRecurring?: true
 }
 
 export interface StatementPreviewGroup {
@@ -376,6 +384,12 @@ export interface StatementPreviewGroup {
  * resumen. Los ciclos futuros son siempre mensuales (un mes por ciclo,
  * consistente con la proyección de cuotas), así que su período se deriva
  * sumando N meses a close_date/due_date del resumen leído.
+ *
+ * Además, cada línea con `createRecurring === true` recibe una fila
+ * `projectedRecurring` (solo visual) en los ciclos futuros ya generados por
+ * cuotas, o en el ciclo siguiente si no hay ninguno — así el usuario ve cómo
+ * va a quedar el próximo resumen. Es puramente informativo: no se persiste
+ * (buildStatementPayload no la reusa) y no suma al subtotal del grupo.
  */
 export function groupStatementPreviewByCycle(input: BuildStatementPayloadInput): StatementPreviewGroup[] {
   const expanded = expandReviewLines(input)
@@ -397,6 +411,31 @@ export function groupStatementPreviewByCycle(input: BuildStatementPayloadInput):
     byOffset.set(e.cycleOffset, list)
   }
 
+  const recurringLines = input.lines.filter(
+    (l) => l.selected && l.createRecurring === true && classifyLine(l) !== "installment"
+  )
+  if (recurringLines.length > 0) {
+    const existingFutureOffsets = Array.from(byOffset.keys())
+      .filter((o) => o > 0)
+      .sort((a, b) => a - b)
+    const targetOffsets = existingFutureOffsets.length > 0 ? existingFutureOffsets : [1]
+    for (const offset of targetOffsets) {
+      const list = byOffset.get(offset) ?? []
+      for (const line of recurringLines) {
+        list.push({
+          kind: classifyLine(line) === "subscription" ? "subscription" : "simple",
+          description: line.description,
+          date: toDateString(addMonths(parseISO(line.date), offset)),
+          amount: line.amount,
+          currency: line.currency,
+          category_id: line.category_id,
+          projectedRecurring: true,
+        })
+      }
+      byOffset.set(offset, list)
+    }
+  }
+
   return Array.from(byOffset.keys())
     .sort((a, b) => a - b)
     .map((offset) => {
@@ -406,6 +445,7 @@ export function groupStatementPreviewByCycle(input: BuildStatementPayloadInput):
       const dueDate = offset === 0 ? input.due_date : toDateString(addMonths(parseISO(input.due_date), offset))
       const totalsByCurrency = { ARS: 0, USD: 0 }
       for (const l of groupLines) {
+        if (l.projectedRecurring) continue
         totalsByCurrency[l.currency] += l.amount
       }
       totalsByCurrency.ARS = Math.round(totalsByCurrency.ARS * 100) / 100

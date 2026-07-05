@@ -367,6 +367,98 @@ describe("reconciliación por identidad de compra — conceptual (Tarea 3.6)", (
   })
 })
 
+describe("groupStatementPreviewByCycle — proyección visual de recurrentes (createRecurring)", () => {
+  it("proyecta una fila projectedRecurring en el ciclo siguiente cuando no hay cuotas futuras", () => {
+    const groups = groupStatementPreviewByCycle(
+      makeInput({
+        lines: [makeLine({ description: "Netflix", createRecurring: true, date: "2026-06-05", amount: 3000 })],
+      })
+    )
+    expect(groups).toHaveLength(2)
+    expect(groups.map((g) => g.cycleOffset)).toEqual([0, 1])
+
+    // El ciclo leído (offset 0) sólo tiene la línea real, sin flag.
+    expect(groups[0].lines.every((l) => !l.projectedRecurring)).toBe(true)
+
+    // El ciclo siguiente (offset 1) trae la proyección informativa.
+    expect(groups[1].closeDate).toBe("2026-07-20")
+    expect(groups[1].lines).toHaveLength(1)
+    expect(groups[1].lines[0]).toMatchObject({
+      description: "Netflix",
+      amount: 3000,
+      currency: "ARS",
+      projectedRecurring: true,
+    })
+    // No suma al subtotal del grupo (es sólo informativa).
+    expect(groups[1].totalsByCurrency).toEqual({ ARS: 0, USD: 0 })
+  })
+
+  it("proyecta la recurrente en cada ciclo futuro ya generado por cuotas, sin sumarla al subtotal", () => {
+    const groups = groupStatementPreviewByCycle(
+      makeInput({
+        lines: [
+          makeLine({ description: "Netflix", createRecurring: true, date: "2026-06-05", amount: 3000 }),
+          makeLine({ description: "Notebook", amount: 1000, installment_number: 1, installment_total: 3 }),
+        ],
+      })
+    )
+    expect(groups.map((g) => g.cycleOffset)).toEqual([0, 1, 2])
+
+    expect(groups[1].lines.some((l) => l.projectedRecurring && l.description === "Netflix")).toBe(true)
+    expect(groups[2].lines.some((l) => l.projectedRecurring && l.description === "Netflix")).toBe(true)
+    // El subtotal del ciclo futuro sólo cuenta la cuota (1000), no la recurrente proyectada.
+    expect(groups[1].totalsByCurrency.ARS).toBe(1000)
+    expect(groups[2].totalsByCurrency.ARS).toBe(1000)
+  })
+
+  it("no proyecta nada si la línea no confirmó createRecurring, o si está deseleccionada", () => {
+    const noRecurring = groupStatementPreviewByCycle(
+      makeInput({ lines: [makeLine({ description: "Netflix", createRecurring: false })] })
+    )
+    expect(noRecurring).toHaveLength(1)
+    expect(noRecurring[0].lines.every((l) => !l.projectedRecurring)).toBe(true)
+
+    const deselected = groupStatementPreviewByCycle(
+      makeInput({ lines: [makeLine({ description: "Netflix", createRecurring: true, selected: false })] })
+    )
+    expect(deselected).toHaveLength(0)
+  })
+
+  it("ignora createRecurring en una línea de cuota (no aplica, no se proyecta)", () => {
+    const groups = groupStatementPreviewByCycle(
+      makeInput({
+        lines: [
+          makeLine({
+            description: "Notebook",
+            amount: 1000,
+            installment_number: 1,
+            installment_total: 3,
+            createRecurring: true,
+          }),
+        ],
+      })
+    )
+    // Sólo cuotas proyectadas (kind installment), ninguna fila projectedRecurring.
+    expect(groups.every((g) => g.lines.every((l) => !l.projectedRecurring))).toBe(true)
+  })
+})
+
+describe("buildStatementPayload — no persiste ocurrencias futuras de recurrentes proyectadas", () => {
+  it("el payload de guardado no incluye las ocurrencias futuras informativas, sólo la línea del período actual", () => {
+    const payload = buildStatementPayload(
+      makeInput({
+        lines: [makeLine({ description: "Netflix", createRecurring: true, date: "2026-06-05", amount: 3000 })],
+      })
+    )
+    expect(payload.lines).toHaveLength(1)
+    expect(payload.lines[0].note).toBe("Netflix")
+    expect(payload.lines[0].create_recurring).toEqual({
+      day_of_month: 5,
+      subscription_key: buildSubscriptionKey("Netflix", "acc-1"),
+    })
+  })
+})
+
 describe("checkUpcomingInstallmentsTotal (Tarea 3.5)", () => {
   it("devuelve null cuando no hay total esperado del PDF", () => {
     const result = checkUpcomingInstallmentsTotal(

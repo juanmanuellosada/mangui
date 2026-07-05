@@ -16,7 +16,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Check, Clock, FileText, FileUp, Loader2, Sparkles, X } from "lucide-react"
+import { Check, Clock, FileText, FileUp, Loader2, Repeat, Sparkles, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -194,21 +194,38 @@ function LineRow({
 
 function ProjectedLineRow({ line, categories }: { line: StatementPreviewLine; categories: Category[] }) {
   const category = categories.find((c) => c.id === line.category_id) ?? null
+  const isProjectedRecurring = line.projectedRecurring === true
+
   return (
-    <div className="flex items-start gap-2 p-3">
+    <div className={cn("flex items-start gap-2 p-3", isProjectedRecurring && "bg-primary/5")}>
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium truncate">{line.description}</span>
-          <span className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
+          <span className={cn("text-sm font-medium truncate", isProjectedRecurring && "text-muted-foreground")}>
+            {line.description}
+          </span>
+          <span
+            className={cn(
+              "text-sm font-bold tabular-nums flex-shrink-0",
+              isProjectedRecurring ? "text-muted-foreground" : "text-destructive"
+            )}
+          >
             − {formatCurrency(line.amount, line.currency)}
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
           <span className="tabular-nums">{format(parseISO(line.date), "d MMM", { locale: es })}</span>
-          {line.installment_number != null && line.installment_total != null && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted font-semibold">
-              cuota {line.installment_number}/{line.installment_total} · proyectada
+          {isProjectedRecurring ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 font-semibold text-primary">
+              <Repeat className="h-2.5 w-2.5" aria-hidden />
+              Recurrente · se genera sola
             </span>
+          ) : (
+            line.installment_number != null &&
+            line.installment_total != null && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted font-semibold">
+                cuota {line.installment_number}/{line.installment_total} · proyectada
+              </span>
+            )
           )}
           {category && (
             <span className="inline-flex items-center gap-1">
@@ -258,6 +275,9 @@ function StatementGroupCard({
   children: React.ReactNode
 }) {
   const { title, subtitle } = groupPeriodLabel(group.cycleOffset, group.closeDate, group.dueDate)
+  // Las filas projectedRecurring son sólo informativas: no se crean en este
+  // import, así que no cuentan como "gastos" de este resumen.
+  const realLineCount = group.lines.filter((l) => !l.projectedRecurring).length
   return (
     <div
       className={cn(
@@ -302,7 +322,7 @@ function StatementGroupCard({
             className="w-full press-effect font-semibold"
             onClick={onToggleApprove}
           >
-            {approved ? "Marcar como pendiente" : `Aprobar este resumen · ${group.lines.length} gasto${group.lines.length === 1 ? "" : "s"}`}
+            {approved ? "Marcar como pendiente" : `Aprobar este resumen · ${realLineCount} gasto${realLineCount === 1 ? "" : "s"}`}
           </Button>
         </div>
       )}
@@ -422,7 +442,12 @@ export function ImportStatementFlow({
   }, [closeDate, dueDate, lines, selectedAccountId, accountCurrency, parsedTotalArs, totalUsd, stampTax])
 
   const allGroupsApproved = groups.length > 0 && groups.every((g) => approvedOffsets.has(g.cycleOffset))
-  const totalItemsToCreate = groups.reduce((sum, g) => sum + g.lines.length, 0)
+  // Las filas projectedRecurring son sólo informativas (no se crean en este
+  // import), así que no suman al conteo de "se crearán N ítems".
+  const totalItemsToCreate = groups.reduce(
+    (sum, g) => sum + g.lines.filter((l) => !l.projectedRecurring).length,
+    0
+  )
 
   const resetAll = useCallback(() => {
     setStep("upload")
