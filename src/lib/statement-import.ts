@@ -3,7 +3,6 @@ import { addMonths, parseISO } from "date-fns"
 import type { Database, Json } from "@/lib/database.types"
 import type { ParsedStatement } from "@/lib/ai/statement-schema"
 import { normalizeNote, extractKeyword } from "@/lib/rules"
-import { computeInstallmentDate } from "@/lib/installments"
 import { toDateString } from "@/lib/cards"
 
 export type { ParsedStatement, ParsedStatementLine } from "@/lib/ai/statement-schema"
@@ -50,7 +49,12 @@ export async function importStatementPdf(
 /** Una línea del resumen ya revisada por el usuario, lista para armar el payload. */
 export interface StatementReviewLine {
   description: string
-  /** YYYY-MM-DD. Para líneas en cuotas, es la fecha de la compra original (ancla de la cuota 1). */
+  /**
+   * YYYY-MM-DD. Para líneas en cuotas, es la fecha de la compra original:
+   * se usa para purchase_key y start_date de la compra, pero NO para anclar
+   * la fecha de cada cuota (eso se ancla al ciclo del resumen, ver
+   * expandReviewLines).
+   */
   date: string
   amount: number
   currency: "ARS" | "USD"
@@ -214,9 +218,14 @@ interface ExpandedLine {
  * Expande cada línea seleccionada en una o más "ocurrencias": una para
  * líneas simples/suscripción, y una por cada cuota desde installment_number
  * hasta installment_total para líneas en cuotas (Tarea 3.2, D1/D3) — el monto
- * de cuota es siempre el leído (cuota fija) y la fecha se proyecta con
- * computeInstallmentDate anclada a la fecha de compra original, un mes por
- * cuota (misma convención que la creación manual de compras en cuotas).
+ * de cuota es siempre el leído (cuota fija) y la fecha se ancla al CICLO DEL
+ * RESUMEN importado (close_date), no a la fecha de la compra original: la
+ * cuota leída (installment_number) cae en close_date, y cada cuota futura
+ * suma un mes más (N+1 = close_date + 1 mes, etc.). Así la cuota queda en el
+ * mismo ciclo que el resumen que la trajo, y al reimportar el resumen
+ * siguiente la cuota N+1 real proyecta la misma fecha (close_date + 1 mes)
+ * que ese nuevo cierre, permitiendo reconciliar por
+ * purchase_key + installment_number sin duplicar (Tarea 3.6).
  *
  * Es la única fuente de verdad para clasificación, purchase_key y proyección:
  * tanto buildStatementPayload como groupStatementPreviewByCycle la reusan. Por
@@ -235,14 +244,15 @@ function expandReviewLines(input: BuildStatementPayloadInput): ExpandedLine[] {
       const total = line.installment_total!
       const purchaseKey = buildPurchaseKey(line.description, line.date, total)
       for (let i = n; i <= total; i++) {
+        const cycleOffset = i - n
         expanded.push({
-          cycleOffset: i - n,
+          cycleOffset,
           kind,
           line,
           installmentNumber: i,
           installmentTotal: total,
           purchaseKey,
-          date: computeInstallmentDate(line.date, i),
+          date: toDateString(addMonths(parseISO(input.close_date), cycleOffset)),
         })
       }
     } else {

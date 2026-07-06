@@ -8,7 +8,8 @@ import {
   type BuildStatementPayloadInput,
   type StatementReviewLine,
 } from "./statement-import"
-import { computeInstallmentDate } from "./installments"
+import { addMonths, parseISO } from "date-fns"
+import { toDateString } from "./cards"
 
 function makeLine(overrides: Partial<StatementReviewLine> = {}): StatementReviewLine {
   return {
@@ -188,9 +189,12 @@ describe("buildStatementPayload — proyección de cuotas (Tarea 3.2)", () => {
     expect(purchase.installments.map((i) => i.installment_number)).toEqual([1, 2, 3, 4, 5, 6])
     // Cuota fija: mismo monto leído en todas las cuotas proyectadas.
     expect(purchase.installments.every((i) => i.amount === 1000)).toBe(true)
+    // start_date guarda la fecha de compra original (para la compra), no la fecha de cada cuota.
     expect(purchase.start_date).toBe("2026-06-10")
+    // La fecha de cada cuota se ancla al ciclo del resumen (close_date): la
+    // cuota leída (1) cae en close_date, cada cuota siguiente suma un mes.
     purchase.installments.forEach((installment, idx) => {
-      expect(installment.date).toBe(computeInstallmentDate("2026-06-10", idx + 1))
+      expect(installment.date).toBe(toDateString(addMonths(parseISO("2026-06-20"), idx)))
     })
   })
 
@@ -211,6 +215,11 @@ describe("buildStatementPayload — proyección de cuotas (Tarea 3.2)", () => {
     const purchase = payload.installment_purchases[0]
     // Incluye la cuota leída (4) y proyecta las restantes (5, 6); nunca 1-3.
     expect(purchase.installments.map((i) => i.installment_number)).toEqual([4, 5, 6])
+    // Bug real (compra de hace meses, ej. Smarttek 4/6): la cuota leída (4)
+    // NO se ancla en la fecha de compra (2026-01-10 + 3 meses = abril, un
+    // ciclo anterior al resumen importado) sino en el ciclo del resumen
+    // (close_date = 2026-06-20); las siguientes suman un mes cada una.
+    expect(purchase.installments.map((i) => i.date)).toEqual(["2026-06-20", "2026-07-20", "2026-08-20"])
   })
 
   it("excluye la compra y todas sus cuotas futuras si el usuario deselecciona la línea", () => {

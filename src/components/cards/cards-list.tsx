@@ -673,6 +673,7 @@ function CardBlock({
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [cuotaDetailId, setCuotaDetailId] = useState<string | null>(null)
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
+  const [allExpensesOpen, setAllExpensesOpen] = useState(false)
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -706,6 +707,71 @@ function CardBlock({
           )
         : [],
     [cycle]
+  )
+
+  const renderMovementRow = useCallback(
+    (m: Movement) => {
+      const cat = m.category_id ? categoryMap.get(m.category_id) : undefined
+      const isCuota = m.installment_purchase_id !== null
+      return isCuota ? (
+        <button
+          key={m.id}
+          type="button"
+          onClick={() => setCuotaDetailId(m.installment_purchase_id)}
+          className={cn(
+            "w-full flex items-center gap-3 px-4 py-3 text-left",
+            "hover:bg-muted/40 transition-colors duration-150 cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+            m.is_future && "opacity-70"
+          )}
+        >
+          <CategoryIconChip icon={cat?.icon} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {cat?.name ?? "Sin categoría"}
+              </p>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground flex-shrink-0">
+                {m.installment_number}/{m.installment_total}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground tabular-nums">
+              {format(parseISO(m.date), "d MMM", { locale: es })}
+              {m.note ? ` · ${m.note}` : ""}
+            </p>
+          </div>
+          <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
+            − {formatCurrency(m.amount, m.original_currency)}
+          </p>
+        </button>
+      ) : (
+        <button
+          key={m.id}
+          type="button"
+          onClick={() => setEditingMovement(m)}
+          className={cn(
+            "w-full flex items-center gap-3 px-4 py-3 text-left",
+            "hover:bg-muted/40 transition-colors duration-150 cursor-pointer",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          )}
+        >
+          <CategoryIconChip icon={cat?.icon} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {cat?.name ?? "Sin categoría"}
+            </p>
+            <p className="text-[11px] text-muted-foreground tabular-nums">
+              {format(parseISO(m.date), "d MMM", { locale: es })}
+              {m.note ? ` · ${m.note}` : ""}
+            </p>
+          </div>
+          <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
+            − {formatCurrency(m.amount, m.original_currency)}
+          </p>
+        </button>
+      )
+    },
+    [categoryMap]
   )
 
   if (!cycle) return null
@@ -838,76 +904,16 @@ function CardBlock({
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Gastos del resumen
               </p>
-              <Link
-                href={`/movimientos?account=${account.id}`}
-                className="text-xs text-primary hover:underline font-medium"
+              <button
+                type="button"
+                onClick={() => setAllExpensesOpen(true)}
+                className="text-xs text-primary hover:underline font-medium cursor-pointer"
               >
                 Ver todos
-              </Link>
+              </button>
             </div>
             <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-              {allCycleMovements.slice(0, 8).map((m) => {
-                const mv = m as Movement
-                const cat = mv.category_id ? categoryMap.get(mv.category_id) : undefined
-                const isCuota = mv.installment_purchase_id !== null
-                return isCuota ? (
-                  <button
-                    key={mv.id}
-                    type="button"
-                    onClick={() => setCuotaDetailId(mv.installment_purchase_id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 text-left",
-                      "hover:bg-muted/40 transition-colors duration-150 cursor-pointer",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                      mv.is_future && "opacity-70"
-                    )}
-                  >
-                    <CategoryIconChip icon={cat?.icon} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {cat?.name ?? "Sin categoría"}
-                        </p>
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground flex-shrink-0">
-                          {mv.installment_number}/{mv.installment_total}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground tabular-nums">
-                        {format(parseISO(mv.date), "d MMM", { locale: es })}
-                        {mv.note ? ` · ${mv.note}` : ""}
-                      </p>
-                    </div>
-                    <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
-                      − {formatCurrency(mv.amount, mv.original_currency)}
-                    </p>
-                  </button>
-                ) : (
-                  <button
-                    key={mv.id}
-                    type="button"
-                    onClick={() => setEditingMovement(mv)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-4 py-3 text-left",
-                      "hover:bg-muted/40 transition-colors duration-150 cursor-pointer",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                    )}
-                  >
-                    <CategoryIconChip icon={cat?.icon} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {cat?.name ?? "Sin categoría"}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground tabular-nums">
-                        {format(parseISO(mv.date), "d MMM", { locale: es })}
-                        {mv.note ? ` · ${mv.note}` : ""}
-                      </p>
-                    </div>
-                    <p className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
-                      − {formatCurrency(mv.amount, mv.original_currency)}
-                    </p>
-                  </button>
-                )
-              })}
+              {allCycleMovements.slice(0, 8).map((m) => renderMovementRow(m as Movement))}
             </div>
           </div>
         )}
@@ -989,6 +995,17 @@ function CardBlock({
             categories={categories}
           />
         )}
+      </MangoSheet>
+
+      {/* All expenses of the selected cycle modal */}
+      <MangoSheet
+        open={allExpensesOpen}
+        onOpenChange={setAllExpensesOpen}
+        title={`Gastos · cierre ${format(cycle.cycleEnd, "d MMM", { locale: es })}`}
+      >
+        <div className="divide-y divide-border/40">
+          {allCycleMovements.map((m) => renderMovementRow(m as Movement))}
+        </div>
       </MangoSheet>
 
       {/* Edit regular movement modal */}
