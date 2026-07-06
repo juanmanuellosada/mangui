@@ -9,6 +9,7 @@ import {
   formatStatementLabel,
   currentCycleSummary,
   listCardCycles,
+  nextCardPayment,
 } from "./cards"
 
 // ---------------------------------------------------------------------------
@@ -227,6 +228,41 @@ describe("isInCycle", () => {
 
   it("date far in the past → false", () => {
     expect(isInCycle("2020-01-01", start, end)).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// nextCardPayment — fallback sin statements persistidos (card_statements vacío)
+// ---------------------------------------------------------------------------
+describe("nextCardPayment — fallback sin statements (cierra día 2, vence día 13)", () => {
+  const account = { closing_date: "2020-01-02", due_date: "2020-01-13", currency: "ARS" }
+  const movements = [
+    // Dentro del último ciclo cerrado (2026-06-03 a 2026-07-02).
+    { account_id: "card-1", type: "expense", date: "2026-06-15", amount: 1000, converted_amount: null, original_currency: "ARS" },
+    // Dentro del ciclo abierto (2026-07-03 en adelante) — no debe contar para el fallback.
+    { account_id: "card-1", type: "expense", date: "2026-07-04", amount: 500, converted_amount: null, original_currency: "ARS" },
+  ]
+
+  it("hoy entre el cierre (2-jul) y el vencimiento (13-jul) del último ciclo cerrado → dueDate = 13-jul, no el mes siguiente", () => {
+    const ref = new Date(2026, 6, 6) // 6 de julio 2026
+    const { amount, dueDate } = nextCardPayment("card-1", account, [], movements, ref)
+    expect(dueDate).toBe("2026-07-13")
+    expect(amount).toBe(1000)
+  })
+
+  it("hoy después del vencimiento (13-jul) ya vencido → rueda al vencimiento del ciclo abierto (13-ago)", () => {
+    const ref = new Date(2026, 6, 20) // 20 de julio 2026
+    const { dueDate } = nextCardPayment("card-1", account, [], movements, ref)
+    expect(dueDate).toBe("2026-08-13")
+  })
+
+  it("amount y dueDate corresponden al mismo ciclo mientras el vencimiento del ciclo cerrado siga vigente", () => {
+    const ref = new Date(2026, 6, 6) // 6 de julio 2026 — vencimiento (13-jul) todavía no llegó
+    const { amount, dueDate } = nextCardPayment("card-1", account, [], movements, ref)
+    // El monto es el del ciclo cerrado (solo el movimiento de junio) y el
+    // vencimiento mostrado corresponde a ese mismo ciclo cerrado (13-jul).
+    expect(amount).toBe(1000)
+    expect(dueDate).toBe("2026-07-13")
   })
 })
 
