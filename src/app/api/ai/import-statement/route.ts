@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
   try {
     const object = await extractStatement({ pdf: pdfBytes, accounts: accountNames, categories })
     return NextResponse.json(object)
-  } catch {
+  } catch (err) {
+    console.error("[import-statement] extract failed:", err)
     return NextResponse.json({ error: "No pude interpretar el resumen. Probá de nuevo." }, { status: 422 })
   }
 }

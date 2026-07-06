@@ -49,6 +49,8 @@ Devolvé SOLO los campos del esquema.`
   const { object } = await generateObject({
     model,
     schema: parsedStatementSchema,
+    maxOutputTokens: 8192,
+    maxRetries: 3,
     messages: [
       {
         role: "user",
