@@ -40,7 +40,7 @@ import { getConversionRate } from "@/lib/rates/dolar"
 import type { RateType, RatesMap } from "@/lib/rates/dolar"
 import type { Tables } from "@/lib/database.types"
 import { fetchAllMovements } from "@/lib/movements"
-import { nextCardPayment, currentCycleSummary } from "@/lib/cards"
+import { nextCardPayment } from "@/lib/cards"
 import { format, parseISO, isBefore, isEqual, startOfDay } from "date-fns"
 import { es } from "date-fns/locale"
 import { useIsDemo } from "@/lib/use-is-demo"
@@ -421,13 +421,6 @@ interface CardPaymentDisplay {
   dueDate: string | null
   /** Whether the primary currency is ARS */
   primaryIsARS: boolean
-  /** Current open cycle */
-  current: {
-    amount: number
-    amountSecondary: number | null
-    closeDate: string | null
-    dueDate: string | null
-  }
 }
 
 // ── Account card ──────────────────────────────────────────────
@@ -462,7 +455,7 @@ function AccountCard({
 
   const cardAmounts = isCreditCard && cardPayment ? (
     <>
-      {/* A pagar — closed statement */}
+      {/* A pagar — próximo vencimiento */}
       {(() => {
         const today = startOfDay(new Date())
         let dueDateLabel: string | null = null
@@ -494,34 +487,6 @@ function AccountCard({
                 {cardPayment.primaryIsARS
                   ? formatCurrency(-cardPayment.amountSecondary!, "USD")
                   : formatCurrency(-cardPayment.amountSecondary!, "ARS")}
-              </p>
-            )}
-          </div>
-        )
-      })()}
-      {/* En curso — open cycle */}
-      {(() => {
-        const { amount: cur, amountSecondary: curSec, closeDate } = cardPayment.current
-        let closeDateLabel = ""
-        if (closeDate) {
-          closeDateLabel = ` · Cierra ${format(parseISO(closeDate), "d/M", { locale: es })}`
-        }
-        const showCurSecondary = curSec != null && Math.abs(curSec) >= 0.005
-        return (
-          <div className="text-right">
-            <p className="text-[10px] text-muted-foreground/70 leading-none mb-0.5">
-              En curso{closeDateLabel}
-            </p>
-            <p className="text-sm tabular-nums text-muted-foreground leading-tight">
-              {cardPayment.primaryIsARS
-                ? formatCurrency(cur, "ARS")
-                : formatCurrency(cur, "USD")}
-            </p>
-            {showCurSecondary && (
-              <p className="text-[11px] text-muted-foreground/70 tabular-nums leading-none">
-                {cardPayment.primaryIsARS
-                  ? formatCurrency(curSec!, "USD")
-                  : formatCurrency(curSec!, "ARS")}
               </p>
             )}
           </div>
@@ -978,7 +943,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
 
   const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
 
-  // Compute credit-card next-payment + current cycle for each tarjeta_credito account
+  // Compute credit-card next-payment for each tarjeta_credito account
   const cardPaymentMap = useMemo(() => {
     const map = new Map<string, CardPaymentDisplay>()
     if (!accounts || !statements || !allMovements) return map
@@ -991,11 +956,6 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
         statements,
         allMovements
       )
-      const {
-        amount: currentAmount,
-        closeDate,
-        dueDate: currentDueDate,
-      } = currentCycleSummary(account.id, account, allMovements)
 
       if (currency === "ARS") {
         const secondaryRate = getConversionRate(rateType, rates, manualRate, "ARS")
@@ -1004,12 +964,6 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
           amountSecondary: secondaryRate != null ? amount / secondaryRate : null,
           dueDate,
           primaryIsARS: true,
-          current: {
-            amount: currentAmount,
-            amountSecondary: secondaryRate != null ? currentAmount / secondaryRate : null,
-            closeDate,
-            dueDate: currentDueDate,
-          },
         })
       } else {
         // USD card: primary is USD, secondary is ARS
@@ -1019,12 +973,6 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
           amountSecondary: secondaryRate != null ? amount * secondaryRate : null,
           dueDate,
           primaryIsARS: false,
-          current: {
-            amount: currentAmount,
-            amountSecondary: secondaryRate != null ? currentAmount * secondaryRate : null,
-            closeDate,
-            dueDate: currentDueDate,
-          },
         })
       }
     }
