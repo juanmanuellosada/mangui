@@ -32,9 +32,9 @@ Datos del encabezado del resumen:
 - "total_usd": total a pagar en DÓLARES (resúmenes bimonetarios tienen un total separado en USD); null si no aplica.
 - "stamp_tax": impuesto de sellos/percepciones/impuestos provinciales del resumen (monto en pesos); null si no figura o es 0.
 
-Por cada consumo/línea del detalle (ítems de compras; NO el total, ni las líneas descartadas más abajo):
+Por cada consumo/línea del detalle (ítems de compras, IMPUESTOS y CARGOS del resumen; NO el total, ni las líneas descartadas más abajo):
 - "description": el comercio o concepto tal como figura.
-- "date": fecha del consumo o, si es una compra en cuotas, la fecha de la compra original tal como figura en el resumen, formato YYYY-MM-DD.
+- "date": fecha del consumo o, si es una compra en cuotas, la fecha de la compra original tal como figura en el resumen, formato YYYY-MM-DD. Si es un impuesto o cargo sin fecha propia, usá la fecha de cierre del resumen.
 - "amount": monto de la línea, numérico sin símbolos ni separadores de miles.
 - "currency": "USD" si la línea está en dólares; si no, "ARS".
 - "amount_ars": si la línea está en USD Y el resumen muestra el equivalente en pesos para esa línea, ese monto; si no aplica o no se muestra, null.
@@ -42,7 +42,11 @@ Por cada consumo/línea del detalle (ítems de compras; NO el total, ni las lín
 - "is_subscription": true si el concepto es un cargo mensual recurrente de un servicio de suscripción (p. ej. Claude, Netflix, Spotify, Disney+, gimnasio) SIN indicador de cuotas; false en cualquier otro caso. Una línea con installment_number/installment_total no nulos NUNCA es una suscripción (is_subscription debe ser false en ese caso).
 - "category_hint": el nombre EXACTO de la lista de categorías de gasto del usuario que mejor coincida con el consumo; si ninguna coincide, null.
 
+IMPORTANTE — impuestos y cargos: además de los consumos, el resumen SIEMPRE incluye impuestos y cargos que forman parte del TOTAL A PAGAR (ej. IVA como "DB IVA" o "IVA RG...", impuesto de sellos como "IMPUESTO DE SELLOS", percepciones como "PERCEPCION...", retenciones como "DB.RG 5617...", y cargos de servicio o administrativos como "GASTOS DE SERVICIO EMINENT"). Incluí CADA UNO de estos conceptos como una línea más, con su monto y moneda. NUNCA los omitas: son parte del total a pagar. Para estas líneas, "category_hint" = "Impuestos y comisiones" si esa categoría figura en la lista de categorías del usuario; si no figura, null.
+
 NO incluyas como línea de consumo el total del resumen ni las siguientes, que no son consumos: el saldo anterior (ej. "SALDO ANTERIOR"), pagos realizados a la tarjeta (ej. "SU PAGO", "PAGO SU CUENTA", "PAGO MINIMO"), ni devoluciones o reintegros (ej. "DEV.IMP.", "DEVOLUCION", "REINTEGRO"). Estas líneas nunca deben aparecer en el resultado, sin importar el signo de su monto.
+
+El objetivo es que la SUMA de todas las líneas devueltas (consumos + impuestos y cargos) se aproxime al total a pagar del resumen ("total_ars"/"total_usd"): revisá el detalle completo para no dejar afuera ningún impuesto o cargo que figure en él.
 
 Devolvé SOLO los campos del esquema.`
 
