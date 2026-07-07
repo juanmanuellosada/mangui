@@ -38,14 +38,18 @@ export async function fetchInstallmentMovements(purchaseId: string): Promise<Mov
   return data
 }
 
-/** All expense movements for a card account — used to compute its billing cycles. */
+/**
+ * Expense + income movements for a card account — used to compute its
+ * billing cycles. Income incluye devoluciones/reintegros (is_refund), que
+ * listCardCycles necesita para netear el total (ver signedAmount en cards.ts).
+ */
 export async function fetchAllMovementsForAccount(accountId: string): Promise<Movement[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("movements")
     .select("*")
     .eq("account_id", accountId)
-    .eq("type", "expense")
+    .in("type", ["expense", "income"])
   if (error) throw error
   return data
 }

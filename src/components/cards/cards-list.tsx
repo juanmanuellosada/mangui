@@ -32,6 +32,7 @@ import {
   listCardCycles,
   toDateString,
   formatStatementLabel,
+  defaultCycleIndex,
   type CardCycle,
 } from "@/lib/cards"
 import {
@@ -82,7 +83,7 @@ async function fetchMovementsForCard(accountId: string): Promise<Movement[]> {
     .from("movements")
     .select("*")
     .eq("account_id", accountId)
-    .eq("type", "expense")
+    .in("type", ["expense", "income"])
     .order("date", { ascending: false })
   if (error) throw error
   return data
@@ -661,9 +662,13 @@ function CardBlock({
     [account, movements, statements]
   )
 
-  // Default to current open cycle = last element
-  const defaultIndex = cycles.length > 0 ? cycles.length - 1 : 0
-  const [selectedIndex, setSelectedIndex] = useState(defaultIndex)
+  // Default to the "A pagar" cycle (closed + unpaid, or the current open
+  // cycle if none is pending) — recomputed as `cycles` changes so it tracks
+  // real data once it loads, instead of freezing on the initial (empty)
+  // render. `manualIndex` overrides it once the user navigates.
+  const [manualIndex, setManualIndex] = useState<number | null>(null)
+  const computedDefaultIndex = useMemo(() => defaultCycleIndex(cycles), [cycles])
+  const selectedIndex = manualIndex ?? computedDefaultIndex
 
   // Keep selectedIndex clamped if cycles list changes length
   const safeIndex = Math.min(selectedIndex, Math.max(0, cycles.length - 1))
@@ -680,10 +685,10 @@ function CardBlock({
     [categories]
   )
 
-  const handlePrev = useCallback(() => setSelectedIndex((i) => Math.max(0, i - 1)), [])
+  const handlePrev = useCallback(() => setManualIndex(Math.max(0, safeIndex - 1)), [safeIndex])
   const handleNext = useCallback(
-    () => setSelectedIndex((i) => Math.min(cycles.length - 1, i + 1)),
-    [cycles.length]
+    () => setManualIndex(Math.min(cycles.length - 1, safeIndex + 1)),
+    [safeIndex, cycles.length]
   )
 
   const handleAddExpense = useCallback(() => {
@@ -696,15 +701,17 @@ function CardBlock({
     })
   }, [cycle, account.id, openQuickAdd])
 
-  // Unified list: all expense movements sorted by date ascending.
+  // Unified list: all expense movements sorted by date ascending. Excluye
+  // los income (devoluciones/reintegros) — ya netean en cycle.total, pero acá
+  // se listan como "gastos" y renderMovementRow los pintaría como si lo fueran.
   // Hook must run unconditionally (before the early return below), so it
   // tolerates a missing cycle by falling back to an empty array.
   const allCycleMovements = useMemo(
     () =>
       cycle
-        ? [...cycle.movements].sort((a, b) =>
-            (a as Movement).date.localeCompare((b as Movement).date)
-          )
+        ? cycle.movements
+            .filter((m) => (m as Movement).type === "expense")
+            .sort((a, b) => (a as Movement).date.localeCompare((b as Movement).date))
         : [],
     [cycle]
   )

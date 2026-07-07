@@ -139,7 +139,7 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
             let cardDueDate: string | null = null
 
             if (isCreditCard) {
-              const { amount, dueDate } = nextCardPayment(
+              const { amount, dueDate, amountUSD } = nextCardPayment(
                 account.id,
                 account,
                 statements ?? [],
@@ -148,8 +148,12 @@ export function AccountsPreview({ rateType, manualRate, rates }: AccountsPreview
               cardAmountARS = amount
               cardDueDate = dueDate
 
-              // Convert ARS → USD
-              if (currency === "ARS") {
+              // Si el resumen tiene consumos nativos en USD (tarjeta
+              // multi-moneda), mostrar ese subtotal real en vez de convertir
+              // el total en pesos por cotización.
+              if (currency === "ARS" && Math.abs(amountUSD) >= 0.005) {
+                cardAmountUSD = amountUSD
+              } else if (currency === "ARS") {
                 const rate = getConversionRate(rateType, rates, manualRate, "ARS")
                 cardAmountUSD = rate != null ? cardAmountARS / rate : null
               } else {

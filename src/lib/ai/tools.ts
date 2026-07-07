@@ -285,12 +285,12 @@ export async function pagosFuturos(
         .eq("is_hidden", false),
       supabase
         .from("card_statements")
-        .select("account_id, total_amount, due_date, close_date")
+        .select("account_id, total_amount, total_amount_usd, due_date, close_date")
         .eq("status", "pendiente"),
       supabase
         .from("movements")
         .select("account_id, type, date, amount, converted_amount, original_currency")
-        .eq("type", "expense"),
+        .in("type", ["expense", "income"]),
     ])
 
   // Recurring: compute next run for each active recurring

@@ -10,6 +10,8 @@ import {
   currentCycleSummary,
   listCardCycles,
   nextCardPayment,
+  defaultCycleIndex,
+  type CardCycle,
 } from "./cards"
 
 // ---------------------------------------------------------------------------
@@ -427,6 +429,43 @@ describe("nextCardPayment — fallback: neteo de reintegros", () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// nextCardPayment — amountUSD (Bug 2: subtotal nativo en USD, sin conversión
+// por cotización — ver el chip de Cuentas en accounts-list.tsx)
+// ---------------------------------------------------------------------------
+describe("nextCardPayment — amountUSD", () => {
+  const account = { closing_date: "2020-01-02", due_date: "2020-01-13", currency: "ARS" }
+
+  it("usa el total_amount_usd del resumen pendiente cuando hay uno ya cerrado", () => {
+    const statements = [
+      { account_id: "card-1", total_amount: 411588.27, total_amount_usd: 215, due_date: "2026-07-13", close_date: "2026-07-02" },
+    ]
+    const ref = new Date(2026, 6, 6) // 6 de julio 2026
+    const { amountUSD } = nextCardPayment("card-1", account, statements, [], ref)
+    expect(amountUSD).toBe(215)
+  })
+
+  it("fallback: suma el subtotal nativo de los movimientos en USD del ciclo cerrado, sin convertir", () => {
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-15", amount: 1000, converted_amount: null, original_currency: "ARS" },
+      { account_id: "card-1", type: "expense", date: "2026-06-16", amount: 48, converted_amount: null, original_currency: "USD" },
+      { account_id: "card-1", type: "expense", date: "2026-06-17", amount: 47, converted_amount: null, original_currency: "USD" },
+    ]
+    const ref = new Date(2026, 6, 6) // 6 de julio 2026
+    const { amountUSD } = nextCardPayment("card-1", account, [], movements, ref)
+    expect(amountUSD).toBe(95)
+  })
+
+  it("fallback: 0 cuando no hay movimientos en USD", () => {
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-15", amount: 1000, converted_amount: null, original_currency: "ARS" },
+    ]
+    const ref = new Date(2026, 6, 6)
+    const { amountUSD } = nextCardPayment("card-1", account, [], movements, ref)
+    expect(amountUSD).toBe(0)
+  })
+})
+
 describe("listCardCycles — agrupación de movimientos importados por resumen", () => {
   const account = { closing_date: "2026-01-02", due_date: "2026-01-10", currency: "ARS" }
 
@@ -484,8 +523,11 @@ describe("listCardCycles — agrupación de movimientos importados por resumen",
     // La fecha del movimiento no se toca — solo cambia en qué resumen aparece.
     expect(julyCycle!.movements.find((m) => m.id === "m-obsidian")!.date).toBe("2026-06-01")
 
-    const juneCycle = cycles.find((c) => c.closeDate === "2026-06-02")
-    expect(juneCycle?.movements.some((m) => m.id === "m-obsidian")).toBe(false)
+    // Como TODOS los movimientos de junio quedaron reagrupados en el resumen
+    // de julio (por import_statement_id), no debe crearse un ciclo de junio
+    // vacío antes del primero real (Bug 3).
+    expect(cycles.some((c) => c.closeDate === "2026-06-02")).toBe(false)
+    expect(cycles[0]).toBe(julyCycle)
   })
 
   it("un movimiento manual (sin import_statement_id) sigue agrupándose por fecha", () => {
@@ -510,5 +552,80 @@ describe("listCardCycles — agrupación de movimientos importados por resumen",
 
     const julyCycle = cycles.find((c) => c.closeDate === "2026-07-02")
     expect(julyCycle?.movements.some((m) => m.id === "m-manual")).toBe(false)
+  })
+
+  it("único movimiento, con fecha en un ciclo anterior pero importado a un resumen posterior → no genera un ciclo vacío inicial (Bug 3)", () => {
+    const statement = makeStatement("2026-07-02")
+    const movements = [
+      {
+        id: "m-obsidian",
+        account_id: "card-1",
+        type: "expense",
+        date: "2026-06-01",
+        amount: 48,
+        converted_amount: null,
+        original_currency: "USD",
+        import_statement_id: "stmt-julio",
+      },
+    ]
+    const ref = new Date(2026, 6, 2) // 2 de julio 2026
+    const cycles = listCardCycles("card-1", account, movements, [statement], ref)
+
+    // El único ciclo debe ser el de julio (el del resumen al que fue
+    // importado) — sin un ciclo de junio vacío por delante.
+    expect(cycles).toHaveLength(1)
+    expect(cycles[0].closeDate).toBe("2026-07-02")
+    expect(cycles[0].movements.map((m) => m.id)).toEqual(["m-obsidian"])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// defaultCycleIndex — índice del resumen "A pagar" a mostrar por default
+// ---------------------------------------------------------------------------
+describe("defaultCycleIndex", () => {
+  // defaultCycleIndex sólo lee cycleEnd y statement?.status — se castea al
+  // tipo completo de CardCycle para no tener que rellenar el resto de los
+  // campos (movements, total, totalsByCurrency, etc.) en cada fixture.
+  function cycle(overrides: { closeDate: string; cycleEnd: Date; statement?: { status: string } | null }) {
+    return {
+      closeDate: overrides.closeDate,
+      dueDate: null,
+      cycleStart: new Date(2026, 0, 1),
+      cycleEnd: overrides.cycleEnd,
+      movements: [],
+      total: 0,
+      totalsByCurrency: { ARS: 0, USD: 0 },
+      statement: overrides.statement ?? null,
+    } as unknown as CardCycle
+  }
+
+  it("devuelve 0 si no hay ciclos", () => {
+    expect(defaultCycleIndex([])).toBe(0)
+  })
+
+  it("elige el ciclo cerrado y no pagado más reciente ('A pagar'), no el más viejo", () => {
+    const ref = new Date(2026, 6, 15) // 15 de julio 2026
+    const cycles = [
+      cycle({ closeDate: "2026-06-02", cycleEnd: new Date(2026, 5, 2), statement: { status: "pagado" } }),
+      cycle({ closeDate: "2026-07-02", cycleEnd: new Date(2026, 6, 2), statement: { status: "pendiente" } }),
+      cycle({ closeDate: "2026-08-02", cycleEnd: new Date(2026, 7, 2) }), // ciclo en curso, sin cerrar
+    ]
+    expect(defaultCycleIndex(cycles, ref)).toBe(1)
+  })
+
+  it("si todos los ciclos cerrados ya están pagados, cae al ciclo en curso", () => {
+    const ref = new Date(2026, 6, 15)
+    const cycles = [
+      cycle({ closeDate: "2026-06-02", cycleEnd: new Date(2026, 5, 2), statement: { status: "pagado" } }),
+      cycle({ closeDate: "2026-07-02", cycleEnd: new Date(2026, 6, 2), statement: { status: "pagado" } }),
+      cycle({ closeDate: "2026-08-02", cycleEnd: new Date(2026, 7, 2) }),
+    ]
+    expect(defaultCycleIndex(cycles, ref)).toBe(2)
+  })
+
+  it("sin ningún ciclo cerrado todavía, cae al único ciclo (en curso)", () => {
+    const ref = new Date(2026, 5, 10)
+    const cycles = [cycle({ closeDate: "2026-06-20", cycleEnd: new Date(2026, 5, 20) })]
+    expect(defaultCycleIndex(cycles, ref)).toBe(0)
   })
 })

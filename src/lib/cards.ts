@@ -34,6 +34,7 @@ export function dayOfMonth(dateStr: string): number {
 interface CardPaymentStatement {
   account_id: string
   total_amount: number
+  total_amount_usd: number
   due_date: string
   close_date: string
 }
@@ -112,7 +113,10 @@ function signedAmount(type: string, amount: number): number {
  * @param movements   All movements (e.g. from fetchAllMovements).
  * @param ref         Optional reference date (defaults to today).
  * @returns           { amount: number (positive, in the card's native currency),
- *                      dueDate: string | null (ISO date) }
+ *                      dueDate: string | null (ISO date),
+ *                      amountUSD: number (subtotal nativo en USD del mismo
+ *                      ciclo/resumen, sin conversión — 0 si no hay consumos
+ *                      en dólares) }
  */
 export function nextCardPayment(
   accountId: string,
@@ -120,7 +124,7 @@ export function nextCardPayment(
   statements: CardPaymentStatement[],
   movements: CardPaymentMovement[],
   ref?: Date
-): { amount: number; dueDate: string | null } {
+): { amount: number; dueDate: string | null; amountUSD: number } {
   const refDate = startOfDay(ref ?? new Date())
   const refStr = toDateString(refDate)
 
@@ -133,13 +137,14 @@ export function nextCardPayment(
     return {
       amount: closedPending.total_amount,
       dueDate: closedPending.due_date,
+      amountUSD: closedPending.total_amount_usd,
     }
   }
 
   // 2. Fallback: sum the last CLOSED cycle from movements (not the open cycle)
   const closingDate = account.closing_date
   if (closingDate == null) {
-    return { amount: 0, dueDate: null }
+    return { amount: 0, dueDate: null, amountUSD: 0 }
   }
   const closingDay = dayOfMonth(closingDate)
 
@@ -164,6 +169,18 @@ export function nextCardPayment(
     )
     .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
 
+  // Subtotal nativo en USD del mismo ciclo (monto original, sin conversión —
+  // mismo criterio que totalsByCurrency en listCardCycles).
+  const closedTotalUSD = movements
+    .filter(
+      (m) =>
+        m.account_id === accountId &&
+        (m.type === "expense" || m.type === "income") &&
+        m.original_currency === "USD" &&
+        isInCycle(m.date, closed.cycleStart, closed.cycleEnd)
+    )
+    .reduce((sum, m) => sum + signedAmount(m.type, m.amount), 0)
+
   const dueDay = account.due_date != null ? dayOfMonth(account.due_date) : null
   // The due date shown must match the cycle whose amount we're showing
   // (closedTotal, from the last CLOSED cycle). If that due date hasn't
@@ -180,7 +197,7 @@ export function nextCardPayment(
         })()
       : null
 
-  return { amount: closedTotal, dueDate }
+  return { amount: closedTotal, dueDate, amountUSD: closedTotalUSD }
 }
 
 /**
@@ -490,9 +507,22 @@ export function listCardCycles(
     return [{ closeDate: toDateString(cycleEnd), dueDate, cycleStart, cycleEnd, movements: [], total: 0, totalsByCurrency: { ARS: 0, USD: 0 }, statement: stmt }]
   }
 
-  // Find the oldest movement date to determine the earliest cycle
+  // Lookup usado tanto para el ciclo más viejo (abajo) como para el
+  // agrupamiento por resumen más adelante (targetCloseDate).
+  const statementsById = new Map(statements.map((s) => [s.id, s]))
+
+  // Fecha "efectiva" de un movimiento para determinar a qué ciclo pertenece:
+  // si fue importado a un resumen, el close_date de ESE resumen (igual que
+  // targetCloseDate más abajo); si no, su propia fecha. Evita crear un ciclo
+  // vacío antes del primero real cuando el movimiento más viejo por fecha en
+  // realidad quedó agrupado en un resumen posterior (ver Tarea Bug 3).
+  function effectiveDate(m: CycleMovement): string {
+    return importedStatementCloseDate(m, accountId, statementsById) ?? m.date
+  }
+
+  // Find the oldest EFFECTIVE date to determine the earliest cycle
   const oldestDate = accountMovements
-    .map((m) => m.date)
+    .map((m) => effectiveDate(m))
     .sort()[0]
 
   // Build the cycle that contains the oldest movement
@@ -549,7 +579,6 @@ export function listCardCycles(
   // into. Falls back to date-based grouping when the statement isn't found
   // or its close_date isn't among the cycles just built.
   const closeDatesInRange = new Set(bounds.map((b) => b.closeDateStr))
-  const statementsById = new Map(statements.map((s) => [s.id, s]))
 
   function targetCloseDate(m: CycleMovement): string | null {
     const closeDate = importedStatementCloseDate(m, accountId, statementsById)
@@ -588,4 +617,23 @@ export function listCardCycles(
   })
 
   return cycles
+}
+
+/**
+ * Índice dentro de `cycles` (ordenados de más viejo a más nuevo) que debe
+ * mostrarse por default al abrir el detalle de una tarjeta: el "A pagar" —
+ * el ciclo ya cerrado más reciente que todavía no fue pagado. Si no hay
+ * ninguno pendiente (todos pagados, o ningún ciclo cerró todavía), cae al
+ * ciclo en curso.
+ */
+export function defaultCycleIndex(cycles: CardCycle[], ref?: Date): number {
+  if (cycles.length === 0) return 0
+  const todayStr = toDateString(startOfDay(ref ?? new Date()))
+  for (let i = cycles.length - 1; i >= 0; i--) {
+    const c = cycles[i]
+    const isPaid = c.statement?.status === "pagado"
+    if (toDateString(c.cycleEnd) <= todayStr && !isPaid) return i
+  }
+  const openIndex = cycles.findIndex((c) => toDateString(c.cycleEnd) > todayStr)
+  return openIndex !== -1 ? openIndex : cycles.length - 1
 }

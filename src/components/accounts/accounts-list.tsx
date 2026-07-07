@@ -950,7 +950,7 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
     for (const account of accounts) {
       if (account.type !== "tarjeta_credito") continue
       const currency = account.currency ?? "ARS"
-      const { amount, dueDate } = nextCardPayment(
+      const { amount, dueDate, amountUSD } = nextCardPayment(
         account.id,
         account,
         statements,
@@ -958,10 +958,17 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
       )
 
       if (currency === "ARS") {
+        // Si el resumen tiene consumos nativos en USD (tarjeta multi-moneda),
+        // mostrar ese subtotal real en vez de una conversión por cotización.
+        const hasNativeUSD = Math.abs(amountUSD) >= 0.005
         const secondaryRate = getConversionRate(rateType, rates, manualRate, "ARS")
         map.set(account.id, {
           amount,
-          amountSecondary: secondaryRate != null ? amount / secondaryRate : null,
+          amountSecondary: hasNativeUSD
+            ? amountUSD
+            : secondaryRate != null
+            ? amount / secondaryRate
+            : null,
           dueDate,
           primaryIsARS: true,
         })
