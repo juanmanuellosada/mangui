@@ -372,6 +372,12 @@ export interface StatementPreviewLine {
   installment_total?: number
   purchase_key?: string
   /**
+   * true si es una devolución/reintegro (ver StatementReviewLine.is_refund):
+   * resta del subtotal del grupo en vez de sumar (mismo neteo que cards.ts
+   * aplica sobre los movimientos guardados). Nunca aplica a una cuota.
+   */
+  is_refund?: boolean
+  /**
    * true si esta fila es una proyección informativa de una recurrente
    * confirmada (`createRecurring`) mostrada en un ciclo futuro para
    * visualizar cómo va a quedar el resumen. NO se persiste en el import (el
@@ -391,7 +397,8 @@ export interface StatementPreviewGroup {
    * Subtotal por moneda (ARS/USD), sumado con el monto original de cada línea
    * (sin convertir) — mismo criterio que el pago de resúmenes reales (ver
    * `listCardCycles` en `@/lib/cards`), para no mezclar montos de distinta
-   * moneda en un único número sin sentido.
+   * moneda en un único número sin sentido. Los reintegros (`is_refund`) restan
+   * en vez de sumar, igual que `signedAmount` en `@/lib/cards`.
    */
   totalsByCurrency: { ARS: number; USD: number }
 }
@@ -426,6 +433,7 @@ export function groupStatementPreviewByCycle(input: BuildStatementPayloadInput):
       installment_number: e.installmentNumber,
       installment_total: e.installmentTotal,
       purchase_key: e.purchaseKey,
+      is_refund: e.line.is_refund === true,
     })
     byOffset.set(e.cycleOffset, list)
   }
@@ -465,7 +473,8 @@ export function groupStatementPreviewByCycle(input: BuildStatementPayloadInput):
       const totalsByCurrency = { ARS: 0, USD: 0 }
       for (const l of groupLines) {
         if (l.projectedRecurring) continue
-        totalsByCurrency[l.currency] += l.amount
+        // Mismo neteo que signedAmount en cards.ts: un reintegro resta.
+        totalsByCurrency[l.currency] += l.is_refund ? -l.amount : l.amount
       }
       totalsByCurrency.ARS = Math.round(totalsByCurrency.ARS * 100) / 100
       totalsByCurrency.USD = Math.round(totalsByCurrency.USD * 100) / 100

@@ -139,12 +139,23 @@ function LineRow({
             className="h-8 text-sm font-medium flex-1"
             aria-label="Descripción"
           />
-          <span className="text-sm font-bold tabular-nums text-destructive flex-shrink-0">
-            − {formatCurrency(line.amount, line.currency)}
+          <span
+            className={cn(
+              "text-sm font-bold tabular-nums flex-shrink-0",
+              line.is_refund ? "text-success" : "text-destructive"
+            )}
+          >
+            {line.is_refund ? "+ " : "− "}
+            {formatCurrency(line.amount, line.currency)}
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
           <span className="tabular-nums">{format(parseISO(line.date), "d MMM", { locale: es })}</span>
+          {line.is_refund && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-success/10 font-semibold text-success">
+              Reintegro
+            </span>
+          )}
           {isInstallment && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-muted font-semibold">
               cuota {line.installment_number}/{line.installment_total}
@@ -168,7 +179,7 @@ function LineRow({
             futuras proyectadas.
           </p>
         )}
-        {!isInstallment && (
+        {!isInstallment && !line.is_refund && (
           <div className="flex items-center justify-between gap-2 pt-0.5">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-xs font-medium">Crear como recurrente</span>
@@ -398,16 +409,22 @@ export function ImportStatementFlow({
   const accountCurrency: "ARS" | "USD" = (selectedAccount?.currency as "ARS" | "USD") ?? "ARS"
 
   const selectedCount = lines.filter((l) => l.selected).length
+  // Para el label "N de N gastos incluidos": un reintegro no es un gasto, no cuenta acá.
+  const expenseLines = lines.filter((l) => !l.is_refund)
+  const selectedExpenseCount = expenseLines.filter((l) => l.selected).length
 
   const computedArsTotal = useMemo(() => {
     if (accountCurrency !== "ARS") return null
     return lines
       .filter((l) => l.selected)
-      .reduce(
-        (sum, l) =>
-          sum + amountInCurrency({ amount: l.amount, converted_amount: l.amount_ars, original_currency: l.currency }, accountCurrency),
-        0
-      )
+      .reduce((sum, l) => {
+        const amount = amountInCurrency(
+          { amount: l.amount, converted_amount: l.amount_ars, original_currency: l.currency },
+          accountCurrency
+        )
+        // Un reintegro resta del total (mismo neteo que la preview y cards.ts).
+        return sum + (l.is_refund ? -amount : amount)
+      }, 0)
   }, [lines, accountCurrency])
 
   const parsedTotalArs = parseFloat(totalArs) || 0
@@ -524,6 +541,7 @@ export function ImportStatementFlow({
         installment_number: l.installment_number,
         installment_total: l.installment_total,
         is_subscription: l.is_subscription,
+        is_refund: l.is_refund,
         category_id: matchCategoryId(l.category_hint, expenseCategories),
         selected: true,
         createRecurring: false,
@@ -873,7 +891,7 @@ export function ImportStatementFlow({
 
             <div className="space-y-2">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {selectedCount} de {lines.length} gastos incluidos
+                {selectedExpenseCount} de {expenseLines.length} gastos incluidos
               </p>
 
               <div className="space-y-2">

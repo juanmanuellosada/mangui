@@ -304,6 +304,34 @@ describe("groupStatementPreviewByCycle (Tarea 3.3)", () => {
     expect(groups).toHaveLength(1)
     expect(groups[0].totalsByCurrency).toEqual({ ARS: 5000, USD: 10 })
   })
+
+  it("resta un reintegro (is_refund) del subtotal del grupo en vez de sumarlo", () => {
+    const groups = groupStatementPreviewByCycle(
+      makeInput({
+        lines: [
+          makeLine({ description: "Super Chino", amount: 5000 }),
+          makeLine({ description: "Devolución IIBB", amount: 500, is_refund: true }),
+        ],
+      })
+    )
+    expect(groups).toHaveLength(1)
+    // 5000 (gasto) - 500 (reintegro) = 4500, no 5500.
+    expect(groups[0].totalsByCurrency).toEqual({ ARS: 4500, USD: 0 })
+    expect(groups[0].lines.find((l) => l.description === "Devolución IIBB")?.is_refund).toBe(true)
+    expect(groups[0].lines.find((l) => l.description === "Super Chino")?.is_refund).toBe(false)
+  })
+
+  it("no cuenta un reintegro deseleccionado en el subtotal", () => {
+    const groups = groupStatementPreviewByCycle(
+      makeInput({
+        lines: [
+          makeLine({ description: "Super Chino", amount: 5000 }),
+          makeLine({ description: "Devolución IIBB", amount: 500, is_refund: true, selected: false }),
+        ],
+      })
+    )
+    expect(groups[0].totalsByCurrency).toEqual({ ARS: 5000, USD: 0 })
+  })
 })
 
 describe("propagación de correcciones a cuotas futuras (Tarea 3.4)", () => {
