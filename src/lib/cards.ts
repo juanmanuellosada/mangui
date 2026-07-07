@@ -67,12 +67,44 @@ function towardAccountCurrency(
 }
 
 /**
+ * Si el movimiento fue importado a un resumen (`import_statement_id`),
+ * pertenece al ciclo de ESE resumen (su close_date), no al que su propia
+ * fecha proyectaría — el corte real del banco puede incluir un consumo
+ * fechado unos días antes del cierre que calcula la app (mismo criterio que
+ * `targetCloseDate` en `listCardCycles`, Tarea 0054). Devuelve null si el
+ * movimiento no fue importado o si el resumen referenciado no es de esta
+ * cuenta.
+ */
+function importedStatementCloseDate(
+  m: { import_statement_id?: string | null },
+  accountId: string,
+  statementsById: Map<string, { account_id: string; close_date: string }>
+): string | null {
+  if (!m.import_statement_id) return null
+  const stmt = statementsById.get(m.import_statement_id)
+  if (stmt == null || stmt.account_id !== accountId) return null
+  return stmt.close_date
+}
+
+/**
+ * Signo neto de un movimiento hacia el total de un ciclo/resumen: un gasto
+ * (`expense`) suma, una devolución/reintegro (`income`, ver is_refund en el
+ * import de resúmenes) resta — así el total cuadra con el TOTAL A PAGAR real
+ * del resumen, que ya netea la devolución.
+ */
+function signedAmount(type: string, amount: number): number {
+  return type === "income" ? -amount : amount
+}
+
+/**
  * Returns the next card payment details for a given credit card account.
  * "A pagar" = the already-closed statement with the nearest due date.
  *
  * Logic:
  *  1. Look for the earliest pending statement with close_date <= ref (already closed).
- *  2. If none, sum the last closed cycle's expense movements as a fallback.
+ *  2. If none, sum the last closed cycle's movements as a fallback (expenses
+ *     minus refunds — no import_statement_id grouping needed here, see comment
+ *     inline: any statement that would qualify is already caught by step 1).
  *
  * @param accountId   The account's UUID.
  * @param account     The account row (needs closing_date / due_date).
@@ -116,14 +148,21 @@ export function nextCardPayment(
   const prevRef = subDays(open.cycleStart, 1)
   const closed = currentCycleRange(closingDay, prevRef)
 
+  // No se aplica acá el agrupamiento por import_statement_id (ver
+  // importedStatementCloseDate/listCardCycles): cualquier resumen cuyo
+  // close_date coincidiera con el de este ciclo cerrado (closedCloseDateStr,
+  // siempre <= refStr) también cumpliría el filtro de closedPending arriba
+  // (close_date <= refStr) y ya habría sido devuelto por la rama 1 — la
+  // rama 1 intercepta siempre antes de llegar acá, así que agrupar por
+  // import_statement_id en este fallback sería código inalcanzable.
   const closedTotal = movements
     .filter(
       (m) =>
         m.account_id === accountId &&
-        m.type === "expense" &&
+        (m.type === "expense" || m.type === "income") &&
         isInCycle(m.date, closed.cycleStart, closed.cycleEnd)
     )
-    .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
+    .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
 
   const dueDay = account.due_date != null ? dayOfMonth(account.due_date) : null
   // The due date shown must match the cycle whose amount we're showing
@@ -150,7 +189,7 @@ export function nextCardPayment(
  *
  * @param accountId   The account's UUID.
  * @param account     The account row (needs closing_date / due_date).
- * @param movements   All movements for this account (expense type).
+ * @param movements   All movements for this account (expense and income/refund types).
  * @param ref         Optional reference date (defaults to today).
  * @returns           { amount, closeDate, dueDate } — ISO strings or null.
  */
@@ -169,14 +208,21 @@ export function currentCycleSummary(
   const refDate = ref ?? new Date()
   const { cycleStart, cycleEnd } = currentCycleRange(closingDay, refDate)
 
+  // No se aplica acá el agrupamiento por import_statement_id (ver
+  // importedStatementCloseDate/listCardCycles): este ciclo está ABIERTO
+  // (todavía acumulando), y un movimiento sólo lleva import_statement_id
+  // después de importarse el resumen de un ciclo ya CERRADO — en la práctica
+  // nunca hay un resumen importado apuntando al ciclo en curso, así que
+  // agrupar siempre por fecha es equivalente y evita sumar un parámetro
+  // `statements` a esta función y a sus dos llamadores (cron routes).
   const amount = movements
     .filter(
       (m) =>
         m.account_id === accountId &&
-        m.type === "expense" &&
+        (m.type === "expense" || m.type === "income") &&
         isInCycle(m.date, cycleStart, cycleEnd)
     )
-    .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
+    .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
 
   const closeDate = toDateString(cycleEnd)
 
@@ -344,6 +390,8 @@ interface CycleMovement {
   amount: number
   converted_amount?: number | null
   original_currency?: string | null
+  /** Statement this movement was imported into (`card_statements.id`), if any. */
+  import_statement_id?: string | null
 }
 
 interface CycleStatement {
@@ -375,15 +423,17 @@ export interface CardCycle {
   movements: CycleMovement[]
   /**
    * Suma en la moneda de la cuenta (amountInCurrency de @/lib/money) de los
-   * movimientos de gasto del ciclo — un gasto USD sin converted_amount ("USD
-   * puro") no se cuenta acá, aparece aparte en totalsByCurrency. Total
-   * autocalculado; para ciclos pagados preferir statement.total_amount.
+   * gastos del ciclo MENOS las devoluciones/reintegros (is_refund, cargados
+   * como type='income') — un gasto USD sin converted_amount ("USD puro") no
+   * se cuenta acá, aparece aparte en totalsByCurrency. Total autocalculado;
+   * para ciclos pagados preferir statement.total_amount.
    */
   total: number
   /**
-   * Per-currency subtotals computed from expense movements, grouped by
-   * original_currency and summed using the ORIGINAL amount (not converted_amount).
-   * Zero when the currency has no movements in the cycle.
+   * Per-currency subtotals computed from expense movements minus refunds
+   * (type='income'), grouped by original_currency and summed using the
+   * ORIGINAL amount (not converted_amount). Zero when the currency has no
+   * movements in the cycle.
    */
   totalsByCurrency: { ARS: number; USD: number }
   /**
@@ -466,9 +516,10 @@ export function listCardCycles(
     ? firstCycleRange.cycleEnd
     : latestMovementDate
 
-  const cycles: CardCycle[] = []
-
-  // Walk month by month until we've passed the latest date we need to cover
+  // First pass: compute cycle boundaries only (no movement assignment yet) —
+  // needed up front so imported movements can be matched against the full
+  // set of close dates the walk will produce (see targetCloseDate below).
+  const bounds: { cycleStart: Date; cycleEnd: Date; closeDateStr: string }[] = []
   while (!isAfter(cursor, coverageEnd)) {
     const cycleEnd = cursor
     // cycleStart = day after previous close
@@ -481,23 +532,50 @@ export function listCardCycles(
       Math.min(closingDay, getDaysInMonth(prevClose))
     ))
     const cycleStart = addDays(prevCloseClamped, 1)
+    bounds.push({ cycleStart, cycleEnd, closeDateStr: toDateString(cycleEnd) })
 
-    const cycleMovements = accountMovements.filter((m) =>
-      isInCycle(m.date, cycleStart, cycleEnd)
-    )
+    // Advance to the next cycle end: same day next month (clamped)
+    const nextCycleEndRaw = addMonths(cycleEnd, 1)
+    const nextY = nextCycleEndRaw.getFullYear()
+    const nextM = nextCycleEndRaw.getMonth() + 1
+    cursor = startOfDay(new Date(nextY, nextM - 1, Math.min(closingDay, getDaysInMonth(new Date(nextY, nextM - 1)))))
+  }
 
-    const expenseMovements = cycleMovements.filter((m) => m.type === "expense")
+  // A movement imported into a statement (`import_statement_id` set) belongs
+  // to that statement's cycle (its close_date), not to whichever cycle its
+  // own date would fall into — the bank's real cut-off can include a
+  // purchase dated a few days before the app's computed close date. The
+  // movement's own date is never changed, only which cycle it's grouped
+  // into. Falls back to date-based grouping when the statement isn't found
+  // or its close_date isn't among the cycles just built.
+  const closeDatesInRange = new Set(bounds.map((b) => b.closeDateStr))
+  const statementsById = new Map(statements.map((s) => [s.id, s]))
 
-    const total = expenseMovements
-      .reduce((sum, m) => sum + towardAccountCurrency(m, account.currency), 0)
+  function targetCloseDate(m: CycleMovement): string | null {
+    const closeDate = importedStatementCloseDate(m, accountId, statementsById)
+    return closeDate != null && closeDatesInRange.has(closeDate) ? closeDate : null
+  }
+
+  const cycles: CardCycle[] = bounds.map(({ cycleStart, cycleEnd, closeDateStr }) => {
+    const cycleMovements = accountMovements.filter((m) => {
+      const forced = targetCloseDate(m)
+      return forced != null ? forced === closeDateStr : isInCycle(m.date, cycleStart, cycleEnd)
+    })
+
+    // Gastos y devoluciones/reintegros (is_refund, cargados como type='income')
+    // del ciclo — el total y los subtotales por moneda restan los reintegros
+    // para cuadrar con el TOTAL A PAGAR real del resumen (ver signedAmount).
+    const netMovements = cycleMovements.filter((m) => m.type === "expense" || m.type === "income")
+
+    const total = netMovements
+      .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
 
     const totalsByCurrency: { ARS: number; USD: number } = { ARS: 0, USD: 0 }
-    for (const m of expenseMovements) {
+    for (const m of netMovements) {
       const cur = m.original_currency === "USD" ? "USD" : "ARS"
-      totalsByCurrency[cur] += m.amount
+      totalsByCurrency[cur] += signedAmount(m.type, m.amount)
     }
 
-    const closeDateStr = toDateString(cycleEnd)
     const dueDate =
       dueDay != null ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay)) : null
 
@@ -506,14 +584,8 @@ export function listCardCycles(
         (s) => s.account_id === accountId && s.close_date === closeDateStr
       ) ?? null
 
-    cycles.push({ closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, total, totalsByCurrency, statement: stmt })
-
-    // Advance to the next cycle end: same day next month (clamped)
-    const nextCycleEndRaw = addMonths(cycleEnd, 1)
-    const nextY = nextCycleEndRaw.getFullYear()
-    const nextM = nextCycleEndRaw.getMonth() + 1
-    cursor = startOfDay(new Date(nextY, nextM - 1, Math.min(closingDay, getDaysInMonth(new Date(nextY, nextM - 1)))))
-  }
+    return { closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, total, totalsByCurrency, statement: stmt }
+  })
 
   return cycles
 }

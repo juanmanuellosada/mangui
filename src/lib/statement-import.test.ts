@@ -102,6 +102,20 @@ describe("buildStatementPayload", () => {
     expect(payload.lines[0].dollar_type).toBe("tarjeta")
   })
 
+  it("marca is_refund true en el payload para una línea de devolución/reintegro", () => {
+    const payload = buildStatementPayload(
+      makeInput({
+        lines: [makeLine({ description: "Devolución IIBB", amount: 500, is_refund: true })],
+      })
+    )
+    expect(payload.lines[0].is_refund).toBe(true)
+  })
+
+  it("is_refund por defecto es false cuando la línea no lo marca", () => {
+    const payload = buildStatementPayload(makeInput({ lines: [makeLine()] }))
+    expect(payload.lines[0].is_refund).toBe(false)
+  })
+
   it("excludes deselected lines from the payload", () => {
     const payload = buildStatementPayload(
       makeInput({

@@ -40,13 +40,16 @@ Por cada consumo/línea del detalle (ítems de compras, IMPUESTOS y CARGOS del r
 - "amount_ars": si la línea está en USD Y el resumen muestra el equivalente en pesos para esa línea, ese monto; si no aplica o no se muestra, null.
 - "installment_number" / "installment_total": si el concepto indica "cuota X/N" (o similar, ej. "3/12", "04/06"), extraé X como installment_number y N como installment_total; si no es una compra en cuotas, ambos null.
 - "is_subscription": true si el concepto es un cargo mensual recurrente de un servicio de suscripción (p. ej. Claude, Netflix, Spotify, Disney+, gimnasio) SIN indicador de cuotas; false en cualquier otro caso. Una línea con installment_number/installment_total no nulos NUNCA es una suscripción (is_subscription debe ser false en ese caso).
+- "is_refund": true SOLO si la línea es una devolución/reintegro de impuestos o percepciones (ver más abajo); false para cualquier otro concepto (consumos, impuestos, cargos).
 - "category_hint": el nombre EXACTO de la lista de categorías de gasto del usuario que mejor coincida con el consumo; si ninguna coincide, null.
 
 IMPORTANTE — impuestos y cargos: además de los consumos, el resumen SIEMPRE incluye impuestos y cargos que forman parte del TOTAL A PAGAR (ej. IVA como "DB IVA" o "IVA RG...", impuesto de sellos como "IMPUESTO DE SELLOS", percepciones como "PERCEPCION...", retenciones como "DB.RG 5617...", y cargos de servicio o administrativos como "GASTOS DE SERVICIO EMINENT"). Incluí CADA UNO de estos conceptos como una línea más, con su monto y moneda. NUNCA los omitas: son parte del total a pagar. Para estas líneas, "category_hint" = "Impuestos y comisiones" si esa categoría figura en la lista de categorías del usuario; si no figura, null.
 
-NO incluyas como línea de consumo el total del resumen ni las siguientes, que no son consumos: el saldo anterior (ej. "SALDO ANTERIOR"), pagos realizados a la tarjeta (ej. "SU PAGO", "PAGO SU CUENTA", "PAGO MINIMO"), ni devoluciones o reintegros (ej. "DEV.IMP.", "DEVOLUCION", "REINTEGRO"). Estas líneas nunca deben aparecer en el resultado, sin importar el signo de su monto.
+IMPORTANTE — devoluciones y reintegros de impuestos (ej. "DEV.IMP.", "DEVOLUCION", "REINTEGRO"): a diferencia de versiones anteriores, SÍ hay que incluirlas como una línea más del detalle, con "is_refund": true y el monto SIEMPRE en POSITIVO (sin importar el signo con que figuren impresas en el resumen). "category_hint" en estas líneas siempre null.
 
-El objetivo es que la SUMA de todas las líneas devueltas (consumos + impuestos y cargos) se aproxime al total a pagar del resumen ("total_ars"/"total_usd"): revisá el detalle completo para no dejar afuera ningún impuesto o cargo que figure en él.
+NO incluyas como línea de consumo el total del resumen ni las siguientes, que no son consumos: el saldo anterior (ej. "SALDO ANTERIOR") ni los pagos realizados a la tarjeta (ej. "SU PAGO", "PAGO SU CUENTA", "PAGO MINIMO"). Estas líneas nunca deben aparecer en el resultado, sin importar el signo de su monto.
+
+El objetivo es que la SUMA de todas las líneas de gasto devueltas (consumos + impuestos y cargos) MENOS la suma de las líneas de devolución/reintegro (is_refund: true) se aproxime al total a pagar del resumen ("total_ars"/"total_usd"): revisá el detalle completo para no dejar afuera ningún impuesto, cargo o devolución que figure en él.
 
 Devolvé SOLO los campos del esquema.`
 

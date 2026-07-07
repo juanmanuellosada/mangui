@@ -13,6 +13,13 @@ export const parsedStatementLineSchema = z.object({
   installment_total: z.number().int().nullable().default(null),
   /** true si es un cargo mensual recurrente de un servicio (Netflix, Spotify, etc.) sin cuotas. */
   is_subscription: z.boolean().default(false),
+  /**
+   * true si la línea es una devolución/reintegro de impuestos o percepciones
+   * (monto siempre positivo, ver extract-statement.ts). Se carga como ingreso
+   * y se resta del total importado para que cuadre con el TOTAL A PAGAR del
+   * resumen, que ya neteó la devolución.
+   */
+  is_refund: z.boolean().default(false),
   category_hint: z.string().nullable().default(null),
 })
 

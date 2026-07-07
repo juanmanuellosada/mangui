@@ -84,6 +84,7 @@ function toStatementReviewLine(l: ReviewLine): StatementReviewLine {
     installment_number: l.installment_number,
     installment_total: l.installment_total,
     is_subscription: l.is_subscription,
+    is_refund: l.is_refund,
     category_id: l.category_id,
     selected: l.selected,
     createRecurring: l.createRecurring,

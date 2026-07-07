@@ -64,6 +64,12 @@ export interface StatementReviewLine {
   installment_total: number | null
   /** true si la IA clasificó la línea como suscripción recurrente (sin cuotas). Opcional/aditivo; default false. */
   is_subscription?: boolean
+  /**
+   * true si es una devolución/reintegro de impuestos (monto siempre positivo).
+   * Se carga como ingreso (no gasto) y resta del total del ciclo. Opcional/
+   * aditivo; default false. Nunca aplica a una línea en cuotas.
+   */
+  is_refund?: boolean
   /** Categoría elegida por el usuario (o sugerida y aceptada); null = sin categoría. */
   category_id: string | null
   /** false = el usuario deseleccionó esta línea (y, si es cuota, todas sus cuotas futuras); se excluye del payload. */
@@ -104,6 +110,8 @@ export interface StatementImportPayloadLine {
    * recurring_transactions si se reimporta el mismo resumen con el toggle activo.
    */
   create_recurring: { day_of_month: number; subscription_key: string } | null
+  /** true = la RPC debe insertar el movimiento con type='income' (devolución/reintegro), no 'expense'. */
+  is_refund: boolean
 }
 
 export interface StatementImportPayloadInstallment {
@@ -298,6 +306,7 @@ export function buildStatementPayload(input: BuildStatementPayloadInput): Statem
         category_id: e.line.category_id,
         note: e.line.description,
         create_recurring,
+        is_refund: e.line.is_refund === true,
       }
     })
 

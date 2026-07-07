@@ -375,3 +375,140 @@ describe("currentCycleSummary — ancla en closing_date/due_date", () => {
     expect(closeDate).toBe("2026-02-28")
   })
 })
+
+// ---------------------------------------------------------------------------
+// listCardCycles — un consumo importado se agrupa por el resumen al que
+// pertenece (import_statement_id), no por su fecha individual. Caso real:
+// un consumo con fecha justo antes del inicio del ciclo calculado por la app,
+// pero que el banco incluyó en el resumen importado.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Neteo de devoluciones/reintegros (is_refund → type 'income' resta del total)
+// ---------------------------------------------------------------------------
+describe("listCardCycles — neteo de reintegros (gastos - devoluciones)", () => {
+  it("un movimiento type='income' resta del total y de totalsByCurrency", () => {
+    const account = { closing_date: "2020-01-20", due_date: "2020-01-10", currency: "ARS" }
+    const movements = [
+      { id: "m1", account_id: "card-1", type: "expense", date: "2026-06-05", amount: 1000, converted_amount: null, original_currency: "ARS" },
+      { id: "m2", account_id: "card-1", type: "income", date: "2026-06-06", amount: 200, converted_amount: null, original_currency: "ARS" },
+    ]
+    const ref = new Date(2026, 5, 20)
+    const cycles = listCardCycles("card-1", account, movements, [], ref)
+    const cycle = cycles[cycles.length - 1]
+    expect(cycle.total).toBe(800)
+    expect(cycle.totalsByCurrency).toEqual({ ARS: 800, USD: 0 })
+  })
+})
+
+describe("currentCycleSummary — neteo de reintegros", () => {
+  it("resta un movimiento type='income' del amount del ciclo abierto", () => {
+    const account = { closing_date: "2020-01-20", due_date: "2020-01-10", currency: "ARS" }
+    const ref = new Date(2026, 5, 10) // June 10 2026 → cycle May 21 – June 20
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-05", amount: 1000, converted_amount: null, original_currency: "ARS" },
+      { account_id: "card-1", type: "income", date: "2026-06-06", amount: 300, converted_amount: null, original_currency: "ARS" },
+    ]
+    const { amount } = currentCycleSummary("card-1", account, movements, ref)
+    expect(amount).toBe(700)
+  })
+})
+
+describe("nextCardPayment — fallback: neteo de reintegros", () => {
+  const account = { closing_date: "2020-01-02", due_date: "2020-01-13", currency: "ARS" }
+
+  it("resta un movimiento type='income' del total del último ciclo cerrado", () => {
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-15", amount: 1000, converted_amount: null, original_currency: "ARS" },
+      { account_id: "card-1", type: "income", date: "2026-06-16", amount: 150, converted_amount: null, original_currency: "ARS" },
+    ]
+    const ref = new Date(2026, 6, 6) // 6 de julio 2026
+    const { amount } = nextCardPayment("card-1", account, [], movements, ref)
+    expect(amount).toBe(850)
+  })
+})
+
+describe("listCardCycles — agrupación de movimientos importados por resumen", () => {
+  const account = { closing_date: "2026-01-02", due_date: "2026-01-10", currency: "ARS" }
+
+  function makeStatement(closeDate: string) {
+    return {
+      id: "stmt-julio",
+      account_id: "card-1",
+      close_date: closeDate,
+      due_date: "2026-07-10",
+      status: "pendiente",
+      total_amount: 0,
+      total_amount_usd: 0,
+      stamp_tax: 0,
+      paid_amount: null,
+      paid_amount_usd: null,
+      paid_date: null,
+      paid_from_account_id: null,
+      paid_from_account_id_usd: null,
+    }
+  }
+
+  it("un movimiento importado con fecha anterior al inicio del ciclo queda en el ciclo del resumen al que fue importado", () => {
+    const statement = makeStatement("2026-07-02")
+    const movements = [
+      // OBSIDIAN: fecha 1-jun, anterior al inicio del ciclo de julio (2026-06-03),
+      // pero importado al resumen de julio (cierre 2026-07-02).
+      {
+        id: "m-obsidian",
+        account_id: "card-1",
+        type: "expense",
+        date: "2026-06-01",
+        amount: 48,
+        converted_amount: null,
+        original_currency: "USD",
+        import_statement_id: "stmt-julio",
+      },
+      // Resto de los consumos del resumen, con fecha ya dentro del ciclo calculado.
+      {
+        id: "m-julio",
+        account_id: "card-1",
+        type: "expense",
+        date: "2026-06-03",
+        amount: 100,
+        converted_amount: null,
+        original_currency: "ARS",
+        import_statement_id: "stmt-julio",
+      },
+    ]
+    const ref = new Date(2026, 6, 2) // 2 de julio 2026
+    const cycles = listCardCycles("card-1", account, movements, [statement], ref)
+
+    const julyCycle = cycles.find((c) => c.closeDate === "2026-07-02")
+    expect(julyCycle).toBeDefined()
+    expect(julyCycle!.movements.map((m) => m.id).sort()).toEqual(["m-julio", "m-obsidian"].sort())
+    // La fecha del movimiento no se toca — solo cambia en qué resumen aparece.
+    expect(julyCycle!.movements.find((m) => m.id === "m-obsidian")!.date).toBe("2026-06-01")
+
+    const juneCycle = cycles.find((c) => c.closeDate === "2026-06-02")
+    expect(juneCycle?.movements.some((m) => m.id === "m-obsidian")).toBe(false)
+  })
+
+  it("un movimiento manual (sin import_statement_id) sigue agrupándose por fecha", () => {
+    const statement = makeStatement("2026-07-02")
+    const movements = [
+      {
+        id: "m-manual",
+        account_id: "card-1",
+        type: "expense",
+        date: "2026-06-01",
+        amount: 48,
+        converted_amount: null,
+        original_currency: "ARS",
+        import_statement_id: null,
+      },
+    ]
+    const ref = new Date(2026, 6, 2) // 2 de julio 2026
+    const cycles = listCardCycles("card-1", account, movements, [statement], ref)
+
+    const juneCycle = cycles.find((c) => c.closeDate === "2026-06-02")
+    expect(juneCycle?.movements.some((m) => m.id === "m-manual")).toBe(true)
+
+    const julyCycle = cycles.find((c) => c.closeDate === "2026-07-02")
+    expect(julyCycle?.movements.some((m) => m.id === "m-manual")).toBe(false)
+  })
+})

@@ -387,7 +387,9 @@ export async function resumenesTarjeta(
       .select("id, name, type, currency, closing_date, due_date")
       .eq("type", "tarjeta_credito")
       .eq("is_hidden", false),
-    supabase.from("movements").select("id, account_id, type, date, amount, converted_amount, original_currency"),
+    supabase
+      .from("movements")
+      .select("id, account_id, type, date, amount, converted_amount, original_currency, import_statement_id"),
     supabase.from("card_statements").select("*"),
   ])
 
