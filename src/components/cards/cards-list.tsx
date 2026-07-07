@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Plus,
+  Repeat,
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -33,7 +34,10 @@ import {
   toDateString,
   formatStatementLabel,
   defaultCycleIndex,
+  matchesCardRecurring,
   type CardCycle,
+  type CardRecurring,
+  type CardCycleProjectedRecurring,
 } from "@/lib/cards"
 import {
   uploadAttachment,
@@ -59,6 +63,13 @@ type Account = Tables<"accounts">
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
 type CardStatement = Tables<"card_statements">
+
+// Ítem de "Gastos del resumen": un movimiento real ya cargado, o una
+// ocurrencia virtual de una recurrente proyectada en un ciclo futuro
+// (CardCycle.projectedRecurrings — ver @/lib/cards).
+type ExpenseListItem =
+  | { kind: "real"; movement: Movement }
+  | { kind: "projected"; item: CardCycleProjectedRecurring }
 
 // ── Query keys ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +107,18 @@ async function fetchStatements(accountId: string): Promise<CardStatement[]> {
     .select("*")
     .eq("account_id", accountId)
     .order("close_date", { ascending: false })
+  if (error) throw error
+  return data
+}
+
+async function fetchCardRecurrings(accountId: string): Promise<CardRecurring[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("recurring_transactions")
+    .select("id, amount, currency, note, day_of_month, category_id")
+    .eq("account_id", accountId)
+    .eq("is_card_recurring", true)
+    .eq("status", "active")
   if (error) throw error
   return data
 }
@@ -632,6 +655,19 @@ function RegisterPaymentDialog({
   )
 }
 
+// ── Badge "Recurrente" ────────────────────────────────────────────────────────
+// Mismo estilo en ambas variantes (movimiento real vs. proyección virtual),
+// sólo cambia el texto — consistente con el badge de import-statement-flow.tsx.
+
+function RecurringBadge({ projected }: { projected: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary flex-shrink-0">
+      <Repeat className="h-2.5 w-2.5" aria-hidden />
+      {projected ? "Recurrente · se genera sola" : "Recurrente"}
+    </span>
+  )
+}
+
 // ── Card block ─────────────────────────────────────────────────────────────────
 
 function CardBlock({
@@ -657,9 +693,14 @@ function CardBlock({
     queryFn: () => fetchStatements(account.id),
   })
 
+  const { data: recurrings = [] } = useQuery({
+    queryKey: ["card_recurrings", account.id],
+    queryFn: () => fetchCardRecurrings(account.id),
+  })
+
   const cycles = useMemo(
-    () => listCardCycles(account.id, account, movements, statements),
-    [account, movements, statements]
+    () => listCardCycles(account.id, account, movements, statements, undefined, recurrings),
+    [account, movements, statements, recurrings]
   )
 
   // Default to the "A pagar" cycle (closed + unpaid, or the current open
@@ -701,25 +742,56 @@ function CardBlock({
     })
   }, [cycle, account.id, openQuickAdd])
 
-  // Unified list: all expense movements sorted by date ascending. Excluye
-  // los income (devoluciones/reintegros) — ya netean en cycle.total, pero acá
-  // se listan como "gastos" y renderMovementRow los pintaría como si lo fueran.
+  // Unified list: movimientos reales tipo expense + ocurrencias virtuales de
+  // recurrentes proyectadas en el ciclo (CardCycle.projectedRecurrings),
+  // ordenados por fecha ascendente. Excluye los income (devoluciones/
+  // reintegros) — ya netean en cycle.total, pero acá se listan como "gastos".
   // Hook must run unconditionally (before the early return below), so it
   // tolerates a missing cycle by falling back to an empty array.
-  const allCycleMovements = useMemo(
-    () =>
-      cycle
-        ? cycle.movements
-            .filter((m) => (m as Movement).type === "expense")
-            .sort((a, b) => (a as Movement).date.localeCompare((b as Movement).date))
-        : [],
-    [cycle]
-  )
+  const allCycleMovements = useMemo<ExpenseListItem[]>(() => {
+    if (!cycle) return []
+    const real: ExpenseListItem[] = cycle.movements
+      .filter((m) => (m as Movement).type === "expense")
+      .map((m) => ({ kind: "real", movement: m as Movement }))
+    const projected: ExpenseListItem[] = cycle.projectedRecurrings.map((item) => ({ kind: "projected", item }))
+    return [...real, ...projected].sort((a, b) => {
+      const dateA = a.kind === "real" ? a.movement.date : a.item.date
+      const dateB = b.kind === "real" ? b.movement.date : b.item.date
+      return dateA.localeCompare(dateB)
+    })
+  }, [cycle])
 
   const renderMovementRow = useCallback(
-    (m: Movement) => {
+    (entry: ExpenseListItem) => {
+      if (entry.kind === "projected") {
+        const p = entry.item
+        const cat = p.category_id ? categoryMap.get(p.category_id) : undefined
+        return (
+          <div key={p.id} className="w-full flex items-start gap-3 px-4 py-3 text-left opacity-70">
+            <CategoryIconChip icon={cat?.icon} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                <p className="text-sm font-medium truncate text-muted-foreground">
+                  {cat?.name ?? "Sin categoría"}
+                </p>
+                <RecurringBadge projected />
+              </div>
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                {format(parseISO(p.date), "d MMM", { locale: es })}
+                {p.note ? ` · ${p.note}` : ""}
+              </p>
+            </div>
+            <p className="text-sm font-bold tabular-nums text-muted-foreground flex-shrink-0">
+              − {formatCurrency(p.amount, p.currency)}
+            </p>
+          </div>
+        )
+      }
+
+      const m = entry.movement
       const cat = m.category_id ? categoryMap.get(m.category_id) : undefined
       const isCuota = m.installment_purchase_id !== null
+      const isRecurring = !isCuota && matchesCardRecurring(m, recurrings)
       return isCuota ? (
         <button
           key={m.id}
@@ -764,9 +836,12 @@ function CardBlock({
         >
           <CategoryIconChip icon={cat?.icon} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {cat?.name ?? "Sin categoría"}
-            </p>
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+              <p className="text-sm font-medium truncate">
+                {cat?.name ?? "Sin categoría"}
+              </p>
+              {isRecurring && <RecurringBadge projected={false} />}
+            </div>
             <p className="text-[11px] text-muted-foreground tabular-nums">
               {format(parseISO(m.date), "d MMM", { locale: es })}
               {m.note ? ` · ${m.note}` : ""}
@@ -778,7 +853,7 @@ function CardBlock({
         </button>
       )
     },
-    [categoryMap]
+    [categoryMap, recurrings]
   )
 
   if (!cycle) return null
@@ -920,7 +995,7 @@ function CardBlock({
               </button>
             </div>
             <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-              {allCycleMovements.slice(0, 8).map((m) => renderMovementRow(m as Movement))}
+              {allCycleMovements.slice(0, 8).map((entry) => renderMovementRow(entry))}
             </div>
           </div>
         )}
@@ -1011,7 +1086,7 @@ function CardBlock({
         title={`Gastos · cierre ${format(cycle.cycleEnd, "d MMM", { locale: es })}`}
       >
         <div className="divide-y divide-border/40">
-          {allCycleMovements.map((m) => renderMovementRow(m as Movement))}
+          {allCycleMovements.map((entry) => renderMovementRow(entry))}
         </div>
       </MangoSheet>
 

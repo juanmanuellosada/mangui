@@ -13,6 +13,7 @@ import {
 } from "date-fns"
 import { es } from "date-fns/locale"
 import { amountInCurrency } from "@/lib/money"
+import { normalizeNote, extractKeyword } from "@/lib/rules"
 
 // Minimal shape needed by nextCardPayment — avoids importing full DB types here.
 interface CardPaymentAccount {
@@ -411,6 +412,92 @@ interface CycleMovement {
   import_statement_id?: string | null
 }
 
+/** Recurrente de tarjeta activa (recurring_transactions con is_card_recurring=true, status='active'), ya filtrada a esta cuenta por el caller. */
+export interface CardRecurring {
+  id: string
+  amount: number
+  currency: "ARS" | "USD"
+  note: string | null
+  day_of_month: number | null
+  category_id: string | null
+}
+
+/**
+ * Ocurrencia VIRTUAL de una recurrente proyectada en un ciclo futuro (solo
+ * display — el cron de recurrentes crea el movimiento real cuando llega la
+ * fecha). Ver `projectRecurringsForCycle`.
+ */
+export interface CardCycleProjectedRecurring {
+  isProjectedRecurring: true
+  id: string
+  recurringId: string
+  date: string
+  amount: number
+  currency: "ARS" | "USD"
+  note: string | null
+  category_id: string | null
+}
+
+/**
+ * Clave de comercio normalizado de una nota (mismo criterio que
+ * normalizeMerchant en statement-import.ts / subscription_key): usada para
+ * matchear una recurrente contra un movimiento real por comercio.
+ */
+function recurringMerchantKey(note: string | null): string {
+  const normalized = normalizeNote(note ?? "")
+  return extractKeyword(normalized) ?? normalized
+}
+
+/**
+ * true si un movimiento (por comercio normalizado + moneda) matchea alguna
+ * recurrente de tarjeta activa. Usado tanto para el dedup de la proyección
+ * (no proyectar en un ciclo que ya tiene el consumo real) como para el badge
+ * "Recurrente" sobre movimientos reales ya cargados (cards-list.tsx).
+ */
+export function matchesCardRecurring(
+  m: { note?: string | null; original_currency?: string | null },
+  recurrings: CardRecurring[]
+): boolean {
+  const key = recurringMerchantKey(m.note ?? null)
+  if (key === "") return false
+  const currency = m.original_currency === "USD" ? "USD" : "ARS"
+  return recurrings.some((r) => r.currency === currency && recurringMerchantKey(r.note) === key)
+}
+
+/**
+ * Proyecta una ocurrencia virtual por recurrente activa en un ciclo futuro
+ * (cycleEnd > today) — salvo que el ciclo ya tenga un movimiento real de esa
+ * misma recurrente (dedup por comercio+moneda, ver matchesCardRecurring). La
+ * fecha se ancla en day_of_month, clampeado al mes del cierre del ciclo.
+ */
+function projectRecurringsForCycle(
+  cycleEnd: Date,
+  netMovements: { note?: string | null; original_currency?: string | null }[],
+  recurrings: CardRecurring[],
+  today: Date
+): CardCycleProjectedRecurring[] {
+  if (recurrings.length === 0 || !isAfter(cycleEnd, today)) return []
+
+  const y = cycleEnd.getFullYear()
+  const m = cycleEnd.getMonth() + 1
+
+  return recurrings
+    .filter((r) => !netMovements.some((mv) => matchesCardRecurring(mv, [r])))
+    .map((r) => {
+      const day = clampDayToMonth(y, m, r.day_of_month ?? cycleEnd.getDate())
+      return {
+        isProjectedRecurring: true as const,
+        id: `projected-recurring-${r.id}-${toDateString(cycleEnd)}`,
+        recurringId: r.id,
+        date: toDateString(startOfDay(new Date(y, m - 1, day))),
+        amount: r.amount,
+        currency: r.currency,
+        note: r.note,
+        category_id: r.category_id,
+      }
+    })
+}
+
 interface CycleStatement {
   id: string
   account_id: string
@@ -439,18 +526,27 @@ export interface CardCycle {
   /** Movements whose date falls within this cycle */
   movements: CycleMovement[]
   /**
+   * Ocurrencias virtuales de recurrentes de tarjeta activas proyectadas en
+   * este ciclo (solo si cycleEnd > today) — ver `projectRecurringsForCycle`.
+   * Vacío cuando no se pasó `recurrings` a listCardCycles. Ya están
+   * deduplicadas contra movimientos reales del ciclo y sumadas en `total` /
+   * `totalsByCurrency`.
+   */
+  projectedRecurrings: CardCycleProjectedRecurring[]
+  /**
    * Suma en la moneda de la cuenta (amountInCurrency de @/lib/money) de los
    * gastos del ciclo MENOS las devoluciones/reintegros (is_refund, cargados
    * como type='income') — un gasto USD sin converted_amount ("USD puro") no
-   * se cuenta acá, aparece aparte en totalsByCurrency. Total autocalculado;
+   * se cuenta acá, aparece aparte en totalsByCurrency. Incluye las
+   * proyecciones de recurrentes (`projectedRecurrings`). Total autocalculado;
    * para ciclos pagados preferir statement.total_amount.
    */
   total: number
   /**
    * Per-currency subtotals computed from expense movements minus refunds
    * (type='income'), grouped by original_currency and summed using the
-   * ORIGINAL amount (not converted_amount). Zero when the currency has no
-   * movements in the cycle.
+   * ORIGINAL amount (not converted_amount). Incluye las proyecciones de
+   * recurrentes. Zero when the currency has no movements in the cycle.
    */
   totalsByCurrency: { ARS: number; USD: number }
   /**
@@ -478,13 +574,17 @@ export interface CardCycle {
  * @param movements   All movements for the user (filtered internally to this account).
  * @param statements  All card_statements for this account (may be a superset).
  * @param ref         Optional reference date for "today" (defaults to now).
+ * @param recurrings  Recurrentes de tarjeta activas de esta cuenta (is_card_recurring=true,
+ *                     status='active'), proyectadas como ocurrencias virtuales en los ciclos
+ *                     futuros (ver CardCycle.projectedRecurrings). Opcional, default [].
  */
 export function listCardCycles(
   accountId: string,
   account: CycleAccount,
   movements: CycleMovement[],
   statements: CycleStatement[],
-  ref?: Date
+  ref?: Date,
+  recurrings: CardRecurring[] = []
 ): CardCycle[] {
   const closingDate = account.closing_date
   if (closingDate == null) return []
@@ -497,14 +597,21 @@ export function listCardCycles(
   const accountMovements = movements.filter((m) => m.account_id === accountId)
 
   if (accountMovements.length === 0) {
-    // No movements: return only the current open cycle (empty)
+    // No movements: return only the current open cycle (empty, salvo recurrentes proyectadas)
     const { cycleStart, cycleEnd } = currentCycleRange(closingDay, today)
     const dueDate =
       dueDay != null ? toDateString(computeDueDate(cycleEnd, dueDay, closingDay)) : null
     const stmt = statements.find(
       (s) => s.account_id === accountId && s.close_date === toDateString(cycleEnd)
     ) ?? null
-    return [{ closeDate: toDateString(cycleEnd), dueDate, cycleStart, cycleEnd, movements: [], total: 0, totalsByCurrency: { ARS: 0, USD: 0 }, statement: stmt }]
+    const projectedRecurrings = projectRecurringsForCycle(cycleEnd, [], recurrings, today)
+    const totalsByCurrency = { ARS: 0, USD: 0 }
+    for (const p of projectedRecurrings) totalsByCurrency[p.currency] += p.amount
+    const total = projectedRecurrings.reduce(
+      (sum, p) => sum + towardAccountCurrency({ amount: p.amount, converted_amount: null, original_currency: p.currency }, account.currency),
+      0
+    )
+    return [{ closeDate: toDateString(cycleEnd), dueDate, cycleStart, cycleEnd, movements: [], projectedRecurrings, total, totalsByCurrency, statement: stmt }]
   }
 
   // Lookup usado tanto para el ciclo más viejo (abajo) como para el
@@ -596,13 +703,22 @@ export function listCardCycles(
     // para cuadrar con el TOTAL A PAGAR real del resumen (ver signedAmount).
     const netMovements = cycleMovements.filter((m) => m.type === "expense" || m.type === "income")
 
-    const total = netMovements
-      .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
+    const projectedRecurrings = projectRecurringsForCycle(cycleEnd, netMovements, recurrings, today)
+
+    const total =
+      netMovements.reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0) +
+      projectedRecurrings.reduce(
+        (sum, p) => sum + towardAccountCurrency({ amount: p.amount, converted_amount: null, original_currency: p.currency }, account.currency),
+        0
+      )
 
     const totalsByCurrency: { ARS: number; USD: number } = { ARS: 0, USD: 0 }
     for (const m of netMovements) {
       const cur = m.original_currency === "USD" ? "USD" : "ARS"
       totalsByCurrency[cur] += signedAmount(m.type, m.amount)
+    }
+    for (const p of projectedRecurrings) {
+      totalsByCurrency[p.currency] += p.amount
     }
 
     const dueDate =
@@ -613,7 +729,7 @@ export function listCardCycles(
         (s) => s.account_id === accountId && s.close_date === closeDateStr
       ) ?? null
 
-    return { closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, total, totalsByCurrency, statement: stmt }
+    return { closeDate: closeDateStr, dueDate, cycleStart, cycleEnd, movements: cycleMovements, projectedRecurrings, total, totalsByCurrency, statement: stmt }
   })
 
   return cycles

@@ -12,6 +12,7 @@ import {
   nextCardPayment,
   defaultCycleIndex,
   type CardCycle,
+  type CardRecurring,
 } from "./cards"
 
 // ---------------------------------------------------------------------------
@@ -627,5 +628,57 @@ describe("defaultCycleIndex", () => {
     const ref = new Date(2026, 5, 10)
     const cycles = [cycle({ closeDate: "2026-06-20", cycleEnd: new Date(2026, 5, 20) })]
     expect(defaultCycleIndex(cycles, ref)).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// listCardCycles — proyección de recurrentes de tarjeta (Feature: recurrentes
+// visibles en los resúmenes, análogo a projectedRecurring de statement-import.ts)
+// ---------------------------------------------------------------------------
+describe("listCardCycles — proyección de recurrentes de tarjeta", () => {
+  const account = { closing_date: "2020-01-20", due_date: "2020-01-10", currency: "ARS" }
+  const ref = new Date(2026, 5, 10) // 10 de junio 2026
+
+  const recurrings: CardRecurring[] = [
+    { id: "r-netflix", amount: 15990, currency: "ARS", note: "Netflix", day_of_month: 5, category_id: null },
+  ]
+
+  // Tres ciclos: mayo (cerrado, con un gasto ajeno), junio (en curso, sin
+  // gastos), julio (futuro, con el consumo real de Netflix ya cargado).
+  function buildCycles() {
+    const movements = [
+      { id: "m-past", account_id: "card-1", type: "expense", date: "2026-05-15", amount: 100, converted_amount: null, original_currency: "ARS" },
+      { id: "m-netflix-julio", account_id: "card-1", type: "expense", date: "2026-07-20", amount: 15990, converted_amount: null, original_currency: "ARS", note: "Netflix" },
+    ]
+    return listCardCycles("card-1", account, movements, [], ref, recurrings)
+  }
+
+  it("proyecta la recurrente en un ciclo futuro sin consumo real, sumando al total", () => {
+    const cycles = buildCycles()
+    const juneCycle = cycles.find((c) => c.closeDate === "2026-06-20")!
+    expect(juneCycle.projectedRecurrings).toHaveLength(1)
+    expect(juneCycle.projectedRecurrings[0]).toMatchObject({
+      isProjectedRecurring: true,
+      recurringId: "r-netflix",
+      amount: 15990,
+      currency: "ARS",
+    })
+    expect(juneCycle.total).toBe(15990)
+    expect(juneCycle.totalsByCurrency).toEqual({ ARS: 15990, USD: 0 })
+  })
+
+  it("no proyecta en un ciclo que ya tiene el consumo real de esa recurrente (dedup por comercio+moneda)", () => {
+    const cycles = buildCycles()
+    const julyCycle = cycles.find((c) => c.closeDate === "2026-07-20")!
+    expect(julyCycle.projectedRecurrings).toHaveLength(0)
+    // El total sigue siendo el del movimiento real, sin duplicar.
+    expect(julyCycle.total).toBe(15990)
+  })
+
+  it("no proyecta en ciclos ya cerrados (pasados)", () => {
+    const cycles = buildCycles()
+    const mayCycle = cycles.find((c) => c.closeDate === "2026-05-20")!
+    expect(mayCycle.projectedRecurrings).toHaveLength(0)
+    expect(mayCycle.total).toBe(100)
   })
 })
