@@ -37,6 +37,7 @@ import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { useIsDemo } from "@/lib/use-is-demo"
 import { MOVEMENTS_KEY, ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
+import { RECURRING_KEY } from "@/lib/recurring"
 import { formatCurrency, cn } from "@/lib/utils"
 import {
   importStatementPdf,
@@ -633,6 +634,10 @@ export function ImportStatementFlow({
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
       queryClient.invalidateQueries({ queryKey: ["card_statements"] })
+      // Las líneas marcadas "crear como recurrente" generan filas en
+      // recurring_transactions — invalidamos para que Tarjetas las muestre
+      // sin recargar la página.
+      queryClient.invalidateQueries({ queryKey: RECURRING_KEY })
 
       toast.success(`Importamos tu resumen: ${result.movements_created} movimientos`)
 

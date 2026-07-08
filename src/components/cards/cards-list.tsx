@@ -45,6 +45,7 @@ import {
   type MovementAttachment,
 } from "@/lib/attachments"
 import { ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
+import { RECURRING_KEY } from "@/lib/recurring"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { MangoSheet } from "@/components/ui/mango-sheet"
@@ -693,8 +694,11 @@ function CardBlock({
     queryFn: () => fetchStatements(account.id),
   })
 
+  // Key starts with RECURRING_KEY so invalidating it in recurring-list.tsx
+  // (crear/editar/borrar/pausar recurrente) o en el import de resúmenes
+  // también refresca esta query automáticamente.
   const { data: recurrings = [] } = useQuery({
-    queryKey: ["card_recurrings", account.id],
+    queryKey: [...RECURRING_KEY, "card", account.id],
     queryFn: () => fetchCardRecurrings(account.id),
   })
 
