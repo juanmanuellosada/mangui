@@ -271,24 +271,19 @@ export function MangoMultiSelect({
         <span className="truncate text-muted-foreground">{placeholder}</span>
       )
     }
-    // Up to 2 chips; beyond that show a "+N" badge.
-    const shown = selectedOptions.slice(0, 2)
-    const overflow = selectedCount - shown.length
+    // Single line, always contained: first selection + "+N" overflow badge.
+    // (Avoids flex-wrap inside the fixed-height trigger, which used to spill
+    // the wrapped line above/below the button and cover neighboring labels.)
+    const first = selectedOptions[0]
+    const overflow = selectedCount - 1
     return (
-      <span className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
-        {shown.map((o) => (
-          <span
-            key={o.value}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-muted/70 border border-border/40 text-xs font-medium max-w-[120px]"
-          >
-            {o.leading && (
-              <span className="flex items-center shrink-0">{o.leading}</span>
-            )}
-            <span className="truncate">{o.label}</span>
-          </span>
-        ))}
+      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+        {first?.leading && (
+          <span className="flex items-center shrink-0">{first.leading}</span>
+        )}
+        <span className="truncate">{first?.label}</span>
         {overflow > 0 && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-semibold">
+          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-semibold">
             +{overflow}
           </span>
         )}
