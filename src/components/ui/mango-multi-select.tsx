@@ -148,6 +148,18 @@ export function MangoMultiSelect({
     onChange([])
   }, [onChange])
 
+  const selectAll = useCallback(() => {
+    onChange(
+      Array.from(
+        new Set([
+          ...values,
+          ...filteredOptions.filter((o) => !o.disabled).map((o) => o.value),
+        ])
+      )
+    )
+    // Do NOT close the popover — same behavior as toggleOption.
+  }, [values, filteredOptions, onChange])
+
   // Close on outside click (check trigger + portal popover separately)
   useEffect(() => {
     if (!open) return
@@ -264,6 +276,12 @@ export function MangoMultiSelect({
   // Trigger label: show count when selections exist, placeholder when empty.
   const selectedCount = values.length
   const selectedOptions = options.filter((o) => values.includes(o.value))
+
+  // "Seleccionar todos" only makes sense while some visible, enabled option
+  // is still unselected — hide it once everything visible is already checked.
+  const canSelectAll = filteredOptions.some(
+    (o) => !o.disabled && !values.includes(o.value)
+  )
 
   function renderTriggerContent() {
     if (selectedCount === 0) {
@@ -455,16 +473,27 @@ export function MangoMultiSelect({
             )}
           </ul>
 
-          {/* Footer: Limpiar action */}
-          {values.length > 0 && (
-            <div className="border-t border-border/60 px-3 py-1.5">
-              <button
-                type="button"
-                onClick={clearAll}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Limpiar
-              </button>
+          {/* Footer: Seleccionar todos / Limpiar actions */}
+          {(canSelectAll || values.length > 0) && (
+            <div className="flex items-center gap-3 border-t border-border/60 px-3 py-1.5">
+              {canSelectAll && (
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Seleccionar todos
+                </button>
+              )}
+              {values.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
             </div>
           )}
         </div>,
