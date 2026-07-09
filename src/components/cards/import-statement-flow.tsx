@@ -55,10 +55,11 @@ import type { Tables } from "@/lib/database.types"
 type Account = Tables<"accounts">
 type Category = Tables<"categories">
 
-const MAX_PDF_SIZE = 15 * 1024 * 1024 // 15 MB
+export const MAX_PDF_SIZE = 15 * 1024 * 1024 // 15 MB
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024 // límite propio de uploadAttachment
 
-interface ReviewLine extends StatementReviewLine {
+/** Exportada: reusada por corroborate-statement-flow.tsx (Grupo 3) para las líneas "falta" del diff. */
+export interface ReviewLine extends StatementReviewLine {
   id: string
 }
 
@@ -68,14 +69,18 @@ function normalizeText(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
 }
 
-function matchCategoryId(hint: string | null, expenseCategories: Category[]): string | null {
+/** Exportada: reusada por corroborate-statement-flow.tsx para matchear category_hint de la IA. */
+export function matchCategoryId(hint: string | null, expenseCategories: Category[]): string | null {
   if (!hint) return null
   const normHint = normalizeText(hint)
   return expenseCategories.find((c) => normalizeText(c.name) === normHint)?.id ?? null
 }
 
-/** Despoja el `id` local (sólo para React keys) antes de pasarle la línea a la lógica pura. */
-function toStatementReviewLine(l: ReviewLine): StatementReviewLine {
+/**
+ * Despoja el `id` local (sólo para React keys) antes de pasarle la línea a la
+ * lógica pura. Exportada: reusada por corroborate-statement-flow.tsx.
+ */
+export function toStatementReviewLine(l: ReviewLine): StatementReviewLine {
   return {
     description: l.description,
     date: l.date,
@@ -108,8 +113,9 @@ function groupPeriodLabel(offset: number, closeDate: string, dueDate: string): {
 }
 
 // ── Line row (editable — sólo grupo del resumen leído) ──────────────────────────
+// Exportada: reusada por corroborate-statement-flow.tsx (Grupo 3, sección FALTA).
 
-function LineRow({
+export function LineRow({
   line,
   accountCurrency,
   categoryOptions,

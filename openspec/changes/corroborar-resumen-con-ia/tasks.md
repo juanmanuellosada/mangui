@@ -12,10 +12,10 @@
 
 ## 3. UI de corroborar (MangoSheet)
 
-- [ ] 3.1 Acción "Corroborar con IA" en el resumen puntual de `cards-list.tsx` (subir PDF ≤15MB, cuenta 1 uso de IA vía la ruta existente).
-- [ ] 3.2 Pantalla de diff (MangoSheet, estilo import): sección FALTA (checkboxes para agregar), DIFERENCIA DE MONTO (muestra PDF vs cargado), SOBRA (solo lectura/marcado). Reusar filas/badges del import.
-- [ ] 3.3 Al confirmar, aplicar solo lo tildado (punto 2); las cuotas faltantes agregan sus proyecciones. Nada automático; cerrar sin confirmar no persiste. Invalidar las queries correctas para que la vista Tarjetas refresque.
-- [ ] 3.4 Consultar `ui-ux-pro-max` para que el diff quede claro (colores por grupo, montos comparados) y consistente con el import.
+- [x] 3.1 Acción "Corroborar con IA" en el resumen puntual de `cards-list.tsx` (subir PDF ≤15MB, cuenta 1 uso de IA vía la ruta existente).
+- [x] 3.2 Pantalla de diff (MangoSheet, estilo import): sección FALTA (checkboxes para agregar), DIFERENCIA DE MONTO (muestra PDF vs cargado), SOBRA (solo lectura/marcado). Reusar filas/badges del import.
+- [x] 3.3 Al confirmar, aplicar solo lo tildado (punto 2); las cuotas faltantes agregan sus proyecciones. Nada automático; cerrar sin confirmar no persiste. Invalidar las queries correctas para que la vista Tarjetas refresque.
+- [x] 3.4 Consultar `ui-ux-pro-max` para que el diff quede claro (colores por grupo, montos comparados) y consistente con el import.
 
 ## 4. Verificación
 

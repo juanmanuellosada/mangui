@@ -59,6 +59,7 @@ import { useIsDemo } from "@/lib/use-is-demo"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
 import { ImportStatementFlow } from "@/components/cards/import-statement-flow"
+import { CorroborateStatementFlow } from "@/components/cards/corroborate-statement-flow"
 
 type Account = Tables<"accounts">
 type Movement = Tables<"movements">
@@ -1053,6 +1054,9 @@ function CardBlock({
             </>
           )}
         </div>
+
+        {/* Corroborar con IA */}
+        <CorroborateStatementFlow account={account} cycle={cycle} categories={categories} />
       </div>
 
       {/* Payment dialog */}
