@@ -189,7 +189,14 @@ function resolveConversion(
   return { converted_amount: null, dollar_type: "tarjeta" }
 }
 
-function normalizeMerchant(description: string): string {
+/**
+ * Comercio normalizado de una descripción de línea de resumen (misma
+ * normalización que purchase_key/subscription_key). Exportada para que
+ * statement-reconcile.ts (Grupo 1, corroborar con IA) matchee líneas del PDF
+ * contra movimientos cargados con el MISMO criterio que el import, sin
+ * duplicar la lógica.
+ */
+export function normalizeMerchant(description: string): string {
   const normalized = normalizeNote(description)
   return extractKeyword(normalized) ?? normalized
 }
