@@ -6,9 +6,9 @@
 
 ## 2. Aplicación reconciliable de lo faltante
 
-- [ ] 2.1 Resolver el vínculo con `import_statement_id`/`card_statements` del resumen corroborado y decidir el modo de persistencia: reusar `import_card_statement` (con su idempotencia) SIN borrar/pisar lo ya cargado. Si el DELETE previo por `import_statement_id` pisara movimientos existentes, definir un ajuste (modo "solo upsert" o payload acotado). Documentar la decisión.
-- [ ] 2.2 Construir el payload de aplicación solo con las líneas/cuotas tildadas (reusar `buildStatementPayload`/proyección de cuotas con close_date + tabla "Cuotas a vencer").
-- [ ] 2.3 Tests: agregar 1 faltante NO toca los demás movimientos del ciclo; re-aplicar lo mismo no duplica (reconciliación por purchase_key/import_statement_id); agregar una cuota proyecta sus futuras.
+- [x] 2.1 Resolver el vínculo con `import_statement_id`/`card_statements` del resumen corroborado y decidir el modo de persistencia: reusar `import_card_statement` (con su idempotencia) SIN borrar/pisar lo ya cargado. Si el DELETE previo por `import_statement_id` pisara movimientos existentes, definir un ajuste (modo "solo upsert" o payload acotado). Documentar la decisión.
+- [x] 2.2 Construir el payload de aplicación solo con las líneas/cuotas tildadas (reusar `buildStatementPayload`/proyección de cuotas con close_date + tabla "Cuotas a vencer").
+- [x] 2.3 Tests: agregar 1 faltante NO toca los demás movimientos del ciclo; re-aplicar lo mismo no duplica (reconciliación por purchase_key/import_statement_id); agregar una cuota proyecta sus futuras.
 
 ## 3. UI de corroborar (MangoSheet)
 

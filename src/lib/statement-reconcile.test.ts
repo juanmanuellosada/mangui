@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
-import { reconcileStatement, type ReconcileMovement } from "./statement-reconcile"
+import { reconcileStatement, buildReconcileApplyPayload, type ReconcileMovement } from "./statement-reconcile"
 import type { ParsedStatement, ParsedStatementLine } from "./ai/statement-schema"
+import type { StatementReviewLine } from "./statement-import"
 
 function makeLine(overrides: Partial<ParsedStatementLine> = {}): ParsedStatementLine {
   return {
@@ -208,5 +209,76 @@ describe("reconcileStatement", () => {
     expect(result.missing).toEqual([lineB])
     expect(result.extra).toHaveLength(0)
     expect(result.mismatched).toHaveLength(0)
+  })
+})
+
+function makeReviewLine(overrides: Partial<StatementReviewLine> = {}): StatementReviewLine {
+  return {
+    description: "Kiosco Don Pepe",
+    date: "2026-06-15",
+    amount: 1200,
+    currency: "ARS",
+    amount_ars: null,
+    installment_number: null,
+    installment_total: null,
+    is_subscription: false,
+    category_id: "cat-1",
+    selected: true,
+    ...overrides,
+  }
+}
+
+describe("buildReconcileApplyPayload", () => {
+  const baseInput = {
+    account_id: "acc-1",
+    account_currency: "ARS" as const,
+    close_date: "2026-06-20",
+    due_date: "2026-06-30",
+    total_amount: 1200,
+    total_amount_usd: 0,
+    stamp_tax: 0,
+  }
+
+  it("marca el payload como additive: true", () => {
+    const payload = buildReconcileApplyPayload({ ...baseInput, linesToApply: [makeReviewLine()] })
+    expect(payload.additive).toBe(true)
+  })
+
+  it("solo incluye las líneas tildadas (no agrega nada de más)", () => {
+    const kiosco = makeReviewLine({ description: "Kiosco Don Pepe", amount: 1200 })
+    const farmacity = makeReviewLine({ description: "Farmacity", amount: 800 })
+    const payload = buildReconcileApplyPayload({ ...baseInput, linesToApply: [kiosco, farmacity] })
+    expect(payload.lines).toHaveLength(2)
+    expect(payload.lines.map((l) => l.note)).toEqual(["Kiosco Don Pepe", "Farmacity"])
+  })
+
+  it("una línea deseleccionada por el usuario no llega al payload", () => {
+    const kiosco = makeReviewLine({ description: "Kiosco Don Pepe" })
+    const noTildada = makeReviewLine({ description: "Farmacity", selected: false })
+    const payload = buildReconcileApplyPayload({ ...baseInput, linesToApply: [kiosco, noTildada] })
+    expect(payload.lines).toHaveLength(1)
+    expect(payload.lines[0].note).toBe("Kiosco Don Pepe")
+  })
+
+  it("una cuota faltante tildada agrega también sus cuotas futuras (misma proyección que el import)", () => {
+    const cuota = makeReviewLine({
+      description: "Notebook",
+      amount: 10000,
+      installment_number: 3,
+      installment_total: 5,
+    })
+    const payload = buildReconcileApplyPayload({ ...baseInput, linesToApply: [cuota] })
+    expect(payload.lines).toHaveLength(0)
+    expect(payload.installment_purchases).toHaveLength(1)
+    // Cuotas 3, 4 y 5 (la leída + las futuras hasta el total).
+    expect(payload.installment_purchases[0].installments.map((i) => i.installment_number)).toEqual([3, 4, 5])
+  })
+
+  it("no muta las líneas de entrada ni recalcula matching (delega toda la expansión a buildStatementPayload)", () => {
+    const line = makeReviewLine()
+    const payload = buildReconcileApplyPayload({ ...baseInput, linesToApply: [line] })
+    expect(line.selected).toBe(true) // sigue intacta
+    expect(payload.account_id).toBe("acc-1")
+    expect(payload.close_date).toBe("2026-06-20")
   })
 })

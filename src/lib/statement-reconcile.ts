@@ -1,5 +1,10 @@
 import type { ParsedStatement, ParsedStatementLine } from "@/lib/ai/statement-schema"
-import { normalizeMerchant } from "@/lib/statement-import"
+import {
+  normalizeMerchant,
+  buildStatementPayload,
+  type StatementReviewLine,
+  type StatementImportPayload,
+} from "@/lib/statement-import"
 
 /**
  * Movimiento ya cargado en el ciclo del resumen, reducido a lo que necesita
@@ -117,4 +122,60 @@ export function reconcileStatement(parsed: ParsedStatement, cycleMovements: Reco
   }
 
   return { missing: remainingLines, extra: remainingMovements, mismatched }
+}
+
+// ── Aplicación reconciliable de lo faltante (Grupo 2, D2/tarea 2.2) ─────────
+
+/** Payload de `import_card_statement` en modo aditivo: NO dispara el DELETE previo de movimientos simples (ver migración 0056_statement_reconcile_additive.sql). */
+export type ReconcileApplyPayload = StatementImportPayload & { additive: true }
+
+export interface BuildReconcileApplyPayloadInput {
+  account_id: string
+  /** Moneda de la cuenta tarjeta (siempre ARS en la práctica). */
+  account_currency: "ARS" | "USD"
+  close_date: string
+  due_date: string
+  total_amount: number
+  total_amount_usd: number
+  stamp_tax: number
+  /**
+   * Subconjunto de `missing` (líneas del PDF) que el usuario tildó para
+   * agregar, ya convertidas a `StatementReviewLine` (con `selected: true` y
+   * `category_id` resuelto) por quien arma la pantalla de diff (Grupo 3, UI)
+   * — mismo shape que usa el import para reusar el componente de fila.
+   */
+  linesToApply: StatementReviewLine[]
+  /** Tabla "Cuotas a vencer" del PDF corroborado, ver BuildStatementPayloadInput. */
+  upcoming_installments_table?: number[] | null
+}
+
+/**
+ * Arma el payload para aplicar SOLO lo que el usuario tildó del diff, en modo
+ * aditivo (tarea 2.2). Reusa `buildStatementPayload` tal cual —la misma
+ * expansión/proyección de cuotas por `close_date` + tabla "Cuotas a vencer"
+ * que el import— así una cuota tildada agrega también sus cuotas futuras sin
+ * duplicar esa lógica; lo único que agrega esta función es `additive: true`,
+ * que le indica a la RPC (migración 0056) que NO borre los movimientos
+ * simples ya cargados del resumen antes de insertar `lines`.
+ *
+ * Idempotencia (tarea 2.3): como el diff (`reconcileStatement`) siempre
+ * recalcula qué falta contra lo YA cargado, re-corroborar el mismo resumen no
+ * vuelve a ofrecer como "falta" lo que ya se agregó (no hay nada tildable
+ * para duplicar). Para cuotas, aunque se re-aplicara la misma línea, el
+ * upsert por `(purchase_key, installment_number)` de la RPC reconcilia en
+ * vez de duplicar, en ambos modos (additive o no).
+ */
+export function buildReconcileApplyPayload(input: BuildReconcileApplyPayloadInput): ReconcileApplyPayload {
+  const payload = buildStatementPayload({
+    account_id: input.account_id,
+    account_currency: input.account_currency,
+    close_date: input.close_date,
+    due_date: input.due_date,
+    total_amount: input.total_amount,
+    total_amount_usd: input.total_amount_usd,
+    stamp_tax: input.stamp_tax,
+    lines: input.linesToApply,
+    upcoming_installments_table: input.upcoming_installments_table,
+  })
+  return { ...payload, additive: true }
 }
