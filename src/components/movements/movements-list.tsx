@@ -1616,7 +1616,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
               <div key={view.id} className="flex items-center gap-1 px-1">
                 <DropdownMenuItem
                   className="flex-1"
-                  onSelect={() => loadView(view)}
+                  onClick={() => loadView(view)}
                 >
                   <span className="truncate">{view.name}</span>
                 </DropdownMenuItem>
@@ -1634,7 +1634,7 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
               </div>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => !isDemo && setSaveDialogOpen(true)} disabled={isDemo} className="gap-2">
+            <DropdownMenuItem onClick={() => !isDemo && setSaveDialogOpen(true)} disabled={isDemo} className="gap-2">
               <Plus className="h-3.5 w-3.5" />
               Guardar filtros actuales
             </DropdownMenuItem>

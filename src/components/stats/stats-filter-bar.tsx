@@ -337,7 +337,7 @@ export function StatsFilterBar({
               <div key={view.id} className="flex items-center gap-1 px-1">
                 <DropdownMenuItem
                   className="flex-1"
-                  onSelect={() => loadView(view)}
+                  onClick={() => loadView(view)}
                 >
                   <span className="truncate">{view.name}</span>
                 </DropdownMenuItem>
@@ -357,7 +357,7 @@ export function StatsFilterBar({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => { if (!isDemo) setSaveDialogOpen(true) }}
+              onClick={() => { if (!isDemo) setSaveDialogOpen(true) }}
               disabled={isDemo}
               title={isDemo ? "No disponible en el modo demo" : undefined}
               className="gap-2"
