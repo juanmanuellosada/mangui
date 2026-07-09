@@ -382,6 +382,10 @@ export function ImportStatementFlow({
   const [stampTax, setStampTax] = useState("0")
   const [lines, setLines] = useState<ReviewLine[]>([])
   const [saving, setSaving] = useState(false)
+  // Tabla "Cuotas a vencer" del PDF (índice 0 = este resumen, índice N =
+  // ciclo futuro N): fuente de verdad para el total de cuotas proyectadas de
+  // cada ciclo futuro cuando el PDF la trae. null si no vino.
+  const [upcomingInstallmentsTable, setUpcomingInstallmentsTable] = useState<number[] | null>(null)
 
   // Aprobación por resumen: qué grupos (por cycleOffset) ya revisó/aprobó el
   // usuario, y cuál está expandido. El Confirm final sólo se habilita cuando
@@ -457,8 +461,19 @@ export function ImportStatementFlow({
       total_amount_usd: parseFloat(totalUsd) || 0,
       stamp_tax: parseFloat(stampTax) || 0,
       lines: reviewLines,
+      upcoming_installments_table: upcomingInstallmentsTable,
     })
-  }, [closeDate, dueDate, lines, selectedAccountId, accountCurrency, parsedTotalArs, totalUsd, stampTax])
+  }, [
+    closeDate,
+    dueDate,
+    lines,
+    selectedAccountId,
+    accountCurrency,
+    parsedTotalArs,
+    totalUsd,
+    stampTax,
+    upcomingInstallmentsTable,
+  ])
 
   const allGroupsApproved = groups.length > 0 && groups.every((g) => approvedOffsets.has(g.cycleOffset))
   // Las filas projectedRecurring son sólo informativas (no se crean en este
@@ -482,6 +497,7 @@ export function ImportStatementFlow({
     setStampTax("0")
     setLines([])
     setSaving(false)
+    setUpcomingInstallmentsTable(null)
     setApprovedOffsets(new Set())
     setExpandedOffset(0)
   }, [cardAccounts])
@@ -531,6 +547,11 @@ export function ImportStatementFlow({
     setTotalArs(parsed.total_ars != null ? String(parsed.total_ars) : "")
     setTotalUsd(parsed.total_usd != null ? String(parsed.total_usd) : "")
     setStampTax(parsed.stamp_tax != null ? String(parsed.stamp_tax) : "0")
+    setUpcomingInstallmentsTable(
+      parsed.upcoming_installments && parsed.upcoming_installments.length > 0
+        ? parsed.upcoming_installments.map((e) => e.amount)
+        : null
+    )
     setLines(
       parsed.lines.map((l) => ({
         id: crypto.randomUUID(),
@@ -619,6 +640,7 @@ export function ImportStatementFlow({
           total_amount_usd: parseFloat(totalUsd) || 0,
           stamp_tax: parseFloat(stampTax) || 0,
           lines: reviewLines,
+          upcoming_installments_table: upcomingInstallmentsTable,
         })
       } catch (err) {
         toast.error("No se pudo armar el resumen", {

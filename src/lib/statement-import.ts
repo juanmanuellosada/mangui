@@ -93,6 +93,20 @@ export interface BuildStatementPayloadInput {
   total_amount_usd: number
   stamp_tax: number
   lines: StatementReviewLine[]
+  /**
+   * Tabla "Cuotas a vencer" del PDF (ver ParsedStatement.upcoming_installments
+   * en @/lib/ai/statement-schema), reducida a sólo los montos en el mismo
+   * orden: índice 0 = el resumen leído (cycleOffset 0, no se usa para
+   * corregir nada — el detalle actual ya es la fuente de verdad), índice N =
+   * cycleOffset N. Cuando está presente es la fuente de verdad para el TOTAL
+   * de cuotas proyectadas de cada ciclo FUTURO (ver capInstallmentOffsets):
+   * algunos bancos terminan una cuota antes de lo que
+   * installment_number/installment_total sugieren, y sin este override la
+   * proyección por número queda corrida un mes. Opcional/aditivo: si es
+   * null/undefined o no cubre un ciclo, ese ciclo cae al cálculo por número
+   * (comportamiento previo).
+   */
+  upcoming_installments_table?: number[] | null
 }
 
 export interface StatementImportPayloadLine {
@@ -209,6 +223,51 @@ function dayOfMonthFromISODate(dateStr: string): number {
   return Number(dateStr.slice(8, 10))
 }
 
+/**
+ * Determina, para cada compra en cuotas, hasta qué cycleOffset proyectar una
+ * ocurrencia futura, usando la tabla "Cuotas a vencer" del PDF (cuando está
+ * presente) en vez de asumir que la cuota sigue hasta installment_total.
+ *
+ * La tabla es la fuente de verdad para el TOTAL por ciclo; el detalle (qué
+ * compra puntual termina en qué mes) es una aproximación greedy: en cada
+ * ciclo futuro cubierto por la tabla, si la suma "naive" de cuotas todavía
+ * activas excede el total de la tabla, se van cortando compras —empezando
+ * por las que tienen MENOS cuotas restantes, que son las candidatas más
+ * probables a estar ya dadas de baja por el banco (ver ejemplo real:
+ * ARFINANZAS/PROYECTOKAINO en "5/6" que el banco da por terminadas)— hasta
+ * acercarse al total esperado. Una compra cortada en un ciclo queda cortada
+ * para siempre (una cuota que el banco no cobra no vuelve a aparecer más
+ * adelante). Si la tabla no cubre todos los ciclos que la proyección por
+ * número alcanzaría, esos ciclos siguen con el cálculo por número (fallback).
+ *
+ * Devuelve un Map<purchaseKey, últimoCycleOffset a proyectar>.
+ */
+function capInstallmentOffsets(
+  purchases: { purchaseKey: string; amount: number; naiveLastOffset: number }[],
+  table: number[] | null | undefined
+): Map<string, number> {
+  const capped = new Map<string, number>()
+  for (const p of purchases) capped.set(p.purchaseKey, p.naiveLastOffset)
+  if (!table) return capped
+
+  const EPSILON = 0.01
+  for (let offset = 1; offset < table.length; offset++) {
+    const target = table[offset]
+    const active = purchases.filter((p) => capped.get(p.purchaseKey)! >= offset)
+    const activeSum = Math.round(active.reduce((sum, p) => sum + p.amount, 0) * 100) / 100
+    let excess = Math.round((activeSum - target) * 100) / 100
+    if (excess <= EPSILON) continue
+
+    const sorted = [...active].sort((a, b) => a.naiveLastOffset - b.naiveLastOffset || a.amount - b.amount)
+    for (const p of sorted) {
+      if (excess <= EPSILON) break
+      capped.set(p.purchaseKey, offset - 1)
+      excess = Math.round((excess - p.amount) * 100) / 100
+    }
+  }
+  return capped
+}
+
 interface ExpandedLine {
   /** 0 = el resumen leído; N>0 = el N-ésimo ciclo futuro (un mes por ciclo). */
   cycleOffset: number
@@ -235,6 +294,11 @@ interface ExpandedLine {
  * que ese nuevo cierre, permitiendo reconciliar por
  * purchase_key + installment_number sin duplicar (Tarea 3.6).
  *
+ * El rango N..installment_total a proyectar por compra puede acortarse por
+ * capInstallmentOffsets cuando input.upcoming_installments_table trae la
+ * tabla "Cuotas a vencer" del PDF: esa tabla manda sobre el número de cuota
+ * para el TOTAL de cada ciclo futuro.
+ *
  * Es la única fuente de verdad para clasificación, purchase_key y proyección:
  * tanto buildStatementPayload como groupStatementPreviewByCycle la reusan. Por
  * eso corregir una línea (categoría/descripción/monto/incluir) se propaga
@@ -243,6 +307,19 @@ interface ExpandedLine {
  * StatementReviewLine en el momento de construir el payload/preview.
  */
 function expandReviewLines(input: BuildStatementPayloadInput): ExpandedLine[] {
+  const installmentLines = input.lines.filter((l) => l.selected && classifyLine(l) === "installment")
+  const cappedOffsets = capInstallmentOffsets(
+    installmentLines.map((line) => {
+      const total = line.installment_total!
+      return {
+        purchaseKey: buildPurchaseKey(line.description, line.date, total),
+        amount: line.amount,
+        naiveLastOffset: total - line.installment_number!,
+      }
+    }),
+    input.upcoming_installments_table
+  )
+
   const expanded: ExpandedLine[] = []
   for (const line of input.lines) {
     if (!line.selected) continue
@@ -251,8 +328,10 @@ function expandReviewLines(input: BuildStatementPayloadInput): ExpandedLine[] {
       const n = line.installment_number!
       const total = line.installment_total!
       const purchaseKey = buildPurchaseKey(line.description, line.date, total)
+      const lastOffset = cappedOffsets.get(purchaseKey) ?? total - n
       for (let i = n; i <= total; i++) {
         const cycleOffset = i - n
+        if (cycleOffset > lastOffset) break
         expanded.push({
           cycleOffset,
           kind,

@@ -246,6 +246,67 @@ describe("buildStatementPayload — proyección de cuotas (Tarea 3.2)", () => {
   })
 })
 
+describe("buildStatementPayload / groupStatementPreviewByCycle — tabla 'Cuotas a vencer' del PDF", () => {
+  it("usa la tabla para cortar una compra que el banco da por terminada antes de lo que sugiere el número de cuota (caso Mastercard)", () => {
+    const input = makeInput({
+      lines: [
+        // Figura como 5/6 pero el banco no la trae en la tabla del ciclo siguiente.
+        makeLine({ description: "ARFINANZAS", amount: 1000, installment_number: 5, installment_total: 6 }),
+        makeLine({ description: "Notebook", amount: 2000, installment_number: 1, installment_total: 3 }),
+      ],
+      // offset0 (este resumen) = 3000, offset1 = 2000 (sin ARFINANZAS), offset2 = 2000.
+      upcoming_installments_table: [3000, 2000, 2000],
+    })
+
+    const payload = buildStatementPayload(input)
+    const arfinanzas = payload.installment_purchases.find((p) => p.description === "ARFINANZAS")!
+    const notebook = payload.installment_purchases.find((p) => p.description === "Notebook")!
+
+    // Sólo la cuota leída (5/6): la 6/6 no se proyecta porque el banco no la
+    // trae en la tabla del ciclo siguiente.
+    expect(arfinanzas.installments.map((i) => i.installment_number)).toEqual([5])
+    // Notebook no se ve afectada, sigue proyectando sus 3 cuotas.
+    expect(notebook.installments.map((i) => i.installment_number)).toEqual([1, 2, 3])
+
+    const groups = groupStatementPreviewByCycle(input)
+    expect(groups.map((g) => g.cycleOffset)).toEqual([0, 1, 2])
+    expect(groups[0].totalsByCurrency.ARS).toBe(3000) // ARFINANZAS 5/6 + Notebook 1/3
+    expect(groups[1].totalsByCurrency.ARS).toBe(2000) // sólo Notebook 2/3, coincide con la tabla
+    expect(groups[2].totalsByCurrency.ARS).toBe(2000) // sólo Notebook 3/3
+  })
+
+  it("cae al cálculo por número para los ciclos futuros que la tabla no cubre", () => {
+    const payload = buildStatementPayload(
+      makeInput({
+        lines: [makeLine({ description: "Heladera", amount: 1000, installment_number: 1, installment_total: 5 })],
+        // Sólo cubre offsets 0, 1 y 2; los ciclos 3 y 4 no tienen dato de tabla.
+        upcoming_installments_table: [1000, 1000, 1000],
+      })
+    )
+    const purchase = payload.installment_purchases[0]
+    expect(purchase.installments.map((i) => i.installment_number)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it("sin tabla (o con un solo mes, el del resumen actual) no corta nada — cálculo por número sin cambios (caso VISA)", () => {
+    const withoutTable = buildStatementPayload(
+      makeInput({
+        lines: [makeLine({ installment_number: 2, installment_total: 3, amount: 34253.59 })],
+      })
+    )
+    expect(withoutTable.installment_purchases[0].installments.map((i) => i.installment_number)).toEqual([2, 3])
+
+    const withOnlyCurrentMonth = buildStatementPayload(
+      makeInput({
+        lines: [makeLine({ installment_number: 2, installment_total: 3, amount: 34253.59 })],
+        upcoming_installments_table: [34253.59],
+      })
+    )
+    expect(withOnlyCurrentMonth.installment_purchases[0].installments.map((i) => i.installment_number)).toEqual([
+      2, 3,
+    ])
+  })
+})
+
 describe("buildPurchaseKey (Tarea 3.1)", () => {
   it("es determinística para el mismo comercio/fecha/total de cuotas", () => {
     const key1 = buildPurchaseKey("Notebook Store SA", "2026-06-10", 6)

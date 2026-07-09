@@ -25,6 +25,16 @@ export const parsedStatementLineSchema = z.object({
 
 export type ParsedStatementLine = z.infer<typeof parsedStatementLineSchema>
 
+/** Un mes de la tabla "Cuotas a vencer" del resumen (ver parsedStatementSchema.upcoming_installments). */
+export const upcomingInstallmentEntrySchema = z.object({
+  /** Mes tal como figura en el PDF (ej. "Agosto/26"), sólo informativo. */
+  month: z.string(),
+  /** Total de cuotas a vencer de ese mes. */
+  amount: z.number(),
+})
+
+export type UpcomingInstallmentEntry = z.infer<typeof upcomingInstallmentEntrySchema>
+
 /** Resumen de tarjeta de crédito interpretado por la IA a partir del PDF. */
 export const parsedStatementSchema = z.object({
   bank: z.string().nullable().default(null),
@@ -36,6 +46,17 @@ export const parsedStatementSchema = z.object({
   total_usd: z.number().nullable().default(null),
   stamp_tax: z.number().nullable().default(null),
   lines: z.array(parsedStatementLineSchema),
+  /**
+   * Tabla "Cuotas a vencer" del resumen (si el PDF la trae): un total de
+   * cuotas por mes, en el mismo orden cronológico en que aparece en el PDF.
+   * El PRIMER elemento corresponde al período de ESTE resumen (mismo total
+   * que las cuotas del detalle actual); los siguientes son los meses futuros.
+   * Se usa para que la proyección de cuotas futuras coincida exacto con lo
+   * que el banco va a cobrar (algunos bancos terminan una cuota antes de lo
+   * que installment_number/installment_total sugieren). null si el PDF no
+   * trae esta tabla.
+   */
+  upcoming_installments: z.array(upcomingInstallmentEntrySchema).nullable().default(null),
 })
 
 export type ParsedStatement = z.infer<typeof parsedStatementSchema>
