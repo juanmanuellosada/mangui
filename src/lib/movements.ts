@@ -34,12 +34,17 @@ export const CATEGORIES_KEY = ["categories"] as const
 
 export type MovementsFilterType = "all" | "income" | "expense" | "transfer"
 
+export type MovementsSortField = "date" | "amount"
+export type MovementsSortDir = "asc" | "desc"
+
 export interface MovementsFilter {
   search: string
   type: MovementsFilterType
   date: DateRangeValue
   accountIds: string[]
   categoryIds: string[]
+  sortField: MovementsSortField
+  sortDir: MovementsSortDir
 }
 
 // ── PostgREST `.or()` escaping ────────────────────────────────────────────────
@@ -72,11 +77,12 @@ export async function fetchMovements(
   // type='transfer' → movements query returns empty
   if (filter.type === "transfer") return []
 
+  const ascending = filter.sortDir === "asc"
   let q = supabase
     .from("movements")
     .select("*")
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false })
+    .order(filter.sortField, { ascending })
+    .order("created_at", { ascending })
     .limit(200)
 
   // Date range
@@ -142,11 +148,13 @@ export async function fetchTransfers(
   if (filter.type === "income" || filter.type === "expense") return []
   if (filter.categoryIds.length > 0) return []
 
+  const ascending = filter.sortDir === "asc"
+  const sortColumn = filter.sortField === "amount" ? "from_amount" : "date"
   let q = supabase
     .from("transfers")
     .select("*")
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false })
+    .order(sortColumn, { ascending })
+    .order("created_at", { ascending })
     .limit(200)
 
   // Date range
@@ -209,5 +217,7 @@ export function filterKey(filter: MovementsFilter): string {
     dt: filter.date.to,
     a: [...filter.accountIds].sort(),
     c: [...filter.categoryIds].sort(),
+    sf: filter.sortField,
+    sd: filter.sortDir,
   })
 }

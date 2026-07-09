@@ -20,6 +20,7 @@ import {
   X,
   ChevronDown,
   LayoutList,
+  ArrowUpDown,
   TrendingUp,
   TrendingDown,
   Scale,
@@ -133,6 +134,28 @@ function defaultFilter(): MovementsFilter {
     date: defaultDateRange(),
     accountIds: [],
     categoryIds: [],
+    sortField: "date",
+    sortDir: "desc",
+  }
+}
+
+/** Amount used to compare FeedItems for "sort by amount" — movements use `amount`, transfers use `from_amount`. */
+function feedItemAmount(fi: FeedItem): number {
+  return fi.kind === "movement" ? fi.item.amount : fi.item.from_amount
+}
+
+/** Comparator for FeedItems honoring the active sort field/direction, with created_at as tie-break. */
+function makeFeedComparator(sortField: MovementsFilter["sortField"], sortDir: MovementsFilter["sortDir"]) {
+  const dirMul = sortDir === "asc" ? 1 : -1
+  return (a: FeedItem, b: FeedItem) => {
+    if (sortField === "amount") {
+      const diff = feedItemAmount(a) - feedItemAmount(b)
+      if (diff !== 0) return diff * dirMul
+    } else {
+      const dateDiff = a.item.date.localeCompare(b.item.date)
+      if (dateDiff !== 0) return dateDiff * dirMul
+    }
+    return a.item.created_at.localeCompare(b.item.created_at) * dirMul
   }
 }
 
@@ -1328,6 +1351,15 @@ const TYPE_OPTIONS: { value: MovementsFilterType; label: string }[] = [
   { value: "transfer", label: "Transferencias" },
 ]
 
+type SortOption = "date-desc" | "date-asc" | "amount-desc" | "amount-asc"
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "date-desc", label: "Fecha (más nueva primero)" },
+  { value: "date-asc", label: "Fecha (más vieja primero)" },
+  { value: "amount-desc", label: "Mayor monto primero" },
+  { value: "amount-asc", label: "Menor monto primero" },
+]
+
 interface MovementsFilterBarProps {
   filter: MovementsFilter
   onChange: (f: MovementsFilter) => void
@@ -1373,8 +1405,10 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
   })
 
   function loadView(view: SavedView) {
-    const f = view.filters as unknown as MovementsFilter
-    onChange(f)
+    // Merge over defaultFilter() so saved views from before a filter field existed
+    // (e.g. sortField/sortDir) fall back to sane defaults instead of `undefined`.
+    const f = view.filters as unknown as Partial<MovementsFilter>
+    onChange({ ...defaultFilter(), ...f })
   }
 
   const accountOptions = accounts.map((a) => ({
@@ -1461,6 +1495,21 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
             onChange={(v) => onGroupByChange(v as GroupBy)}
             options={GROUP_BY_OPTIONS}
             aria-label="Agrupar movimientos"
+          />
+        </div>
+        <div className="space-y-1.5 w-full lg:w-52 lg:shrink-0">
+          <Label className="text-xs flex items-center gap-1">
+            <ArrowUpDown className="h-3 w-3" aria-hidden />
+            Ordenar
+          </Label>
+          <MangoSelect
+            value={`${filter.sortField}-${filter.sortDir}`}
+            onChange={(v) => {
+              const [sortField, sortDir] = v.split("-") as [MovementsFilter["sortField"], MovementsFilter["sortDir"]]
+              onChange({ ...filter, sortField, sortDir })
+            }}
+            options={SORT_OPTIONS}
+            aria-label="Ordenar movimientos"
           />
         </div>
         <div className="space-y-1.5 w-full lg:w-44 lg:shrink-0">
@@ -1793,13 +1842,13 @@ export function MovementsList() {
 
   // ── Build grouped feed parametrized by groupBy ───────────────────────────
   const groupedFeed = useMemo<{ key: string; label: string; items: FeedItem[] }[]>(() => {
+    const cmp = makeFeedComparator(filter.sortField, filter.sortDir)
+    // Group order for day/month follows sortDir: desc = newest group first (previous default), asc = oldest first
+    const groupDirMul = filter.sortDir === "asc" ? 1 : -1
+
     if (groupBy === "none") {
-      // Flat list — still sorted desc; return a single pseudo-group with no label
-      const sorted = [...feed].sort((a, b) => {
-        const dateDiff = b.item.date.localeCompare(a.item.date)
-        if (dateDiff !== 0) return dateDiff
-        return b.item.created_at.localeCompare(a.item.created_at)
-      })
+      // Flat list — sorted by the active sort field/direction; single pseudo-group with no label
+      const sorted = [...feed].sort(cmp)
       return sorted.length > 0 ? [{ key: "__flat__", label: "", items: sorted }] : []
     }
 
@@ -1811,11 +1860,11 @@ export function MovementsList() {
         map.get(day)!.push(fi)
       }
       return [...map.entries()]
-        .sort((a, b) => b[0].localeCompare(a[0]))
+        .sort((a, b) => a[0].localeCompare(b[0]) * groupDirMul)
         .map(([key, items]) => ({
           key,
           label: formatDayLabel(items[0].item.date),
-          items,
+          items: [...items].sort(cmp),
         }))
     }
 
@@ -1828,11 +1877,11 @@ export function MovementsList() {
         map.get(monthKey)!.push(fi)
       }
       return [...map.entries()]
-        .sort((a, b) => b[0].localeCompare(a[0]))
+        .sort((a, b) => a[0].localeCompare(b[0]) * groupDirMul)
         .map(([key, items]) => {
           const d = parseISO(key + "-01")
           const label = format(d, "MMMM yyyy", { locale: es })
-          return { key, label: label.charAt(0).toUpperCase() + label.slice(1), items }
+          return { key, label: label.charAt(0).toUpperCase() + label.slice(1), items: [...items].sort(cmp) }
         })
     }
 
@@ -1855,7 +1904,7 @@ export function MovementsList() {
           if (key === "__transfer__") label = "Transferencias"
           else if (key === "__none__") label = "Sin categoría"
           else label = categoryMap.get(key)?.name ?? "Sin categoría"
-          return { key, label, items }
+          return { key, label, items: [...items].sort(cmp) }
         })
     }
 
@@ -1877,12 +1926,12 @@ export function MovementsList() {
           let label: string
           if (key === "__transfer__") label = "Transferencias"
           else label = accountMap.get(key)?.name ?? "—"
-          return { key, label, items }
+          return { key, label, items: [...items].sort(cmp) }
         })
     }
 
     return []
-  }, [feed, groupBy, accountMap, categoryMap])
+  }, [feed, groupBy, accountMap, categoryMap, filter.sortField, filter.sortDir])
 
   const totalItems = feed.length
 
