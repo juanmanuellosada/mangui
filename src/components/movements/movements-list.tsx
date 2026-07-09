@@ -340,6 +340,22 @@ function TransferDetailSheet({
   )
 }
 
+// ── Date chip (day/month, shown on every row) ─────────────────────────────────
+
+function RowDateChip({ date }: { date: string }) {
+  const d = parseISO(date)
+  return (
+    <div className="flex flex-col items-center justify-center w-8 md:w-9 flex-shrink-0 leading-none">
+      <span className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase">
+        {format(d, "MMM", { locale: es })}
+      </span>
+      <span className="text-sm md:text-base font-bold tabular-nums">
+        {format(d, "d")}
+      </span>
+    </div>
+  )
+}
+
 // ── Movement row ──────────────────────────────────────────────────────────────
 
 const MAX_ROW_TAGS = 3
@@ -407,6 +423,8 @@ function MovementRow({
         </div>
       )}
 
+      <RowDateChip date={movement.date} />
+
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap min-w-0">
@@ -430,9 +448,14 @@ function MovementRow({
             </Link>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground truncate">
-          {account?.name ?? "—"}
-          {movement.note ? ` · ${movement.note}` : ""}
+        <p className="text-[11px] md:text-xs text-muted-foreground truncate">
+          <span className="md:text-foreground/70">{account?.name ?? "—"}</span>
+          {movement.note ? (
+            <>
+              <span className="mx-1">·</span>
+              <span className="md:text-foreground/90 md:font-medium">{movement.note}</span>
+            </>
+          ) : null}
         </p>
         {movement.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
@@ -556,6 +579,8 @@ function TransferRow({
         </div>
       )}
 
+      <RowDateChip date={transfer.date} />
+
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
@@ -566,9 +591,14 @@ function TransferRow({
             <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground truncate">
-          {fromAccount?.name ?? "—"} → {toAccount?.name ?? "—"}
-          {transfer.note ? ` · ${transfer.note}` : ""}
+        <p className="text-[11px] md:text-xs text-muted-foreground truncate">
+          <span className="md:text-foreground/70">{fromAccount?.name ?? "—"} → {toAccount?.name ?? "—"}</span>
+          {transfer.note ? (
+            <>
+              <span className="mx-1">·</span>
+              <span className="md:text-foreground/90 md:font-medium">{transfer.note}</span>
+            </>
+          ) : null}
         </p>
       </div>
 
