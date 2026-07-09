@@ -26,6 +26,7 @@ import {
   Scale,
   Hash,
   Divide,
+  Check,
   type LucideIcon,
 } from "lucide-react"
 import { useMultiSelect } from "@/hooks/use-multi-select"
@@ -1411,6 +1412,15 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
     onChange({ ...defaultFilter(), ...f })
   }
 
+  // Vista activa vs. filtro por defecto vs. filtros sin guardar (para el indicador de "Vistas")
+  const currentKey = filterKey(filter)
+  const defaultKey = filterKey(defaultFilter())
+  const isDefault = currentKey === defaultKey
+  const activeView = savedViews.find(
+    (v) =>
+      filterKey({ ...defaultFilter(), ...(v.filters as unknown as Partial<MovementsFilter>) }) === currentKey
+  )
+
   const accountOptions = accounts.map((a) => ({
     value: a.id,
     label: a.name,
@@ -1601,23 +1611,36 @@ function MovementsFilterBar({ filter, onChange, accounts, categories, groupBy, o
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border border-input bg-background">
             <Bookmark className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Vistas</span>
-            {savedViews.length > 0 && (
-              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">
-                {savedViews.length}
-              </span>
+            {activeView ? (
+              <span className="max-w-[8rem] truncate text-foreground">{activeView.name}</span>
+            ) : (
+              <>
+                <span className="hidden sm:inline">Vistas</span>
+                {savedViews.length > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">
+                    {savedViews.length}
+                  </span>
+                )}
+              </>
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
+            <div className="px-3 py-1.5 text-[11px] text-muted-foreground">
+              {activeView ? `Vista actual: ${activeView.name}` : isDefault ? "Vista por defecto" : "Filtros sin guardar"}
+            </div>
             {savedViews.length === 0 && (
               <div className="px-3 py-2 text-xs text-muted-foreground">Sin vistas guardadas</div>
             )}
             {savedViews.map((view) => (
               <div key={view.id} className="flex items-center gap-1 px-1">
                 <DropdownMenuItem
-                  className="flex-1"
+                  className={cn(
+                    "flex-1 gap-1.5",
+                    view.id === activeView?.id && "bg-primary/10 text-primary font-medium"
+                  )}
                   onClick={() => loadView(view)}
                 >
+                  {view.id === activeView?.id && <Check className="h-3.5 w-3.5 shrink-0" />}
                   <span className="truncate">{view.name}</span>
                 </DropdownMenuItem>
                 <button
