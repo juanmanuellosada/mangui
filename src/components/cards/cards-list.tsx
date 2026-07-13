@@ -44,15 +44,16 @@ import {
   listStatementAttachments,
   type MovementAttachment,
 } from "@/lib/attachments"
-import { ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
+import { ACCOUNTS_KEY, BALANCES_KEY, TRANSFERS_KEY, MOVEMENTS_KEY } from "@/lib/movements"
 import { RECURRING_KEY } from "@/lib/recurring"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { InstallmentDetailBody } from "@/components/installments/installment-detail"
 import { EditMovementDialog } from "@/components/movements/movements-list"
-import type { Tables } from "@/lib/database.types"
+import type { Tables, Json } from "@/lib/database.types"
 import { format, parseISO, isBefore, startOfDay } from "date-fns"
+import { todayAR } from "@/lib/date-utils"
 import { es } from "date-fns/locale"
 import { useQuickAdd } from "@/components/quick-add-provider"
 import { useIsDemo } from "@/lib/use-is-demo"
@@ -321,13 +322,31 @@ function RegisterPaymentDialog({
   )
 
   // State — single-currency (reuses the ARS slot; currency overridden by singleCurrency)
+  // El default SOLO debe considerar cuentas de la moneda del ciclo (singleCurrency):
+  // una cuenta de otra moneda como origen viola check_movement_converted_amount
+  // (tramo USD) o descuenta el monto en la moneda equivocada en account_balances
+  // (tramo ARS, ver 0007_views.sql — from_amount/to_amount no se convierten).
   const [paidAmountSingle, setPaidAmountSingle] = useState(initialSingle)
-  const [paidFromAccountIdSingle, setPaidFromAccountIdSingle] = useState(
-    () => cycle.statement?.paid_from_account_id ??
-      allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito")?.id ?? ""
-  )
+  const [paidFromAccountIdSingle, setPaidFromAccountIdSingle] = useState(() => {
+    // Al reabrir un pago ya hecho, restaurar la cuenta de origen del lado
+    // que corresponda (USD o ARS) según la moneda del ciclo — no siempre
+    // paid_from_account_id (ARS), o un ciclo USD-puro ya pagado perdía la
+    // cuenta USD que se había usado. Si el id restaurado no es una cuenta
+    // existente de la moneda correcta, queda en "Sin especificar" en vez
+    // de asumir cualquier otra cuenta.
+    const restoredId = singleCurrency === "USD"
+      ? cycle.statement?.paid_from_account_id_usd
+      : cycle.statement?.paid_from_account_id
+    if (restoredId != null) {
+      return allAccounts.find((a) => a.id === restoredId && a.currency === singleCurrency)?.id ?? ""
+    }
+    return allAccounts.find((a) => a.id !== account.id && a.type !== "tarjeta_credito" && a.currency === singleCurrency)?.id ?? ""
+  })
 
-  const [paidDate, setPaidDate] = useState<Date>(new Date())
+  // Default a "hoy" en horario argentino — new Date() + un corte en UTC
+  // (como hacía toDateString) marca el día siguiente entre las 21 y las
+  // 24hs en AR (UTC-3).
+  const [paidDate, setPaidDate] = useState<Date>(() => parseISO(todayAR()))
   const [pendingResumen, setPendingResumen] = useState<File | null>(null)
   const [pendingComprobante, setPendingComprobante] = useState<File | null>(null)
   const [existingResumen, setExistingResumen] = useState<MovementAttachment | null>(null)
@@ -340,6 +359,9 @@ function RegisterPaymentDialog({
   )
   const arsAccounts = nonCardAccounts.filter((a) => a.currency === "ARS")
   const usdAccounts = nonCardAccounts.filter((a) => a.currency === "USD")
+  // Modo mono-moneda: el select "Pagado desde" solo debe ofrecer cuentas de
+  // la moneda del ciclo (mismo criterio que arsAccounts/usdAccounts arriba).
+  const singleCurrencyAccounts = nonCardAccounts.filter((a) => a.currency === singleCurrency)
 
   // Load existing attachments when viewing an already-paid cycle
   const statementId = cycle.statement?.id
@@ -364,19 +386,20 @@ function RegisterPaymentDialog({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("No autenticado")
 
-      const paidDateStr = toDateString(paidDate)
+      // Fecha AR elegida por el usuario — format() usa los componentes
+      // locales del Date (no corta en UTC como toDateString), así que no
+      // se corre un día entre las 21 y las 24hs en Argentina (UTC-3).
+      const paidDateStr = format(paidDate, "yyyy-MM-dd")
 
-      // Build the upsert payload depending on single vs multi-currency
-      const upsertPayload = isMultiCurrency
+      // Build the payment payload depending on single vs multi-currency
+      const payload = isMultiCurrency
         ? {
-            user_id: user.id,
             account_id: account.id,
             close_date: cycle.closeDate,
             due_date: cycle.dueDate ?? cycle.closeDate,
             total_amount: arsCycleTotal,
             total_amount_usd: usdCycleTotal,
             stamp_tax: cycle.statement?.stamp_tax ?? 0,
-            status: "pagado",
             paid_amount: parseFloat(paidAmountARS) || arsCycleTotal,
             paid_from_account_id: paidFromAccountIdARS || null,
             paid_amount_usd: parseFloat(paidAmountUSD) || usdCycleTotal,
@@ -384,14 +407,12 @@ function RegisterPaymentDialog({
             paid_date: paidDateStr,
           }
         : {
-            user_id: user.id,
             account_id: account.id,
             close_date: cycle.closeDate,
             due_date: cycle.dueDate ?? cycle.closeDate,
             total_amount: singleCurrency === "ARS" ? singleCycleTotal : 0,
             total_amount_usd: singleCurrency === "USD" ? singleCycleTotal : 0,
             stamp_tax: cycle.statement?.stamp_tax ?? 0,
-            status: "pagado",
             paid_amount: singleCurrency === "ARS" ? (parseFloat(paidAmountSingle) || singleCycleTotal) : null,
             paid_from_account_id: singleCurrency === "ARS" ? (paidFromAccountIdSingle || null) : null,
             paid_amount_usd: singleCurrency === "USD" ? (parseFloat(paidAmountSingle) || singleCycleTotal) : null,
@@ -399,14 +420,17 @@ function RegisterPaymentDialog({
             paid_date: paidDateStr,
           }
 
-      const { data: stmt, error } = await supabase
-        .from("card_statements")
-        .upsert(upsertPayload, { onConflict: "account_id,close_date" })
-        .select()
-        .single()
+      // RPC atómica: upsert del statement + transferencia ARS + gasto USD +
+      // link de ids, todo en una sola transacción en el servidor (valida
+      // moneda de las cuentas de origen y limpia transfer/movement previos
+      // antes de crear los nuevos). Ver 0057_card_payment_transfers.sql.
+      const { data, error } = await supabase.rpc("pay_card_statement", {
+        p_payload: payload as unknown as Json,
+      })
       if (error) throw error
 
-      const newStatementId = stmt.id
+      const newStatementId = (data as { statement_id: string } | null)?.statement_id
+      if (!newStatementId) throw new Error("No se pudo registrar el pago")
 
       // Upload pending attachments
       const uploads: Array<{ file: File; kind: "resumen" | "comprobante" }> = []
@@ -429,6 +453,8 @@ function RegisterPaymentDialog({
       queryClient.invalidateQueries({ queryKey: CARD_STATEMENTS_KEY })
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      queryClient.invalidateQueries({ queryKey: TRANSFERS_KEY })
+      queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
       toast.success("Pago registrado")
       onOpenChange(false)
     },
@@ -548,7 +574,7 @@ function RegisterPaymentDialog({
                 />
               </div>
 
-              {nonCardAccounts.length > 0 && (
+              {singleCurrencyAccounts.length > 0 && (
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground font-medium">Pagado desde</Label>
                   <MangoSelect
@@ -556,7 +582,7 @@ function RegisterPaymentDialog({
                     onChange={(v) => setPaidFromAccountIdSingle(v ?? "")}
                     options={[
                       { value: "", label: "Sin especificar" },
-                      ...nonCardAccounts.map((a) => ({
+                      ...singleCurrencyAccounts.map((a) => ({
                         value: a.id,
                         label: a.name,
                         leading: <AccountIconChip icon={a.icon} />,

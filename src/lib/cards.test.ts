@@ -485,6 +485,8 @@ describe("listCardCycles — agrupación de movimientos importados por resumen",
       paid_date: null,
       paid_from_account_id: null,
       paid_from_account_id_usd: null,
+      transfer_id: null,
+      paid_movement_id_usd: null,
     }
   }
 

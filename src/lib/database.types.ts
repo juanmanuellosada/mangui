@@ -83,6 +83,7 @@ export type Database = {
           paid_date: string | null
           paid_from_account_id: string | null
           paid_from_account_id_usd: string | null
+          paid_movement_id_usd: string | null
           stamp_tax: number
           status: string
           total_amount: number
@@ -103,6 +104,7 @@ export type Database = {
           paid_date?: string | null
           paid_from_account_id?: string | null
           paid_from_account_id_usd?: string | null
+          paid_movement_id_usd?: string | null
           stamp_tax?: number
           status?: string
           total_amount?: number
@@ -123,6 +125,7 @@ export type Database = {
           paid_date?: string | null
           paid_from_account_id?: string | null
           paid_from_account_id_usd?: string | null
+          paid_movement_id_usd?: string | null
           stamp_tax?: number
           status?: string
           total_amount?: number
@@ -193,6 +196,13 @@ export type Database = {
             columns: ["paid_from_account_id_usd"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statements_paid_movement_id_usd_fkey"
+            columns: ["paid_movement_id_usd"]
+            isOneToOne: false
+            referencedRelation: "movements"
             referencedColumns: ["id"]
           },
           {
@@ -1482,6 +1492,10 @@ export type Database = {
         Returns: boolean
       }
       import_card_statement: {
+        Args: { p_payload: Json }
+        Returns: Json
+      }
+      pay_card_statement: {
         Args: { p_payload: Json }
         Returns: Json
       }

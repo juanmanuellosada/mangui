@@ -512,6 +512,8 @@ interface CycleStatement {
   paid_date: string | null
   paid_from_account_id: string | null
   paid_from_account_id_usd: string | null
+  transfer_id: string | null
+  paid_movement_id_usd: string | null
 }
 
 export interface CardCycle {
