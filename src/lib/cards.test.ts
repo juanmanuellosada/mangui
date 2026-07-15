@@ -253,10 +253,10 @@ describe("nextCardPayment — fallback sin statements (cierra día 2, vence día
     expect(amount).toBe(1000)
   })
 
-  it("hoy después del vencimiento (13-jul) ya vencido → rueda al vencimiento del ciclo abierto (13-ago)", () => {
+  it("hoy después del vencimiento (13-jul) ya vencido → sigue mostrando ese mismo vencimiento (no rueda al mes siguiente, igual que Tarjetas: queda 'vencido' hasta pagarse)", () => {
     const ref = new Date(2026, 6, 20) // 20 de julio 2026
     const { dueDate } = nextCardPayment("card-1", account, [], movements, ref)
-    expect(dueDate).toBe("2026-08-13")
+    expect(dueDate).toBe("2026-07-13")
   })
 
   it("amount y dueDate corresponden al mismo ciclo mientras el vencimiento del ciclo cerrado siga vigente", () => {
@@ -437,15 +437,6 @@ describe("nextCardPayment — fallback: neteo de reintegros", () => {
 describe("nextCardPayment — amountUSD", () => {
   const account = { closing_date: "2020-01-02", due_date: "2020-01-13", currency: "ARS" }
 
-  it("usa el total_amount_usd del resumen pendiente cuando hay uno ya cerrado", () => {
-    const statements = [
-      { account_id: "card-1", total_amount: 411588.27, total_amount_usd: 215, due_date: "2026-07-13", close_date: "2026-07-02" },
-    ]
-    const ref = new Date(2026, 6, 6) // 6 de julio 2026
-    const { amountUSD } = nextCardPayment("card-1", account, statements, [], ref)
-    expect(amountUSD).toBe(215)
-  })
-
   it("fallback: suma el subtotal nativo de los movimientos en USD del ciclo cerrado, sin convertir", () => {
     const movements = [
       { account_id: "card-1", type: "expense", date: "2026-06-15", amount: 1000, converted_amount: null, original_currency: "ARS" },
@@ -464,6 +455,86 @@ describe("nextCardPayment — amountUSD", () => {
     const ref = new Date(2026, 6, 6)
     const { amountUSD } = nextCardPayment("card-1", account, [], movements, ref)
     expect(amountUSD).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// nextCardPayment — delega en listCardCycles + defaultCycleIndex (Bug: Cuentas
+// mostraba un monto viejo del resumen guardado apenas se editaban cierre/
+// vencimiento, porque su propio algoritmo confiaba en el total_amount
+// guardado de cualquier resumen "cerrado" sin chequear si sus fechas seguían
+// alineadas con el ciclo recalculado. Ahora usa el mismo ciclo que Tarjetas).
+// ---------------------------------------------------------------------------
+describe("nextCardPayment — resumen matcheado por close_date", () => {
+  const account = { closing_date: "2020-01-02", due_date: "2020-01-13", currency: "ARS" }
+  const movements = [
+    { account_id: "card-1", type: "expense", date: "2026-06-15", amount: 1000, converted_amount: null, original_currency: "ARS" },
+  ]
+  const ref = new Date(2026, 6, 6) // 6 de julio 2026 — mismo ciclo que el resto de este describe (cierre 2026-07-02)
+
+  it("resumen PENDIENTE: usa el total EN VIVO del ciclo, no el total guardado (aunque las fechas coincidan)", () => {
+    const statements = [
+      { account_id: "card-1", total_amount: 999999, total_amount_usd: 999, due_date: "2026-07-13", close_date: "2026-07-02", status: "pendiente" },
+    ]
+    const { amount, amountUSD, dueDate } = nextCardPayment("card-1", account, statements, movements, ref)
+    expect(amount).toBe(1000) // el del movimiento real, no 999999
+    expect(amountUSD).toBe(0)
+    expect(dueDate).toBe("2026-07-13")
+  })
+
+  it("resumen PAGADO: usa el total_amount guardado (no el ciclo, que puede haber cambiado desde que se pagó)", () => {
+    const statements = [
+      { account_id: "card-1", total_amount: 1000, total_amount_usd: 0, due_date: "2026-07-13", close_date: "2026-07-02", status: "pagado" },
+    ]
+    const { amount, dueDate } = nextCardPayment("card-1", account, statements, movements, ref)
+    expect(amount).toBe(1000)
+    expect(dueDate).toBe("2026-07-13")
+  })
+})
+
+describe("nextCardPayment — parity con listCardCycles/defaultCycleIndex tras editar cierre/vencimiento", () => {
+  it("un resumen guardado con las fechas VIEJAS ya no matchea el ciclo recalculado con las fechas nuevas → nextCardPayment usa el total en vivo del ciclo actual, no el total viejo guardado", () => {
+    // Antes de editar: cierre día 15, vencimiento día 25 — un resumen ya se
+    // había generado para ese ciclo viejo (cierre 2026-06-15).
+    const staleStatement = {
+      account_id: "card-1",
+      total_amount: 50000,
+      total_amount_usd: 0,
+      due_date: "2026-06-25",
+      close_date: "2026-06-15",
+      status: "pendiente",
+    }
+    // Después de editar: cierre día 20, vencimiento día 28 — el ciclo se
+    // recalcula con las fechas nuevas (Tarea del bug: Tarjetas ya hace esto
+    // via listCardCycles; Cuentas debe coincidir).
+    const account = { closing_date: "2026-01-20", due_date: "2026-01-28", currency: "ARS" }
+    const movements = [
+      { account_id: "card-1", type: "expense", date: "2026-06-10", amount: 30000, converted_amount: null, original_currency: "ARS" },
+    ]
+    const ref = new Date(2026, 6, 1) // 1 de julio 2026 — el ciclo nuevo (cierre 2026-06-20) ya cerró
+
+    const payment = nextCardPayment("card-1", account, [staleStatement], movements, ref)
+
+    // Referencia independiente: lo que Tarjetas mostraría para este mismo
+    // ciclo, calculado directamente con listCardCycles + defaultCycleIndex.
+    const cycles = listCardCycles(
+      "card-1",
+      account,
+      movements.map((m) => ({ ...m, id: "m1" })),
+      [{ ...staleStatement, id: "stmt-1", stamp_tax: 0, paid_amount: null, paid_amount_usd: null, paid_date: null, paid_from_account_id: null, paid_from_account_id_usd: null, transfer_id: null, paid_movement_id_usd: null }],
+      ref
+    )
+    const expectedCycle = cycles[defaultCycleIndex(cycles, ref)]
+
+    expect(payment.amount).toBe(expectedCycle.total)
+    expect(payment.amountUSD).toBe(expectedCycle.totalsByCurrency.USD)
+    expect(payment.dueDate).toBe(expectedCycle.dueDate)
+
+    // El resumen viejo (cierre 15) no matchea el ciclo nuevo (cierre 20) —
+    // nextCardPayment ya no debe devolver su total guardado (50000).
+    expect(payment.amount).toBe(30000)
+    expect(payment.amount).not.toBe(staleStatement.total_amount)
+    expect(payment.dueDate).toBe("2026-06-28")
   })
 })
 

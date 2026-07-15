@@ -1,7 +1,6 @@
 import {
   addMonths,
   subMonths,
-  subDays,
   getDaysInMonth,
   parseISO,
   isAfter,
@@ -100,105 +99,95 @@ function signedAmount(type: string, amount: number): number {
 
 /**
  * Returns the next card payment details for a given credit card account.
- * "A pagar" = the already-closed statement with the nearest due date.
- *
- * Logic:
- *  1. Look for the earliest pending statement with close_date <= ref (already closed).
- *  2. If none, sum the last closed cycle's movements as a fallback (expenses
- *     minus refunds — no import_statement_id grouping needed here, see comment
- *     inline: any statement that would qualify is already caught by step 1).
+ * "A pagar" = whatever cycle `defaultCycleIndex` picks out of
+ * `listCardCycles` — the exact same algorithm the Tarjetas view
+ * (`CardBlock` in cards-list.tsx) uses. Used to run its own statement-first
+ * algorithm (oldest pending statement with close_date <= today, trusting its
+ * stored total), which went stale whenever a card's closing/due dates were
+ * edited: the stored statement's close_date stopped matching the recomputed
+ * cycle boundaries, but this function kept using it anyway. Delegating
+ * guarantees this always agrees with what Tarjetas shows.
  *
  * @param accountId   The account's UUID.
  * @param account     The account row (needs closing_date / due_date).
- * @param statements  All pending card_statements (pre-filtered to "pendiente").
+ * @param statements  card_statements for this account — ideally the full
+ *                     history (any status), like Tarjetas fetches. A
+ *                     "pendiente"-only list still works, it just can't tell
+ *                     a paid cycle apart from one with no stored statement.
  * @param movements   All movements (e.g. from fetchAllMovements).
  * @param ref         Optional reference date (defaults to today).
+ * @param recurrings  Recurrentes de tarjeta activas de esta cuenta — sólo
+ *                     afectan el ciclo EN CURSO (abierto); si el ciclo por
+ *                     default es uno ya cerrado no importan (ver
+ *                     projectRecurringsForCycle). Opcional, default [].
  * @returns           { amount: number (positive, in the card's native currency),
  *                      dueDate: string | null (ISO date),
  *                      amountUSD: number (subtotal nativo en USD del mismo
- *                      ciclo/resumen, sin conversión — 0 si no hay consumos
- *                      en dólares) }
+ *                      ciclo, sin conversión — 0 si no hay consumos en
+ *                      dólares) }
  */
 export function nextCardPayment(
   accountId: string,
   account: CardPaymentAccount,
   statements: CardPaymentStatement[],
   movements: CardPaymentMovement[],
-  ref?: Date
+  ref?: Date,
+  recurrings: CardRecurring[] = []
 ): { amount: number; dueDate: string | null; amountUSD: number } {
-  const refDate = startOfDay(ref ?? new Date())
-  const refStr = toDateString(refDate)
-
-  // 1. Nearest pending statement that has already closed (close_date <= today)
-  const closedPending = statements
-    .filter((s) => s.account_id === accountId && s.close_date <= refStr)
-    .sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null
-
-  if (closedPending) {
+  // Adaptar al shape que espera listCardCycles — los callers reales pasan
+  // filas completas de la DB (superset de CardPaymentStatement/Movement);
+  // callers con un select más angosto (p. ej. ai/tools.ts) reciben defaults
+  // seguros para los campos que no piden: `id` sólo importa para el
+  // agrupamiento de movimientos importados (importedStatementCloseDate), que
+  // ya es un no-op ahí porque esos mismos callers tampoco piden
+  // import_statement_id; `status` ausente se asume "pendiente" (que es
+  // exactamente lo que ai/tools.ts ya filtra en su propia query).
+  const cycleStatements: CycleStatement[] = statements.map((s) => {
+    const extra: Partial<CycleStatement> = s
     return {
-      amount: closedPending.total_amount,
-      dueDate: closedPending.due_date,
-      amountUSD: closedPending.total_amount_usd,
+      id: extra.id ?? `${s.account_id}|${s.close_date}`,
+      account_id: s.account_id,
+      close_date: s.close_date,
+      due_date: s.due_date,
+      status: extra.status ?? "pendiente",
+      total_amount: s.total_amount,
+      total_amount_usd: s.total_amount_usd,
+      stamp_tax: extra.stamp_tax ?? 0,
+      paid_amount: extra.paid_amount ?? null,
+      paid_amount_usd: extra.paid_amount_usd ?? null,
+      paid_date: extra.paid_date ?? null,
+      paid_from_account_id: extra.paid_from_account_id ?? null,
+      paid_from_account_id_usd: extra.paid_from_account_id_usd ?? null,
+      transfer_id: extra.transfer_id ?? null,
+      paid_movement_id_usd: extra.paid_movement_id_usd ?? null,
     }
+  })
+
+  const cycleMovements: CycleMovement[] = movements.map((m, i) => {
+    const extra: Partial<CycleMovement> = m
+    return {
+      id: extra.id ?? `m-${i}`,
+      account_id: m.account_id,
+      type: m.type,
+      date: m.date,
+      amount: m.amount,
+      converted_amount: m.converted_amount ?? null,
+      original_currency: m.original_currency ?? null,
+      import_statement_id: extra.import_statement_id ?? null,
+    }
+  })
+
+  const cycles = listCardCycles(accountId, account, cycleMovements, cycleStatements, ref, recurrings)
+  if (cycles.length === 0) return { amount: 0, dueDate: null, amountUSD: 0 }
+
+  const cycle = cycles[defaultCycleIndex(cycles, ref)]
+  const isPaid = cycle.statement?.status === "pagado"
+
+  return {
+    amount: isPaid ? (cycle.statement?.total_amount ?? cycle.total) : cycle.total,
+    dueDate: cycle.dueDate,
+    amountUSD: cycle.totalsByCurrency.USD,
   }
-
-  // 2. Fallback: sum the last CLOSED cycle from movements (not the open cycle)
-  const closingDate = account.closing_date
-  if (closingDate == null) {
-    return { amount: 0, dueDate: null, amountUSD: 0 }
-  }
-  const closingDay = dayOfMonth(closingDate)
-
-  // Determine the last closed cycle: go one day before the current open cycle start
-  const open = currentCycleRange(closingDay, refDate)
-  const prevRef = subDays(open.cycleStart, 1)
-  const closed = currentCycleRange(closingDay, prevRef)
-
-  // No se aplica acá el agrupamiento por import_statement_id (ver
-  // importedStatementCloseDate/listCardCycles): cualquier resumen cuyo
-  // close_date coincidiera con el de este ciclo cerrado (closedCloseDateStr,
-  // siempre <= refStr) también cumpliría el filtro de closedPending arriba
-  // (close_date <= refStr) y ya habría sido devuelto por la rama 1 — la
-  // rama 1 intercepta siempre antes de llegar acá, así que agrupar por
-  // import_statement_id en este fallback sería código inalcanzable.
-  const closedTotal = movements
-    .filter(
-      (m) =>
-        m.account_id === accountId &&
-        (m.type === "expense" || m.type === "income") &&
-        isInCycle(m.date, closed.cycleStart, closed.cycleEnd)
-    )
-    .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
-
-  // Subtotal nativo en USD del mismo ciclo (monto original, sin conversión —
-  // mismo criterio que totalsByCurrency en listCardCycles).
-  const closedTotalUSD = movements
-    .filter(
-      (m) =>
-        m.account_id === accountId &&
-        (m.type === "expense" || m.type === "income") &&
-        m.original_currency === "USD" &&
-        isInCycle(m.date, closed.cycleStart, closed.cycleEnd)
-    )
-    .reduce((sum, m) => sum + signedAmount(m.type, m.amount), 0)
-
-  const dueDay = account.due_date != null ? dayOfMonth(account.due_date) : null
-  // The due date shown must match the cycle whose amount we're showing
-  // (closedTotal, from the last CLOSED cycle). If that due date hasn't
-  // passed yet, show it — only roll to the open cycle's due date once
-  // the closed cycle's payment is actually overdue.
-  const dueDate =
-    dueDay != null
-      ? (() => {
-          const closedDueDate = computeDueDate(closed.cycleEnd, dueDay, closingDay)
-          const dueDateToShow = isBefore(closedDueDate, refDate)
-            ? computeDueDate(open.cycleEnd, dueDay, closingDay)
-            : closedDueDate
-          return toDateString(dueDateToShow)
-        })()
-      : null
-
-  return { amount: closedTotal, dueDate, amountUSD: closedTotalUSD }
 }
 
 /**

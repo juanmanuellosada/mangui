@@ -41,10 +41,12 @@ async function fetchBalances(): Promise<AccountBalance[]> {
 
 async function fetchAllStatements(): Promise<CardStatement[]> {
   const supabase = createClient()
+  // Sin filtro de status: nextCardPayment ahora delega en listCardCycles +
+  // defaultCycleIndex (igual que Tarjetas), que necesita ver también los
+  // resúmenes "pagado" para no confundir un ciclo ya pagado con uno pendiente.
   const { data, error } = await supabase
     .from("card_statements")
     .select("*")
-    .eq("status", "pendiente")
     .order("due_date", { ascending: true })
   if (error) throw error
   return data

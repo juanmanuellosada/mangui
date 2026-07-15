@@ -60,10 +60,12 @@ const MOVEMENTS_KEY = ["movements", "stats-all"] as const
 // ── Data fetchers ─────────────────────────────────────────────
 async function fetchAllStatements(): Promise<CardStatement[]> {
   const supabase = createClient()
+  // Sin filtro de status: nextCardPayment ahora delega en listCardCycles +
+  // defaultCycleIndex (igual que Tarjetas), que necesita ver también los
+  // resúmenes "pagado" para no confundir un ciclo ya pagado con uno pendiente.
   const { data, error } = await supabase
     .from("card_statements")
     .select("*")
-    .eq("status", "pendiente")
     .order("due_date", { ascending: true })
   if (error) throw error
   return data
@@ -251,6 +253,11 @@ function EditAccountDialog({ account, userId, open, onOpenChange }: { account: A
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY })
       queryClient.invalidateQueries({ queryKey: BALANCES_KEY })
+      // Editar cierre/vencimiento cambia los ciclos calculados — refrescar
+      // también la vista de Tarjetas (credit_card_accounts) y los resúmenes
+      // guardados (card_statements) para que ambas vistas queden consistentes.
+      queryClient.invalidateQueries({ queryKey: ["credit_card_accounts"] })
+      queryClient.invalidateQueries({ queryKey: STATEMENTS_KEY })
       toast.success("Cuenta actualizada")
       onOpenChange(false)
     },
