@@ -29,6 +29,7 @@ import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Switch } from "@/components/ui/switch"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
 import { createClient } from "@/lib/supabase/client"
+import { resolveEntity } from "@/lib/entity-resolver"
 import { uploadAttachment } from "@/lib/attachments"
 import { toDateString, nextCloseDate, computeDueDate, dayOfMonth } from "@/lib/cards"
 import { amountInCurrency } from "@/lib/money"
@@ -65,15 +66,10 @@ export interface ReviewLine extends StatementReviewLine {
 
 type Step = "upload" | "review"
 
-function normalizeText(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim()
-}
-
 /** Exportada: reusada por corroborate-statement-flow.tsx para matchear category_hint de la IA. */
 export function matchCategoryId(hint: string | null, expenseCategories: Category[]): string | null {
-  if (!hint) return null
-  const normHint = normalizeText(hint)
-  return expenseCategories.find((c) => normalizeText(c.name) === normHint)?.id ?? null
+  const result = resolveEntity(hint, expenseCategories)
+  return result.resolved ? result.id : null
 }
 
 /**
@@ -532,12 +528,30 @@ export function ImportStatementFlow({
   }
 
   function initReviewFromParsed(parsed: ParsedStatement) {
+    // 5.6 — si el usuario todavía no eligió una tarjeta (no la precargó en el
+    // paso de carga ni hay una sola disponible), usamos el índice/hint que
+    // devolvió la IA como sugerencia: preselecciona, pero sigue siendo
+    // editable en "Tarjeta" del paso de revisión — nunca se impone.
+    let accountForCycle = selectedAccount
+    if (!selectedAccountId) {
+      const idx = parsed.account_idx
+      const byIndex = idx != null && idx >= 0 && idx < cardAccounts.length ? cardAccounts[idx] : null
+      const byHint = byIndex
+        ? null
+        : resolveEntity(parsed.account_hint, cardAccounts, { isHidden: (a) => a.is_hidden })
+      const suggested = byIndex ?? (byHint?.resolved ? cardAccounts.find((a) => a.id === byHint.id) ?? null : null)
+      if (suggested) {
+        accountForCycle = suggested
+        setSelectedAccountId(suggested.id)
+      }
+    }
+
     // Default de cierre/vencimiento: derivado del ciclo de la tarjeta
     // (closing_date/due_date) para que coincida con lo que tiene cargado. Si la
     // tarjeta no tiene el ciclo cargado, cae a las fechas que trajo el PDF
     // (fallback ya existente). En ambos casos el usuario puede editarlo después.
-    const closingDay = selectedAccount?.closing_date ? dayOfMonth(selectedAccount.closing_date) : null
-    const dueDay = selectedAccount?.due_date ? dayOfMonth(selectedAccount.due_date) : null
+    const closingDay = accountForCycle?.closing_date ? dayOfMonth(accountForCycle.closing_date) : null
+    const dueDay = accountForCycle?.due_date ? dayOfMonth(accountForCycle.due_date) : null
     let defaultClose = parsed.close_date
     let defaultDue = parsed.due_date
     if (closingDay != null) {
@@ -581,7 +595,7 @@ export function ImportStatementFlow({
   }
 
   async function handleAnalyze() {
-    if (!file || !selectedAccountId) return
+    if (!file) return
     setAnalyzing(true)
     setErrorMsg(null)
     setRateLimited(false)
@@ -723,6 +737,7 @@ export function ImportStatementFlow({
                 disabled={
                   saving ||
                   selectedCount === 0 ||
+                  !selectedAccountId ||
                   !closeDate ||
                   !dueDate ||
                   !allGroupsApproved
@@ -745,7 +760,7 @@ export function ImportStatementFlow({
         {step === "upload" ? (
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground font-medium">Tarjeta</Label>
+              <Label className="text-xs text-muted-foreground font-medium">Tarjeta (opcional)</Label>
               <MangoSelect
                 value={selectedAccountId}
                 onChange={setSelectedAccountId}
@@ -754,7 +769,7 @@ export function ImportStatementFlow({
                   label: a.name,
                   leading: <AccountIconChip icon={a.icon} />,
                 }))}
-                placeholder="Elegí una tarjeta"
+                placeholder="La detectamos del PDF si no la elegís"
                 disabled={analyzing}
               />
             </div>
@@ -827,7 +842,7 @@ export function ImportStatementFlow({
             ) : (
               <Button
                 onClick={handleAnalyze}
-                disabled={!file || !selectedAccountId}
+                disabled={!file}
                 className="w-full press-effect font-semibold"
               >
                 Analizar resumen
@@ -836,6 +851,26 @@ export function ImportStatementFlow({
           </div>
         ) : (
           <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground font-medium">Tarjeta</Label>
+              <MangoSelect
+                value={selectedAccountId}
+                onChange={setSelectedAccountId}
+                options={cardAccounts.map((a) => ({
+                  value: a.id,
+                  label: a.name,
+                  leading: <AccountIconChip icon={a.icon} />,
+                }))}
+                placeholder="Elegí a qué tarjeta corresponde este resumen"
+                aria-invalid={!selectedAccountId}
+              />
+              {!selectedAccountId && (
+                <p className="text-[11px] text-destructive">
+                  No pudimos identificar la tarjeta de este resumen — elegila para continuar.
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground font-medium">Cierre</Label>

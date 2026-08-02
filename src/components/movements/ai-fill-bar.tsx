@@ -14,6 +14,7 @@ export interface AiExtractResult {
   original_currency: "ARS" | "USD"
   categoria: string | null
   cuenta: string | null
+  cuenta_idx: number | null
   fecha: string | null
   nota: string | null
   cuotas: number | null
@@ -24,7 +25,7 @@ export function AiFillBar({
   categories,
   onResult,
 }: {
-  accounts: { name: string }[]
+  accounts: { name: string; type: string; currency: string }[]
   categories: { name: string; type: string }[]
   onResult: (r: AiExtractResult) => void
 }) {
@@ -34,13 +35,17 @@ export function AiFillBar({
 
   if (isDemo) return null
 
+  // Metadata (tipo, moneda) además del nombre: el modelo la usa para elegir
+  // la cuenta por índice cuando hay nombres parecidos (ver extract-movement).
+  const accountsPayload = accounts.map((a) => ({ name: a.name, type: a.type, currency: a.currency }))
+
   async function submitImage(file: File) {
     if (loading) return
     setLoading(true)
     try {
       const form = new FormData()
       form.append("image", file, file.name || "foto.jpg")
-      form.append("accounts", JSON.stringify(accounts.map((a) => a.name)))
+      form.append("accounts", JSON.stringify(accountsPayload))
       form.append("categories", JSON.stringify(categories.map((c) => ({ name: c.name, type: c.type }))))
       const res = await fetch("/api/ai/extract-movement", { method: "POST", body: form })
       if (!res.ok) {
@@ -64,7 +69,7 @@ export function AiFillBar({
     try {
       const form = new FormData()
       form.append("audio", wav, "audio.wav")
-      form.append("accounts", JSON.stringify(accounts.map((a) => a.name)))
+      form.append("accounts", JSON.stringify(accountsPayload))
       form.append("categories", JSON.stringify(categories.map((c) => ({ name: c.name, type: c.type }))))
       const res = await fetch("/api/ai/extract-movement", { method: "POST", body: form })
       if (!res.ok) {
@@ -92,7 +97,7 @@ export function AiFillBar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: t,
-          accounts: accounts.map((a) => a.name),
+          accounts: accountsPayload,
           categories: categories.map((c) => ({ name: c.name, type: c.type })),
         }),
       })

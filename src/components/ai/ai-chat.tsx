@@ -35,24 +35,7 @@ import { PhotoInputButton } from "@/components/ai/photo-input-button"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories, type Category } from "@/lib/hooks/use-categories"
 import { UpgradeLink } from "@/components/ui/upgrade-link"
-
-// ── Name → id resolver ────────────────────────────────────────────────────────
-
-function normalizeStr(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-}
-
-function findIdByName(name: string, items: Array<{ id: string; name: string }>): string | undefined {
-  const target = normalizeStr(name)
-  const exact = items.find((i) => normalizeStr(i.name) === target)
-  if (exact) return exact.id
-  const fuzzy = items.find(
-    (i) =>
-      normalizeStr(i.name).includes(target) ||
-      target.includes(normalizeStr(i.name))
-  )
-  return fuzzy?.id
-}
+import { resolveEntity } from "@/lib/entity-resolver"
 
 // ── Read-tool indicator ───────────────────────────────────────────────────────
 
@@ -147,13 +130,13 @@ function CrearMovimientoCard({
   // Resolve default values from tool input
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" })
 
-  const categoryId = input.categoria
-    ? findIdByName(input.categoria, categories) ?? null
-    : null
+  const resolvedCategory = resolveEntity(input.categoria, categories)
+  const categoryId = resolvedCategory.resolved ? resolvedCategory.id : null
 
-  const accountId = input.cuenta
-    ? findIdByName(input.cuenta, accounts) ?? accounts[0]?.id ?? ""
-    : accounts[0]?.id ?? ""
+  const resolvedAccount = resolveEntity(input.cuenta, accounts, {
+    isHidden: (a) => a.is_hidden,
+  })
+  const accountId = resolvedAccount.resolved ? resolvedAccount.id : ""
 
   const defaultValues: Partial<MovementFormValues> = {
     type: input.tipo,

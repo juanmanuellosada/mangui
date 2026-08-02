@@ -341,6 +341,61 @@ export type Database = {
           },
         ]
       }
+      account_learning: {
+        Row: {
+          account_id: string
+          context_key: string
+          context_kind: string
+          created_at: string
+          hit_count: number
+          id: string
+          last_used_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          context_key: string
+          context_kind: string
+          created_at?: string
+          hit_count?: number
+          id?: string
+          last_used_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          context_key?: string
+          context_kind?: string
+          created_at?: string
+          hit_count?: number
+          id?: string
+          last_used_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_learning_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "account_learning_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_balances_projected"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "account_learning_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           account_ids: string[]
@@ -1483,6 +1538,15 @@ export type Database = {
       }
     }
     Functions: {
+      bump_account_learning: {
+        Args: {
+          p_account_id: string
+          p_category_id: string
+          p_currency: string
+          p_merchant_key: string
+        }
+        Returns: undefined
+      }
       bump_category_learning: {
         Args: { p_merchant_key: string; p_category_id: string }
         Returns: undefined

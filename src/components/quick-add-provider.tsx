@@ -41,6 +41,7 @@ import { enqueueMovement } from "@/lib/offline-queue"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
 import { LEARNING_KEY, recordCategoryLearning } from "@/lib/category-learning"
+import { ACCOUNT_LEARNING_KEY, recordAccountLearning } from "@/lib/account-learning"
 
 export type QuickAddMode = "movement" | "transfer"
 
@@ -324,6 +325,18 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
         recordCategoryLearning(createClient(), variables.values.note, variables.values.category_id)
         queryClient.invalidateQueries({ queryKey: LEARNING_KEY })
       }
+      // Fire-and-forget: register categoría+moneda / comercio → cuenta para el
+      // prior del resolver de cuentas (no-op interno si no hay contexto útil).
+      recordAccountLearning(
+        createClient(),
+        {
+          categoryId: variables.values.category_id,
+          currency: variables.values.original_currency,
+          note: variables.values.note,
+        },
+        variables.values.account_id
+      )
+      queryClient.invalidateQueries({ queryKey: ACCOUNT_LEARNING_KEY })
       toast.success("Movimiento creado")
       setIsOpen(false)
       setPendingAiResult(null)

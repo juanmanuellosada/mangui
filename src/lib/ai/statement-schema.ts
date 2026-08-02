@@ -38,7 +38,9 @@ export type UpcomingInstallmentEntry = z.infer<typeof upcomingInstallmentEntrySc
 /** Resumen de tarjeta de crédito interpretado por la IA a partir del PDF. */
 export const parsedStatementSchema = z.object({
   bank: z.string().nullable().default(null),
-  /** Últimos 4 dígitos o nombre de la tarjeta, para sugerir la cuenta del usuario. */
+  /** Índice (0-based) de la tarjeta del usuario que mejor coincide con el resumen, dentro de la lista numerada que se le mandó al modelo. null si ninguna coincide o no hay lista. */
+  account_idx: z.number().int().nullable().default(null),
+  /** Respaldo de account_idx: últimos 4 dígitos o nombre de la tarjeta tal como se mencionan en el PDF, para cuando el índice no vino o quedó fuera de rango. */
   account_hint: z.string().nullable().default(null),
   close_date: z.string().nullable().default(null),
   due_date: z.string().nullable().default(null),

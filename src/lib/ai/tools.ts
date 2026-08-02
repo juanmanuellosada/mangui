@@ -21,28 +21,13 @@ import { computeGoalProgress, type GoalScope } from "@/lib/goals"
 import { computeNextRun } from "@/lib/recurring"
 import { computeInstallmentDate } from "@/lib/installments"
 import { nextCardPayment, listCardCycles, toDateString } from "@/lib/cards"
+import { resolveEntity, normalizeText } from "@/lib/entity-resolver"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/database.types"
 
 type SessionClient = SupabaseClient<Database>
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function normalizeStr(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-}
-
-function findIdByName(name: string, items: Array<{ id: string; name: string }>): string | null {
-  const target = normalizeStr(name)
-  const exact = items.find((i) => normalizeStr(i.name) === target)
-  if (exact) return exact.id
-  const fuzzy = items.find(
-    (i) =>
-      normalizeStr(i.name).includes(target) ||
-      target.includes(normalizeStr(i.name))
-  )
-  return fuzzy?.id ?? null
-}
 
 function todayAR(): string {
   return new Date().toLocaleDateString("en-CA", {
@@ -182,6 +167,7 @@ export interface BuscarMovimientosResult {
     nota: string | null
   }>
   total_encontrados: number
+  advertencias?: string[]
 }
 
 export async function buscarMovimientos(
@@ -193,15 +179,32 @@ export async function buscarMovimientos(
   // Load categories and accounts for name resolution
   const [catsRes, accsRes] = await Promise.all([
     supabase.from("categories").select("id, name"),
-    supabase.from("accounts").select("id, name"),
+    supabase.from("accounts").select("id, name, is_hidden"),
   ])
 
   const categories = catsRes.data ?? []
   const accounts = accsRes.data ?? []
 
   // Resolve names → ids for filtering
-  const categoryId = params.categoria ? findIdByName(params.categoria, categories) : null
-  const accountId = params.cuenta ? findIdByName(params.cuenta, accounts) : null
+  const advertencias: string[] = []
+
+  const categoriaResuelta = params.categoria ? resolveEntity(params.categoria, categories) : null
+  const categoryId = categoriaResuelta?.resolved ? categoriaResuelta.id : null
+  if (params.categoria && !categoriaResuelta?.resolved) {
+    advertencias.push(
+      `No pude identificar la categoría "${params.categoria}", así que no se filtró por categoría.`
+    )
+  }
+
+  const cuentaResuelta = params.cuenta
+    ? resolveEntity(params.cuenta, accounts, { isHidden: (a) => a.is_hidden })
+    : null
+  const accountId = cuentaResuelta?.resolved ? cuentaResuelta.id : null
+  if (params.cuenta && !cuentaResuelta?.resolved) {
+    advertencias.push(
+      `No pude identificar la cuenta "${params.cuenta}", así que no se filtró por cuenta.`
+    )
+  }
 
   let q = supabase
     .from("movements")
@@ -220,11 +223,12 @@ export async function buscarMovimientos(
   if (params.texto?.trim()) {
     const escaped = params.texto.trim().replace(/[%_(),]/g, (c) => `\\${c}`)
     const orParts: string[] = [`note.ilike.%${escaped}%`]
+    const normalizedTexto = normalizeText(params.texto)
     const matchCatIds = categories
-      .filter((c) => c.name.toLowerCase().includes(params.texto!.toLowerCase()))
+      .filter((c) => normalizeText(c.name).includes(normalizedTexto))
       .map((c) => c.id)
     const matchAccIds = accounts
-      .filter((a) => a.name.toLowerCase().includes(params.texto!.toLowerCase()))
+      .filter((a) => normalizeText(a.name).includes(normalizedTexto))
       .map((a) => a.id)
     if (matchCatIds.length > 0) orParts.push(`category_id.in.(${matchCatIds.join(",")})`)
     if (matchAccIds.length > 0) orParts.push(`account_id.in.(${matchAccIds.join(",")})`)
@@ -247,7 +251,11 @@ export async function buscarMovimientos(
     nota: m.note ?? null,
   }))
 
-  return { movimientos, total_encontrados: movimientos.length }
+  return {
+    movimientos,
+    total_encontrados: movimientos.length,
+    ...(advertencias.length > 0 ? { advertencias } : {}),
+  }
 }
 
 // ── pagos_futuros ─────────────────────────────────────────────────────────────
@@ -375,6 +383,7 @@ export interface ResumenesTarjetaResult {
     ciclo_actual: { cierre: string | null; vencimiento: string | null; total: number }
     ultimos_ciclos: Array<{ cierre: string; vencimiento: string | null; total: number; pagado: boolean }>
   }>
+  advertencia?: string
 }
 
 export async function resumenesTarjeta(
@@ -394,11 +403,14 @@ export async function resumenesTarjeta(
   ])
 
   let creditCards = accountsRes.data ?? []
+  let advertencia: string | undefined
   if (params.tarjeta) {
-    const target = normalizeStr(params.tarjeta)
-    creditCards = creditCards.filter((c) =>
-      normalizeStr(c.name).includes(target) || target.includes(normalizeStr(c.name))
-    )
+    const tarjetaResuelta = resolveEntity(params.tarjeta, creditCards)
+    if (tarjetaResuelta.resolved) {
+      creditCards = creditCards.filter((c) => c.id === tarjetaResuelta.id)
+    } else {
+      advertencia = `No pude identificar la tarjeta "${params.tarjeta}", así que se muestran todas las tarjetas.`
+    }
   }
 
   const allMovements = movsRes.data ?? []
@@ -436,7 +448,7 @@ export async function resumenesTarjeta(
     result.push({ nombre: card.name, ciclo_actual, ultimos_ciclos })
   }
 
-  return { tarjetas: result }
+  return { tarjetas: result, ...(advertencia ? { advertencia } : {}) }
 }
 
 // ── estado_presupuestos ───────────────────────────────────────────────────────

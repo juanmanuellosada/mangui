@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAiRateLimit } from "@/lib/ai/rate-limit"
-import { extractMovement } from "@/lib/ai/extract-movement"
+import { extractMovement, type AiAccountInput } from "@/lib/ai/extract-movement"
 
 const MODEL_ID = "gemini-2.5-flash"
 export const maxDuration = 30
@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
   let mediaBytes: Uint8Array | null = null
   let mediaMediaType = "audio/wav"
   let mediaKind: "audio" | "image" = "audio"
-  let accountNames: string[] = []
+  // Acepta cuentas como string[] (sólo nombre, compat) u objetos con metadata
+  // (nombre, tipo, moneda) para que el modelo pueda desambiguar por índice.
+  let accountsInput: AiAccountInput[] = []
   let categories: { name: string; type: string }[] = []
 
   const contentType = req.headers.get("content-type") || ""
@@ -35,18 +37,18 @@ export async function POST(req: NextRequest) {
       if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "Archivo demasiado grande" }, { status: 413 })
       if (file.type) mediaMediaType = file.type
       mediaBytes = new Uint8Array(await file.arrayBuffer())
-      try { accountNames = JSON.parse((form.get("accounts") as string) || "[]") } catch { accountNames = [] }
+      try { accountsInput = JSON.parse((form.get("accounts") as string) || "[]") } catch { accountsInput = [] }
       try { categories = JSON.parse((form.get("categories") as string) || "[]") } catch { categories = [] }
     } else {
       const body = await req.json()
       text = (body?.text ?? "").trim()
-      accountNames = Array.isArray(body?.accounts) ? body.accounts : []
+      accountsInput = Array.isArray(body?.accounts) ? body.accounts : []
       categories = Array.isArray(body?.categories) ? body.categories : []
     }
   } catch {
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 })
   }
-  accountNames = accountNames.slice(0, 100)
+  accountsInput = accountsInput.slice(0, 100)
   categories = categories.slice(0, 300)
   if (!mediaBytes && !text) return NextResponse.json({ error: "Entrada vacía" }, { status: 400 })
 
@@ -70,9 +72,9 @@ export async function POST(req: NextRequest) {
     const object = await extractMovement(
       mediaBytes
         ? mediaKind === "image"
-          ? { image: mediaBytes, imageMediaType: mediaMediaType, accounts: accountNames, categories }
-          : { audio: mediaBytes, audioMediaType: mediaMediaType, accounts: accountNames, categories }
-        : { text, accounts: accountNames, categories }
+          ? { image: mediaBytes, imageMediaType: mediaMediaType, accounts: accountsInput, categories }
+          : { audio: mediaBytes, audioMediaType: mediaMediaType, accounts: accountsInput, categories }
+        : { text, accounts: accountsInput, categories }
     )
     return NextResponse.json(object)
   } catch {

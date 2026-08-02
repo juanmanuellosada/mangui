@@ -77,6 +77,7 @@ export async function POST(req: Request) {
       original_currency: "ARS",
       categoria: null,
       cuenta: null,
+      cuenta_idx: null,
       fecha: null,
       nota: fallbackNota,
       cuotas: null,

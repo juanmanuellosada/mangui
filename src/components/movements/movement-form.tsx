@@ -34,6 +34,9 @@ import {
 } from "@/lib/rules"
 import { suggestLearnedCategory } from "@/lib/category-learning"
 import { useCategoryLearning } from "@/lib/hooks/use-category-learning"
+import { accountPriorBoost, suggestLearnedAccount } from "@/lib/account-learning"
+import { useAccountLearning } from "@/lib/hooks/use-account-learning"
+import { resolveEntity } from "@/lib/entity-resolver"
 import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
@@ -140,16 +143,34 @@ interface MovementFormProps {
   initialAiResult?: AiExtractResult
 }
 
-function _norm(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim()
-}
-function matchByName<T extends { id: string; name: string }>(name: string, items: T[]): string | undefined {
-  const target = _norm(name)
-  if (!target) return undefined
-  const exact = items.find((i) => _norm(i.name) === target)
-  if (exact) return exact.id
-  const fuzzy = items.find((i) => _norm(i.name).includes(target) || target.includes(_norm(i.name)))
-  return fuzzy?.id
+/** Cap de cuentas mandadas al modelo en extract-movement (ver route.ts). */
+const AI_ACCOUNTS_CAP = 100
+
+/**
+ * Resuelve la cuenta de un resultado de IA con precedencia índice > puntaje
+ * (Decisión 1 de mejorar-deteccion-cuenta-ia): valida `cuenta_idx` contra
+ * `sentAccounts` (la misma lista, en el mismo orden, que se mandó al modelo,
+ * ya capada); si está ausente o fuera de rango, cae al resolver por nombre
+ * sobre `allAccounts` excluyendo cuentas ocultas. `priorBoost` (opcional) es
+ * el término de aprendizaje del puntaje (ver account-learning.ts, capa 3) —
+ * solo se aplica en el fallback por nombre, nunca cuando hay índice válido.
+ * Exportada para tests (5.7, 6.6).
+ */
+export function resolveAiAccount<T extends { id: string; name: string; is_hidden: boolean }>(
+  result: { cuenta_idx: number | null | undefined; cuenta: string | null },
+  sentAccounts: readonly T[],
+  allAccounts: readonly T[],
+  priorBoost?: (candidate: T) => number
+): T | null {
+  const idx = result.cuenta_idx
+  if (idx != null && Number.isInteger(idx) && idx >= 0 && idx < sentAccounts.length) {
+    return sentAccounts[idx]
+  }
+  if (result.cuenta) {
+    const byName = resolveEntity(result.cuenta, allAccounts, { isHidden: (a) => a.is_hidden, priorBoost })
+    if (byName.resolved) return allAccounts.find((a) => a.id === byName.id) ?? null
+  }
+  return null
 }
 
 export function MovementForm({
@@ -311,7 +332,11 @@ export function MovementForm({
   // ── Rule auto-fill (create mode only) ─────────────────────────────────────
   const [ruleHint, setRuleHint] = useState<{ ruleName: string; ruleId: string } | null>(null)
   const [learnHint, setLearnHint] = useState<{ categoryId: string } | null>(null)
+  const [accountLearnHint, setAccountLearnHint] = useState<{ accountId: string } | null>(null)
   const userSetCategory = useRef(false)
+  // Precedencia usuario > índice del modelo > resolver por nombre: si el
+  // usuario ya tocó el campo cuenta a mano, un resultado de IA no lo pisa.
+  const userSetAccount = useRef(false)
 
   const { data: activeRules = [] } = useQuery({
     queryKey: RULES_KEY,
@@ -328,6 +353,7 @@ export function MovementForm({
   })
 
   const { data: learnings = [] } = useCategoryLearning()
+  const { data: accountLearnings = [] } = useAccountLearning()
 
   const condsByRule = useMemo(() => {
     const map = new Map<string, AutoRuleCondition[]>()
@@ -376,6 +402,31 @@ export function MovementForm({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note, amount, accountId, type, isCreateMode, activeRules, condsByRule, learnings, categories])
+
+  // ── Learned account suggestion (create mode only) ─────────────────────────
+  // Precedencia usuario > índice del modelo > puntaje con prior (design
+  // decisión 3 y requirement "Precedencia de señales y ausencia de
+  // adivinanza"): cuando no hay ningún hint de cuenta pero sí un prior fuerte
+  // para el contexto, se muestra como sugerencia descartable — nunca se
+  // completa el campo en silencio. Mismo patrón que el learnHint de
+  // categorías, arriba.
+  useEffect(() => {
+    if (!isCreateMode) return
+    if (userSetAccount.current || accountId) {
+      setAccountLearnHint((prev) => (prev ? null : prev))
+      return
+    }
+    const suggestedId = suggestLearnedAccount(accountLearnings, {
+      categoryId,
+      currency: originalCurrency,
+      note: note ?? null,
+    })
+    if (suggestedId) {
+      setAccountLearnHint({ accountId: suggestedId })
+    } else {
+      setAccountLearnHint((prev) => (prev ? null : prev))
+    }
+  }, [note, categoryId, originalCurrency, accountId, isCreateMode, accountLearnings])
 
   // ── Live rate preview for cross-currency ─────────────────────────────────
   const [liveRate, setLiveRate] = useState<number | null>(null)
@@ -477,24 +528,39 @@ export function MovementForm({
     // type / visual mode
     setMode(r.type)
     setValue("type", r.type, { shouldValidate: false })
-    // account (resolve name → id)
-    if (r.cuenta) {
-      const accId = matchByName(r.cuenta, accounts)
-      if (accId) setValue("account_id", accId, { shouldValidate: true })
+    // category (match within the right type) — resuelta antes que la cuenta
+    // para que su id alimente el contexto del prior aprendido de abajo
+    // (categoría + moneda es una de las dos claves de contexto, ver
+    // account-learning.ts / design decisión 5).
+    let resolvedCategoryId: string | null = null
+    if (r.categoria) {
+      const catMatch = resolveEntity(r.categoria, categories.filter((c) => c.type === r.type))
+      if (catMatch.resolved) resolvedCategoryId = catMatch.id
+    }
+    // account: usuario > índice del modelo > puntaje (con prior aprendido)
+    if (!userSetAccount.current) {
+      const sentAccounts = accounts.slice(0, AI_ACCOUNTS_CAP)
+      const resolved = resolveAiAccount(
+        { cuenta_idx: r.cuenta_idx, cuenta: r.cuenta },
+        sentAccounts,
+        accounts,
+        accountPriorBoost(accountLearnings, {
+          categoryId: resolvedCategoryId,
+          currency: r.original_currency ?? null,
+          note: r.nota ?? null,
+        })
+      )
+      if (resolved) setValue("account_id", resolved.id, { shouldValidate: true })
     }
     // currency (note: for non-credit-card accounts the form may re-derive this from the account)
     if (r.original_currency) setValue("original_currency", r.original_currency, { shouldValidate: false })
     // amount
     if (typeof r.amount === "number" && r.amount > 0) setValue("amount", r.amount, { shouldValidate: true })
-    // category (match within the right type)
-    if (r.categoria) {
-      const catId = matchByName(r.categoria, categories.filter((c) => c.type === r.type))
-      if (catId) {
-        setValue("category_id", catId, { shouldValidate: false })
-        // Mark as user-set so the rule/learned auto-fill effect doesn't overwrite
-        // the AI's suggestion (it otherwise runs on every note/amount/account change).
-        userSetCategory.current = true
-      }
+    if (resolvedCategoryId) {
+      setValue("category_id", resolvedCategoryId, { shouldValidate: false })
+      // Mark as user-set so the rule/learned auto-fill effect doesn't overwrite
+      // the AI's suggestion (it otherwise runs on every note/amount/account change).
+      userSetCategory.current = true
     }
     // date + is_future
     if (r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) {
@@ -704,7 +770,11 @@ export function MovementForm({
             {/* Income: credit cards excluded; Expense: all accounts allowed */}
             <MangoSelect
               value={accountId}
-              onChange={(v) => v && setValue("account_id", v, { shouldValidate: true })}
+              onChange={(v) => {
+                if (!v) return
+                userSetAccount.current = true
+                setValue("account_id", v, { shouldValidate: true })
+              }}
               options={(type === "income" ? incomeAccounts : accounts).map((a) => ({
                 value: a.id,
                 label: a.name,
@@ -718,6 +788,38 @@ export function MovementForm({
               <p className="text-xs text-destructive">{errors.account_id.message}</p>
             )}
           </div>
+
+          {/* Learned account hint chip — sugerencia descartable, nunca autocompleta
+              (requirement "Precedencia de señales y ausencia de adivinanza") */}
+          {accountLearnHint && !userSetAccount.current && !accountId && (
+            <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2">
+              <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
+              <button
+                type="button"
+                onClick={() => {
+                  userSetAccount.current = true
+                  setValue("account_id", accountLearnHint.accountId, { shouldValidate: true })
+                  setAccountLearnHint(null)
+                }}
+                className="text-xs text-primary flex-1 text-left cursor-pointer"
+              >
+                Solés usar{" "}
+                <strong>{accounts.find((a) => a.id === accountLearnHint.accountId)?.name}</strong>{" "}
+                para esto — tocá para usarla
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  userSetAccount.current = true
+                  setAccountLearnHint(null)
+                }}
+                className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                aria-label="Descartar sugerencia"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* 3.5 — Category in its own row */}
           <div className="space-y-1.5">

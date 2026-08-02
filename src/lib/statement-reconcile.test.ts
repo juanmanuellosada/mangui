@@ -22,6 +22,7 @@ function makeLine(overrides: Partial<ParsedStatementLine> = {}): ParsedStatement
 function makeParsed(lines: ParsedStatementLine[]): ParsedStatement {
   return {
     bank: null,
+    account_idx: null,
     account_hint: null,
     close_date: "2026-06-20",
     due_date: "2026-06-30",

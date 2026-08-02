@@ -87,6 +87,7 @@ import {
 } from "@/lib/installments"
 import { listCardCycles, type CardCycle } from "@/lib/cards"
 import { LEARNING_KEY, recordCategoryLearning } from "@/lib/category-learning"
+import { ACCOUNT_LEARNING_KEY, recordAccountLearning } from "@/lib/account-learning"
 import {
   format,
   isToday,
@@ -1164,6 +1165,20 @@ export function EditMovementDialog({
       ) {
         recordCategoryLearning(createClient(), variables.values.note, variables.values.category_id)
         queryClient.invalidateQueries({ queryKey: LEARNING_KEY })
+      }
+      // Same criterio: una corrección de cuenta en la edición es la señal más
+      // fuerte de aprendizaje — solo se registra cuando la cuenta cambió.
+      if (variables.values.account_id !== movement.account_id) {
+        recordAccountLearning(
+          createClient(),
+          {
+            categoryId: variables.values.category_id,
+            currency: variables.values.original_currency,
+            note: variables.values.note,
+          },
+          variables.values.account_id
+        )
+        queryClient.invalidateQueries({ queryKey: ACCOUNT_LEARNING_KEY })
       }
       toast.success(variables.scope === "all" ? "Cuotas actualizadas" : "Movimiento actualizado")
       onOpenChange(false)

@@ -17,15 +17,18 @@ export async function extractStatement(input: ExtractStatementInput): Promise<Pa
   const google = createGoogleGenerativeAI({ apiKey })
   const model = google(MODEL_ID)
   const expenseCats = input.categories.filter((c) => c.type === "expense").map((c) => c.name)
+  const accountsList = input.accounts.map((name, i) => `[${i}] ${name}`).join("\n")
 
   const prompt = `Extraé los datos de un RESUMEN DE TARJETA DE CRÉDITO argentino a partir del PDF adjunto (puede tener varias páginas).
 
-Tarjetas del usuario: ${input.accounts.join(" | ") || "(ninguna)"}
+Tarjetas del usuario:
+${accountsList || "(ninguna)"}
 Categorías de GASTO del usuario: ${expenseCats.join(" | ") || "(ninguna)"}
 
 Datos del encabezado del resumen:
 - "bank": nombre del banco o entidad emisora; null si no se identifica.
-- "account_hint": pista para identificar la tarjeta (últimos 4 dígitos o nombre) que mejor coincida con la lista de tarjetas del usuario; null si no hay pista clara.
+- "account_idx": el índice (el número entre corchetes) de la tarjeta de la lista "Tarjetas del usuario" que mejor coincida con este resumen (según el banco, últimos dígitos o nombre visible en el PDF); null si ninguna coincide o la lista está vacía.
+- "account_hint": como respaldo, si no podés identificar el índice con confianza, una pista textual (últimos 4 dígitos o nombre) que ayude a identificar la tarjeta; null si no aplica.
 - "close_date": fecha de cierre del resumen, formato YYYY-MM-DD; null si no figura.
 - "due_date": fecha de vencimiento de pago, formato YYYY-MM-DD; null si no figura.
 - "total_ars": total a pagar en PESOS ARGENTINOS; null si el resumen no tiene un total en pesos.
