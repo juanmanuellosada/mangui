@@ -34,7 +34,7 @@ Datos del encabezado del resumen:
 - "total_ars": total a pagar en PESOS ARGENTINOS; null si el resumen no tiene un total en pesos.
 - "total_usd": total a pagar en DÓLARES (resúmenes bimonetarios tienen un total separado en USD); null si no aplica.
 - "stamp_tax": impuesto de sellos/percepciones/impuestos provinciales del resumen (monto en pesos); null si no figura o es 0.
-- "upcoming_installments": si el resumen incluye una tabla tipo "Cuotas a vencer" (o similar) con el total de cuotas por mes, devolvé un array de objetos {"month": <mes tal como figura, ej. "Agosto/26">, "amount": <total de ese mes, numérico sin símbolos ni separadores de miles>} en el MISMO ORDEN en que aparece en el PDF (cronológico). El PRIMER mes de esa tabla es siempre el período de ESTE resumen (mismo total que las cuotas del detalle que estás extrayendo). Si el resumen no trae esa tabla, devolvé null.
+- "upcoming_installments": si el resumen incluye una tabla tipo "Cuotas a vencer" (o similar) con el total de cuotas por mes, devolvé un array de objetos {"month": <mes tal como figura, ej. "Agosto/26">, "amount": <total de ese mes, numérico sin símbolos ni separadores de miles>} en el MISMO ORDEN en que aparece en el PDF (cronológico), tal cual figuran, sin interpretar a qué período corresponde cada mes ni ajustar nada. Si el resumen no trae esa tabla, devolvé null.
 
 Por cada consumo/línea del detalle (ítems de compras, IMPUESTOS y CARGOS del resumen; NO el total, ni las líneas descartadas más abajo):
 - "description": el comercio o concepto tal como figura.

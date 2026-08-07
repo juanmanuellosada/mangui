@@ -96,9 +96,10 @@ export interface BuildStatementPayloadInput {
   /**
    * Tabla "Cuotas a vencer" del PDF (ver ParsedStatement.upcoming_installments
    * en @/lib/ai/statement-schema), reducida a sólo los montos en el mismo
-   * orden: índice 0 = el resumen leído (cycleOffset 0, no se usa para
-   * corregir nada — el detalle actual ya es la fuente de verdad), índice N =
-   * cycleOffset N. Cuando está presente es la fuente de verdad para el TOTAL
+   * orden en que figuran en el PDF. A qué ciclo corresponde el índice 0 lo
+   * decide resolveTableStartOffset por aritmética: en Galicia (VISA y
+   * Mastercard, verificado) es el ciclo SIGUIENTE al resumen leído; otros
+   * bancos podrían incluir el ciclo actual. Cuando está presente es la fuente de verdad para el TOTAL
    * de cuotas proyectadas de cada ciclo FUTURO (ver capInstallmentOffsets):
    * algunos bancos terminan una cuota antes de lo que
    * installment_number/installment_total sugieren, y sin este override la
@@ -249,17 +250,53 @@ function dayOfMonthFromISODate(dateStr: string): number {
  *
  * Devuelve un Map<purchaseKey, últimoCycleOffset a proyectar>.
  */
+const TABLE_EPSILON = 0.01
+
+/**
+ * A qué cycleOffset corresponde el PRIMER monto de la tabla "Cuotas a
+ * vencer". Galicia (verificado contra resúmenes reales de VISA y Mastercard)
+ * la arranca en el primer ciclo FUTURO: el primer monto es lo que va a
+ * cobrar el mes que viene, NO lo que estás por pagar en este resumen. Los
+ * títulos de mes de la tabla no sirven para deducirlo (VISA con cierre 30-jul
+ * titula la primera columna "Agosto/26" y Mastercard con cierre 28-may la
+ * titula "Junio-26"), así que se calibra con la aritmética del propio
+ * resumen: si el primer monto coincide con el total de cuotas del ciclo
+ * SIGUIENTE, la tabla arranca en el ciclo siguiente (offset 1); si coincide
+ * con el total de cuotas de ESTE resumen, arranca en el actual (offset 0,
+ * formato de otros bancos). Ante la duda gana offset 1, que es lo observado
+ * en la realidad: asumir 0 de más recorta las compras un mes antes de tiempo
+ * y borra la última cuota de cada plan.
+ */
+function resolveTableStartOffset(
+  purchases: { amount: number; naiveLastOffset: number }[],
+  table: number[]
+): number {
+  const first = table[0]
+  if (first == null) return 1
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  // Toda compra en cuotas del resumen aporta su cuota en el ciclo leído.
+  const currentSum = round2(purchases.reduce((sum, p) => sum + p.amount, 0))
+  const nextSum = round2(
+    purchases.filter((p) => p.naiveLastOffset >= 1).reduce((sum, p) => sum + p.amount, 0)
+  )
+  if (Math.abs(first - nextSum) <= TABLE_EPSILON) return 1
+  if (Math.abs(first - currentSum) <= TABLE_EPSILON) return 0
+  return 1
+}
+
 function capInstallmentOffsets(
   purchases: { purchaseKey: string; amount: number; naiveLastOffset: number }[],
   table: number[] | null | undefined
 ): Map<string, number> {
   const capped = new Map<string, number>()
   for (const p of purchases) capped.set(p.purchaseKey, p.naiveLastOffset)
-  if (!table) return capped
+  if (!table || table.length === 0) return capped
 
-  const EPSILON = 0.01
-  for (let offset = 1; offset < table.length; offset++) {
-    const target = table[offset]
+  const EPSILON = TABLE_EPSILON
+  const startOffset = resolveTableStartOffset(purchases, table)
+  const lastCoveredOffset = table.length - 1 + startOffset
+  for (let offset = Math.max(1, startOffset); offset <= lastCoveredOffset; offset++) {
+    const target = table[offset - startOffset]
     const active = purchases.filter((p) => capped.get(p.purchaseKey)! >= offset)
     const activeSum = Math.round(active.reduce((sum, p) => sum + p.amount, 0) * 100) / 100
     let excess = Math.round((activeSum - target) * 100) / 100

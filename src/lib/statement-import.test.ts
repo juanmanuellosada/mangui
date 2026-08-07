@@ -247,32 +247,75 @@ describe("buildStatementPayload — proyección de cuotas (Tarea 3.2)", () => {
 })
 
 describe("buildStatementPayload / groupStatementPreviewByCycle — tabla 'Cuotas a vencer' del PDF", () => {
-  it("usa la tabla para cortar una compra que el banco da por terminada antes de lo que sugiere el número de cuota (caso Mastercard)", () => {
+  it("la tabla arranca en el ciclo SIGUIENTE: caso real del Mastercard de Galicia (cierre 28-may-26)", () => {
+    // Detalle de cuotas real del resumen + su tabla "Cuotas a vencer"
+    // (Junio-26 a Noviembre-26). Las cuotas de ESTE resumen suman 201.383,74;
+    // la primera columna de la tabla (119.417,25) es el ciclo SIGUIENTE.
     const input = makeInput({
       lines: [
-        // Figura como 5/6 pero el banco no la trae en la tabla del ciclo siguiente.
+        makeLine({ description: "43MOOV SAN MIGUEL", amount: 28333.16, installment_number: 6, installment_total: 6 }),
+        makeLine({ description: "MERPAGO*ARFINANZAS", amount: 29500, installment_number: 4, installment_total: 6 }),
+        makeLine({ description: "MERPAGO*PROYECTOKAINO", amount: 29086.1, installment_number: 4, installment_total: 6 }),
+        makeLine({ description: "MERPAGO*MERCADOLIBRE", date: "2026-03-01", amount: 21666.66, installment_number: 3, installment_total: 6 }),
+        makeLine({ description: "MERPAGO*SANLORENZO", amount: 53633.33, installment_number: 3, installment_total: 3 }),
+        makeLine({ description: "MERPAGO*THONETVANDER", amount: 15341.14, installment_number: 2, installment_total: 12 }),
+        makeLine({ description: "MERPAGO*MERCADOLIBRE", date: "2026-05-05", amount: 23823.35, installment_number: 1, installment_total: 6 }),
+      ],
+      upcoming_installments_table: [119417.25, 119417.25, 60831.15, 39164.49, 39164.49, 15341.14],
+    })
+
+    const groups = groupStatementPreviewByCycle(input)
+    const totalPorCiclo = groups.map((g) => g.totalsByCurrency.ARS)
+    // Ciclo leído + los seis de la tabla, cada uno clavado con el PDF.
+    expect(totalPorCiclo.slice(0, 7)).toEqual([
+      201383.74, 119417.25, 119417.25, 60831.15, 39164.49, 39164.49, 15341.14,
+    ])
+
+    const payload = buildStatementPayload(input)
+    const cuotasDe = (desc: string, date: string) =>
+      payload.installment_purchases
+        .find((p) => p.description === desc && p.start_date === date)!
+        .installments.map((i) => i.installment_number)
+    // Ninguna compra se corta: la última cuota de cada plan se proyecta entera.
+    expect(cuotasDe("MERPAGO*ARFINANZAS", "2026-06-15")).toEqual([4, 5, 6])
+    expect(cuotasDe("MERPAGO*MERCADOLIBRE", "2026-05-05")).toEqual([1, 2, 3, 4, 5, 6])
+    expect(cuotasDe("MERPAGO*THONETVANDER", "2026-06-15")).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+  })
+
+  it("corta una compra que el banco da por terminada antes de lo que sugiere el número de cuota", () => {
+    const input = makeInput({
+      lines: [
+        // Figura como 5/6 pero el banco no la trae en el ciclo siguiente.
         makeLine({ description: "ARFINANZAS", amount: 1000, installment_number: 5, installment_total: 6 }),
         makeLine({ description: "Notebook", amount: 2000, installment_number: 1, installment_total: 3 }),
       ],
-      // offset0 (este resumen) = 3000, offset1 = 2000 (sin ARFINANZAS), offset2 = 2000.
-      upcoming_installments_table: [3000, 2000, 2000],
+      // Tabla del ciclo SIGUIENTE en adelante: 2000 = sólo Notebook.
+      upcoming_installments_table: [2000, 2000],
     })
 
     const payload = buildStatementPayload(input)
     const arfinanzas = payload.installment_purchases.find((p) => p.description === "ARFINANZAS")!
     const notebook = payload.installment_purchases.find((p) => p.description === "Notebook")!
-
-    // Sólo la cuota leída (5/6): la 6/6 no se proyecta porque el banco no la
-    // trae en la tabla del ciclo siguiente.
     expect(arfinanzas.installments.map((i) => i.installment_number)).toEqual([5])
-    // Notebook no se ve afectada, sigue proyectando sus 3 cuotas.
     expect(notebook.installments.map((i) => i.installment_number)).toEqual([1, 2, 3])
 
     const groups = groupStatementPreviewByCycle(input)
-    expect(groups.map((g) => g.cycleOffset)).toEqual([0, 1, 2])
-    expect(groups[0].totalsByCurrency.ARS).toBe(3000) // ARFINANZAS 5/6 + Notebook 1/3
-    expect(groups[1].totalsByCurrency.ARS).toBe(2000) // sólo Notebook 2/3, coincide con la tabla
-    expect(groups[2].totalsByCurrency.ARS).toBe(2000) // sólo Notebook 3/3
+    expect(groups.map((g) => g.totalsByCurrency.ARS)).toEqual([3000, 2000, 2000])
+  })
+
+  it("si la tabla SÍ incluye el ciclo actual (otro formato de banco), se detecta por la suma y no se corre un mes", () => {
+    const input = makeInput({
+      lines: [
+        makeLine({ description: "ARFINANZAS", amount: 1000, installment_number: 5, installment_total: 6 }),
+        makeLine({ description: "SANLORENZO", amount: 500, installment_number: 3, installment_total: 3 }),
+      ],
+      // 1500 = las cuotas de ESTE resumen (no coincide con el ciclo siguiente, 1000).
+      upcoming_installments_table: [1500, 1000],
+    })
+    const payload = buildStatementPayload(input)
+    const arfinanzas = payload.installment_purchases.find((p) => p.description === "ARFINANZAS")!
+    // La 6/6 sobrevive: la tabla dice 1000 para el ciclo siguiente, que es justo ARFINANZAS.
+    expect(arfinanzas.installments.map((i) => i.installment_number)).toEqual([5, 6])
   })
 
   it("cae al cálculo por número para los ciclos futuros que la tabla no cubre", () => {

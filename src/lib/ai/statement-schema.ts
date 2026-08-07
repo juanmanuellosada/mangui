@@ -50,13 +50,17 @@ export const parsedStatementSchema = z.object({
   lines: z.array(parsedStatementLineSchema),
   /**
    * Tabla "Cuotas a vencer" del resumen (si el PDF la trae): un total de
-   * cuotas por mes, en el mismo orden cronológico en que aparece en el PDF.
-   * El PRIMER elemento corresponde al período de ESTE resumen (mismo total
-   * que las cuotas del detalle actual); los siguientes son los meses futuros.
-   * Se usa para que la proyección de cuotas futuras coincida exacto con lo
-   * que el banco va a cobrar (algunos bancos terminan una cuota antes de lo
-   * que installment_number/installment_total sugieren). null si el PDF no
-   * trae esta tabla.
+   * cuotas por mes, en el mismo orden cronológico en que aparece en el PDF,
+   * SIN interpretar a qué ciclo corresponde cada mes (los títulos de mes de
+   * Galicia no son confiables: con cierre 30-jul la primera columna se
+   * titula "Agosto/26" y con cierre 28-may, "Junio-26"). A qué cycleOffset
+   * corresponde el primer monto lo resuelve capInstallmentOffsets por
+   * aritmética (ver resolveTableStartOffset en statement-import.ts): en los
+   * resúmenes reales de Galicia arranca en el ciclo SIGUIENTE. Se usa para
+   * que la proyección de cuotas futuras coincida exacto con lo que el banco
+   * va a cobrar (algunos bancos terminan una cuota antes de lo que
+   * installment_number/installment_total sugieren). null si el PDF no trae
+   * esta tabla.
    */
   upcoming_installments: z.array(upcomingInstallmentEntrySchema).nullable().default(null),
 })
