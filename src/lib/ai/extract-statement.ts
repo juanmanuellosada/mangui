@@ -39,13 +39,15 @@ Datos del encabezado del resumen:
 Por cada consumo/línea del detalle (ítems de compras, IMPUESTOS y CARGOS del resumen; NO el total, ni las líneas descartadas más abajo):
 - "description": el comercio o concepto tal como figura.
 - "date": fecha del consumo o, si es una compra en cuotas, la fecha de la compra original tal como figura en el resumen, formato YYYY-MM-DD. Si es un impuesto o cargo sin fecha propia, usá la fecha de cierre del resumen.
-- "amount": monto de la línea, numérico sin símbolos ni separadores de miles.
-- "currency": "USD" si la línea está en dólares; si no, "ARS".
+- "amount": el monto que el banco COBRA por esa línea, leído SIEMPRE de las columnas de importe del detalle (las de la derecha, tituladas "PESOS" y "DÓLARES"), numérico sin símbolos ni separadores de miles.
+- "currency": "USD" si el importe de la fila está en la columna DÓLARES; "ARS" si está en la columna PESOS.
 - "amount_ars": si la línea está en USD Y el resumen muestra el equivalente en pesos para esa línea, ese monto; si no aplica o no se muestra, null.
 - "installment_number" / "installment_total": si el concepto indica "cuota X/N" (o similar, ej. "3/12", "04/06"), extraé X como installment_number y N como installment_total; si no es una compra en cuotas, ambos null.
 - "is_subscription": true si el concepto es un cargo mensual recurrente de un servicio de suscripción (p. ej. Claude, Netflix, Spotify, Disney+, gimnasio) SIN indicador de cuotas; false en cualquier otro caso. Una línea con installment_number/installment_total no nulos NUNCA es una suscripción (is_subscription debe ser false en ese caso).
 - "is_refund": true SOLO si la línea es una devolución/reintegro de impuestos o percepciones (ver más abajo); false para cualquier otro concepto (consumos, impuestos, cargos).
 - "category_hint": el nombre EXACTO de la lista de categorías de gasto del usuario que mejor coincida con el consumo; si ninguna coincide, null.
+
+IMPORTANTE — moneda de la compra vs moneda del cobro: muchas filas muestran DENTRO de la referencia la moneda y el monto ORIGINAL de la compra (ej. "TEBEX.ORG USD 11,39", "RESEND USD 20,00", "Order o-y6es4pa EUR 17,67"). Ese número NO es necesariamente el importe de la línea: el importe es el que figura en la columna PESOS o DÓLARES de esa MISMA fila. Cuando la compra es en una moneda que no es ni pesos ni dólares (EUR, BRL, etc.), el banco igual la cobra en una de esas dos columnas y ahí suele haber otro número: si la referencia dice "EUR 17,67" pero la columna DÓLARES dice 20,45, la línea es amount=20.45 y currency="USD" (17,67 es el precio en euros, no lo que se paga). Ante cualquier diferencia entre el número de la referencia y el de la columna, GANA el de la columna.
 
 IMPORTANTE — impuestos y cargos: además de los consumos, el resumen SIEMPRE incluye impuestos y cargos que forman parte del TOTAL A PAGAR (ej. IVA como "DB IVA" o "IVA RG...", impuesto de sellos como "IMPUESTO DE SELLOS", percepciones como "PERCEPCION...", retenciones como "DB.RG 5617...", y cargos de servicio o administrativos como "GASTOS DE SERVICIO EMINENT"). Incluí CADA UNO de estos conceptos como una línea más, con su monto y moneda. NUNCA los omitas: son parte del total a pagar. Para estas líneas, "category_hint" = "Impuestos y comisiones" si esa categoría figura en la lista de categorías del usuario; si no figura, null.
 
@@ -53,7 +55,7 @@ IMPORTANTE — devoluciones y reintegros de impuestos (ej. "DEV.IMP.", "DEVOLUCI
 
 NO incluyas como línea de consumo el total del resumen ni las siguientes, que no son consumos: el saldo anterior (ej. "SALDO ANTERIOR") ni los pagos realizados a la tarjeta (ej. "SU PAGO", "PAGO SU CUENTA", "PAGO MINIMO"). Estas líneas nunca deben aparecer en el resultado, sin importar el signo de su monto.
 
-El objetivo es que la SUMA de todas las líneas de gasto devueltas (consumos + impuestos y cargos) MENOS la suma de las líneas de devolución/reintegro (is_refund: true) se aproxime al total a pagar del resumen ("total_ars"/"total_usd"): revisá el detalle completo para no dejar afuera ningún impuesto, cargo o devolución que figure en él.
+El objetivo es que, POR MONEDA, la SUMA de las líneas de gasto devueltas (consumos + impuestos y cargos) MENOS la suma de las líneas de devolución/reintegro (is_refund: true) dé el total a pagar del resumen: las líneas en ARS deben sumar "total_ars" y las líneas en USD deben sumar "total_usd". Antes de responder, hacé esa cuenta para las dos monedas y, si alguna no cierra, revisá el detalle: falta una línea, o tomaste el monto de la referencia en vez del de la columna de importes.
 
 Devolvé SOLO los campos del esquema.`
 
