@@ -245,6 +245,12 @@ export interface ReconcilePlan {
   fixes: number
   /** Movimientos cargados tildados para eliminar. */
   deletions: number
+  /**
+   * Compras en cuotas de este resumen cuyas cuotas FUTURAS se recalculan
+   * (upsert idempotente): no cambian nada de este ciclo, reparan la
+   * proyección de los que vienen.
+   */
+  reprojected: number
   /** true si no hay ninguna operación tildada. */
   empty: boolean
   /** Una fila por moneda con movimiento (o con total en el PDF). */
@@ -263,6 +269,8 @@ export interface BuildReconcilePlanInput {
   fixes: StatementMismatch[]
   /** Movimientos tildados para eliminar. */
   deletions: ReconcileMovement[]
+  /** Cantidad de compras en cuotas cuyas cuotas futuras se van a recalcular. Opcional; default 0. */
+  reprojections?: number
 }
 
 /** Mismo criterio de neteo que `signedAmount` en cards.ts: un reintegro (income) resta. */
@@ -329,11 +337,17 @@ export function buildReconcilePlan(input: BuildReconcilePlanInput): ReconcilePla
       }
     })
 
+  const reprojected = input.reprojections ?? 0
   return {
     additions: input.additions.length,
     fixes: input.fixes.length,
     deletions: input.deletions.length,
-    empty: input.additions.length === 0 && input.fixes.length === 0 && input.deletions.length === 0,
+    reprojected,
+    empty:
+      input.additions.length === 0 &&
+      input.fixes.length === 0 &&
+      input.deletions.length === 0 &&
+      reprojected === 0,
     totals,
     allMatch: totals.length > 0 && totals.every((t) => t.matches),
   }

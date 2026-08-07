@@ -34,7 +34,14 @@ import { MOVEMENTS_KEY, ACCOUNTS_KEY, BALANCES_KEY } from "@/lib/movements"
 import { RECURRING_KEY } from "@/lib/recurring"
 import { INSTALLMENTS_KEY } from "@/lib/installments"
 import type { CardCycle } from "@/lib/cards"
-import { importStatementPdf, saveImportedStatement, StatementImportError, type ParsedStatement } from "@/lib/statement-import"
+import {
+  importStatementPdf,
+  saveImportedStatement,
+  buildPurchaseKey,
+  StatementImportError,
+  type ParsedStatement,
+  type StatementReviewLine,
+} from "@/lib/statement-import"
 import {
   MAX_PDF_SIZE,
   matchCategoryId,
@@ -60,14 +67,19 @@ type Step = "upload" | "diff"
 
 // ── Data fetchers ──────────────────────────────────────────────────────────────
 
-/** Descripciones de compras en cuotas de la cuenta, para resolver el comercio de un movimiento de cuota (movements.note queda NULL en cuotas). */
-async function fetchInstallmentPurchaseDescriptions(
+/**
+ * Compras en cuotas de la cuenta: la descripción resuelve el comercio de un
+ * movimiento de cuota (movements.note queda NULL en cuotas) y `purchase_key`
+ * identifica el plan ya cargado, para reproyectar sólo planes existentes (ver
+ * reprojectLines en handleAnalyze).
+ */
+async function fetchInstallmentPurchases(
   accountId: string
-): Promise<{ id: string; description: string }[]> {
+): Promise<{ id: string; description: string; purchase_key: string | null }[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from("installment_purchases")
-    .select("id, description")
+    .select("id, description, purchase_key")
     .eq("account_id", accountId)
   if (error) throw error
   return data
@@ -225,7 +237,20 @@ function PlanSummary({ plan }: { plan: ReconcilePlan }) {
                 Eliminar {plan.deletions}
               </span>
             )}
+            {plan.reprojected > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[11px] font-semibold">
+                Recalcular cuotas de {plan.reprojected}
+              </span>
+            )}
           </div>
+        )}
+        {plan.reprojected > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            Las cuotas futuras de {plan.reprojected === 1 ? "la compra en cuotas" : `las ${plan.reprojected} compras en cuotas`} de este resumen se
+            recalculan contra el PDF: importe de cada cuota y hasta qué mes llegan (tabla &quot;Cuotas a
+            vencer&quot;). Repara las que quedaron con un monto viejo o sin la última cuota. No cambia el total
+            de este resumen.
+          </p>
         )}
       </div>
 
@@ -284,6 +309,9 @@ function applyLabel(plan: ReconcilePlan): string {
   if (plan.additions > 0) partes.push(`agregar ${plan.additions}`)
   if (plan.fixes > 0) partes.push(`corregir ${plan.fixes}`)
   if (plan.deletions > 0) partes.push(`eliminar ${plan.deletions}`)
+  if (partes.length === 0 && plan.reprojected > 0) {
+    return `Recalcular las cuotas de ${plan.reprojected} compra${plan.reprojected === 1 ? "" : "s"}`
+  }
   return `Aplicar · ${partes.join(" · ")}`
 }
 
@@ -316,6 +344,18 @@ export function CorroborateStatementFlow({
   const [missingLines, setMissingLines] = useState<ReviewLine[]>([])
   const [extra, setExtra] = useState<ReconcileMovement[]>([])
   const [mismatched, setMismatched] = useState<StatementMismatch[]>([])
+  /**
+   * Cuotas del PDF que YA están cargadas en este resumen y cuyo plan existe en
+   * la base: se mandan igual en el payload para que la RPC recalcule las
+   * cuotas FUTURAS de ese plan (upsert por purchase_key + nº de cuota, no
+   * duplica). Repara las dos formas en que la proyección puede haber quedado
+   * mal: el IMPORTE de las cuotas que vienen (una cuota mal leída se arrastra
+   * a todas las futuras, corregir sólo la de este resumen no alcanza) y hasta
+   * QUÉ MES llegan (la tabla "Cuotas a vencer"). El diff por sí solo nunca lo
+   * vería: compara este ciclo, no los que vienen. No suman al total de este
+   * resumen (ya están contadas).
+   */
+  const [reprojectLines, setReprojectLines] = useState<StatementReviewLine[]>([])
   /** Bajas tildadas, por id de movimiento. Arrancan en true: el PDF manda. */
   const [deleteSelected, setDeleteSelected] = useState<Record<string, boolean>>({})
   /** Correcciones de importe tildadas, por id del movimiento cargado. Arrancan en true. */
@@ -324,7 +364,7 @@ export function CorroborateStatementFlow({
 
   const { data: purchases = [], isLoading: purchasesLoading } = useQuery({
     queryKey: [...INSTALLMENTS_KEY, "descriptions", account.id],
-    queryFn: () => fetchInstallmentPurchaseDescriptions(account.id),
+    queryFn: () => fetchInstallmentPurchases(account.id),
     enabled: open,
   })
 
@@ -353,6 +393,12 @@ export function CorroborateStatementFlow({
     [extra, deleteSelected]
   )
 
+  /** Compras (no cuotas sueltas) cuya proyección futura se va a recalcular. */
+  const reprojectedPurchaseCount = useMemo(
+    () => new Set(reprojectLines.map((l) => buildPurchaseKey(l.description, l.date, l.installment_total!))).size,
+    [reprojectLines]
+  )
+
   /**
    * El plan que se muestra ANTES de tocar nada: cuántos movimientos se
    * agregan/corrigen/eliminan y con qué total queda cada moneda contra el PDF.
@@ -366,9 +412,10 @@ export function CorroborateStatementFlow({
             additions: linesToAdd.map(toStatementReviewLine),
             fixes: fixesToApply,
             deletions: movementsToDelete,
+            reprojections: reprojectedPurchaseCount,
           })
         : null,
-    [parsed, cycleSnapshot, linesToAdd, fixesToApply, movementsToDelete]
+    [parsed, cycleSnapshot, linesToAdd, fixesToApply, movementsToDelete, reprojectedPurchaseCount]
   )
 
   function resetAll() {
@@ -382,6 +429,7 @@ export function CorroborateStatementFlow({
     setMissingLines([])
     setExtra([])
     setMismatched([])
+    setReprojectLines([])
     setDeleteSelected({})
     setFixSelected({})
     setSaving(false)
@@ -440,6 +488,37 @@ export function CorroborateStatementFlow({
       setExtra(result.extra)
       setMismatched(result.mismatched)
       setCycleSnapshot(cycleMovements)
+
+      // Cuotas del PDF ya cargadas (no están en "falta"), cuyo plan existe en
+      // la base con la misma purchase_key: se reproyectan. Si la clave no
+      // existe no se manda nada, para no crear un plan duplicado por una
+      // descripción que la IA leyó distinto.
+      const missingSet = new Set(result.missing)
+      const knownKeys = new Set(purchases.map((p) => p.purchase_key).filter((k): k is string => k != null))
+      setReprojectLines(
+        p.lines
+          .filter(
+            (l) =>
+              l.installment_number != null &&
+              l.installment_total != null &&
+              !missingSet.has(l) &&
+              knownKeys.has(buildPurchaseKey(l.description, l.date, l.installment_total))
+          )
+          .map((l) => ({
+            description: l.description,
+            date: l.date,
+            amount: l.amount,
+            currency: l.currency,
+            amount_ars: l.amount_ars,
+            installment_number: l.installment_number,
+            installment_total: l.installment_total,
+            is_subscription: false,
+            is_refund: false,
+            category_id: matchCategoryId(l.category_hint, expenseCategories),
+            selected: true,
+            createRecurring: false,
+          }))
+      )
       // Por default se aplica todo: el PDF es la fuente de verdad de lo que
       // hay que pagar. El usuario destilda lo que no quiera antes de aplicar.
       setDeleteSelected(Object.fromEntries(result.extra.map((m) => [m.id, true])))
@@ -466,7 +545,7 @@ export function CorroborateStatementFlow({
   async function handleApply() {
     setSaving(true)
     try {
-      const linesToApply = linesToAdd.map(toStatementReviewLine)
+      const linesToApply = [...linesToAdd.map(toStatementReviewLine), ...reprojectLines]
       // El PDF es la fuente de verdad de lo que hay que pagar: el total del
       // resumen pasa a ser el del PDF (si la IA lo leyó); si no vino, queda el
       // proyectado después de aplicar el plan.
@@ -537,7 +616,7 @@ export function CorroborateStatementFlow({
         title={step === "upload" ? "Corroborar con IA" : "Revisar diferencias"}
         footer={
           step === "diff" ? (
-            noDifferences ? (
+            noDifferences && (!plan || plan.empty) ? (
               <Button
                 variant="outline"
                 onClick={() => handleOpenChange(false)}
