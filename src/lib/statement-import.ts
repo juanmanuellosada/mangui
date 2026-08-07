@@ -616,6 +616,10 @@ export function checkUpcomingInstallmentsTotal(
 export interface SaveImportedStatementResult {
   statement_id: string
   movements_created: number
+  /** Bajas aplicadas por "Corroborar con IA" (payload.deletions, migración 0059). Ausente en RPCs viejas. */
+  movements_deleted?: number
+  /** Correcciones de importe aplicadas (payload.amount_updates, migración 0059). Ausente en RPCs viejas. */
+  movements_updated?: number
 }
 
 /** Llama a la RPC import_card_statement con el payload ya armado. */

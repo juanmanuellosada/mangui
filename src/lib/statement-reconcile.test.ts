@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest"
-import { reconcileStatement, buildReconcileApplyPayload, type ReconcileMovement } from "./statement-reconcile"
+import {
+  reconcileStatement,
+  buildReconcileApplyPayload,
+  buildReconcilePlan,
+  type ReconcileMovement,
+} from "./statement-reconcile"
 import type { ParsedStatement, ParsedStatementLine } from "./ai/statement-schema"
 import type { StatementReviewLine } from "./statement-import"
 
@@ -281,5 +286,164 @@ describe("buildReconcileApplyPayload", () => {
     expect(line.selected).toBe(true) // sigue intacta
     expect(payload.account_id).toBe("acc-1")
     expect(payload.close_date).toBe("2026-06-20")
+  })
+})
+
+describe("buildReconcileApplyPayload · bajas y correcciones (migración 0059)", () => {
+  const base = {
+    account_id: "acc-1",
+    account_currency: "ARS" as const,
+    close_date: "2026-06-20",
+    due_date: "2026-06-30",
+    total_amount: 0,
+    total_amount_usd: 0,
+    stamp_tax: 0,
+    linesToApply: [],
+  }
+
+  it("sin bajas ni correcciones manda arrays vacíos (no borra ni toca nada)", () => {
+    const payload = buildReconcileApplyPayload(base)
+    expect(payload.deletions).toEqual([])
+    expect(payload.amount_updates).toEqual([])
+  })
+
+  it("manda los ids de los movimientos que sobran para que la RPC los elimine", () => {
+    const payload = buildReconcileApplyPayload({
+      ...base,
+      deletions: [makeMovement({ id: "mov-9" }), makeMovement({ id: "mov-10" })],
+    })
+    expect(payload.deletions).toEqual(["mov-9", "mov-10"])
+  })
+
+  it("una corrección de importe usa el monto del PDF, no el cargado", () => {
+    const payload = buildReconcileApplyPayload({
+      ...base,
+      amountFixes: [
+        { line: makeLine({ amount: 7500 }), movement: makeMovement({ id: "mov-3", amount: 5000 }) },
+      ],
+    })
+    expect(payload.amount_updates).toEqual([{ id: "mov-3", amount: 7500 }])
+  })
+})
+
+describe("buildReconcilePlan", () => {
+  function reviewLine(overrides: Partial<StatementReviewLine> = {}): StatementReviewLine {
+    return {
+      description: "Kiosco Don Pepe",
+      date: "2026-06-15",
+      amount: 1200,
+      currency: "ARS",
+      amount_ars: null,
+      installment_number: null,
+      installment_total: null,
+      is_subscription: false,
+      is_refund: false,
+      category_id: null,
+      selected: true,
+      ...overrides,
+    }
+  }
+
+  it("aplicar todo el diff deja el resumen clavado con el total del PDF", () => {
+    // Cargado: 5000 (ok) + 3000 (debería ser 4000) + 900 (no está en el PDF).
+    // PDF: 5000 + 4000 + 1200 (falta) = 10200.
+    const cycleMovements = [
+      makeMovement({ id: "ok", amount: 5000 }),
+      makeMovement({ id: "mal", description: "Farmacia", amount: 3000 }),
+      makeMovement({ id: "sobra", description: "Ferretería", amount: 900 }),
+    ]
+    const parsed = makeParsed([
+      makeLine({ amount: 5000 }),
+      makeLine({ description: "Farmacia", amount: 4000 }),
+      makeLine({ description: "Kiosco Don Pepe", amount: 1200 }),
+    ])
+    parsed.total_ars = 10200
+
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements,
+      additions: [reviewLine()],
+      fixes: [
+        { line: makeLine({ description: "Farmacia", amount: 4000 }), movement: cycleMovements[1] },
+      ],
+      deletions: [cycleMovements[2]],
+    })
+
+    expect(plan).toMatchObject({ additions: 1, fixes: 1, deletions: 1, empty: false, allMatch: true })
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.current).toBe(8900)
+    expect(ars.after).toBe(10200)
+    expect(ars.pdf).toBe(10200)
+    expect(ars.difference).toBe(0)
+    expect(ars.pdfFromLines).toBe(false)
+  })
+
+  it("sin nada tildado el plan queda vacío y muestra la diferencia contra el PDF", () => {
+    const parsed = makeParsed([makeLine({ amount: 5000 }), makeLine({ description: "Farmacia", amount: 4000 })])
+    parsed.total_ars = 9000
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [makeMovement({ amount: 5000 })],
+      additions: [],
+      fixes: [],
+      deletions: [],
+    })
+    expect(plan.empty).toBe(true)
+    expect(plan.allMatch).toBe(false)
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.after).toBe(5000)
+    expect(ars.difference).toBe(-4000)
+  })
+
+  it("si el PDF no declara total, usa la suma de sus líneas y lo avisa", () => {
+    const parsed = makeParsed([makeLine({ amount: 5000 })])
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [makeMovement({ amount: 5000 })],
+      additions: [],
+      fixes: [],
+      deletions: [],
+    })
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.pdf).toBe(5000)
+    expect(ars.pdfFromLines).toBe(true)
+    expect(ars.matches).toBe(true)
+  })
+
+  it("un reintegro resta en los dos lados (cargado y PDF), igual que en el resumen real", () => {
+    const parsed = makeParsed([
+      makeLine({ amount: 5000 }),
+      makeLine({ description: "DEV.IMP", amount: 800, is_refund: true }),
+    ])
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [makeMovement({ amount: 5000 })],
+      additions: [reviewLine({ description: "DEV.IMP", amount: 800, is_refund: true })],
+      fixes: [],
+      deletions: [],
+    })
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.after).toBe(4200)
+    expect(ars.pdf).toBe(4200)
+    expect(ars.matches).toBe(true)
+  })
+
+  it("separa ARS y USD: cada moneda cuadra contra su propio total del PDF", () => {
+    const parsed = makeParsed([
+      makeLine({ amount: 5000 }),
+      makeLine({ description: "Claude", amount: 25.3, currency: "USD" }),
+    ])
+    parsed.total_ars = 5000
+    parsed.total_usd = 25.3
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [makeMovement({ amount: 5000 })],
+      additions: [reviewLine({ description: "Claude", amount: 25.3, currency: "USD" })],
+      fixes: [],
+      deletions: [],
+    })
+    expect(plan.totals).toHaveLength(2)
+    expect(plan.allMatch).toBe(true)
+    expect(plan.totals.find((t) => t.currency === "USD")!.after).toBe(25.3)
   })
 })

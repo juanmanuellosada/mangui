@@ -126,8 +126,26 @@ export function reconcileStatement(parsed: ParsedStatement, cycleMovements: Reco
 
 // ── Aplicación reconciliable de lo faltante (Grupo 2, D2/tarea 2.2) ─────────
 
-/** Payload de `import_card_statement` en modo aditivo: NO dispara el DELETE previo de movimientos simples (ver migración 0056_statement_reconcile_additive.sql). */
-export type ReconcileApplyPayload = StatementImportPayload & { additive: true }
+/** Corrección de importe de un movimiento ya cargado al valor que figura en el PDF (migración 0059). */
+export interface ReconcileAmountUpdate {
+  id: string
+  amount: number
+}
+
+/**
+ * Payload de `import_card_statement` en modo aditivo: NO dispara el DELETE
+ * previo de movimientos simples (ver migración 0056_statement_reconcile_additive.sql).
+ * `deletions` y `amount_updates` (migración 0059) son las bajas y correcciones
+ * de importe que el usuario tildó en el diff, y se aplican en la MISMA
+ * transacción que las altas: o queda todo el resumen corregido, o no queda nada.
+ */
+export type ReconcileApplyPayload = StatementImportPayload & {
+  additive: true
+  /** IDs de movimientos cargados que el PDF no tiene y el usuario decidió eliminar. */
+  deletions: string[]
+  /** Movimientos cargados cuyo importe se corrige al del PDF. */
+  amount_updates: ReconcileAmountUpdate[]
+}
 
 export interface BuildReconcileApplyPayloadInput {
   account_id: string
@@ -145,6 +163,18 @@ export interface BuildReconcileApplyPayloadInput {
    * — mismo shape que usa el import para reusar el componente de fila.
    */
   linesToApply: StatementReviewLine[]
+  /**
+   * Movimientos cargados que el usuario tildó para ELIMINAR porque el PDF no
+   * los tiene (sección "sobra" del diff). Opcional/aditivo: sin esta clave el
+   * comportamiento es el de antes (no se borra nada).
+   */
+  deletions?: ReconcileMovement[]
+  /**
+   * Diferencias de importe que el usuario tildó para CORREGIR: el movimiento
+   * cargado pasa a valer lo que dice el PDF, que es la fuente de verdad de lo
+   * que hay que pagar. Opcional/aditivo.
+   */
+  amountFixes?: StatementMismatch[]
   /** Tabla "Cuotas a vencer" del PDF corroborado, ver BuildStatementPayloadInput. */
   upcoming_installments_table?: number[] | null
 }
@@ -177,5 +207,134 @@ export function buildReconcileApplyPayload(input: BuildReconcileApplyPayloadInpu
     lines: input.linesToApply,
     upcoming_installments_table: input.upcoming_installments_table,
   })
-  return { ...payload, additive: true }
+  return {
+    ...payload,
+    additive: true,
+    deletions: (input.deletions ?? []).map((m) => m.id),
+    amount_updates: (input.amountFixes ?? []).map((m) => ({ id: m.movement.id, amount: m.line.amount })),
+  }
+}
+
+// ── Plan de corroboración: qué se va a hacer y cómo quedan los importes ─────
+
+export interface CurrencyTotals {
+  ARS: number
+  USD: number
+}
+
+/** Cómo queda una moneda después de aplicar el plan, contra lo que dice el PDF. */
+export interface ReconcileTotalsRow {
+  currency: "ARS" | "USD"
+  /** Suma de lo cargado hoy en el ciclo (gastos − reintegros), mismo neteo que cards.ts. */
+  current: number
+  /** Suma proyectada después de aplicar altas, correcciones y bajas tildadas. */
+  after: number
+  /** Lo que hay que pagar según el PDF (total declarado si vino; si no, suma de sus líneas). */
+  pdf: number
+  /** after − pdf (0 = el resumen queda clavado con el PDF). */
+  difference: number
+  matches: boolean
+  /** true si el total de esta moneda del PDF salió de sumar sus líneas porque el PDF no declaró total. */
+  pdfFromLines: boolean
+}
+
+export interface ReconcilePlan {
+  /** Líneas del PDF tildadas para agregar (sólo la ocurrencia de ESTE resumen). */
+  additions: number
+  /** Diferencias de importe tildadas para corregir al monto del PDF. */
+  fixes: number
+  /** Movimientos cargados tildados para eliminar. */
+  deletions: number
+  /** true si no hay ninguna operación tildada. */
+  empty: boolean
+  /** Una fila por moneda con movimiento (o con total en el PDF). */
+  totals: ReconcileTotalsRow[]
+  /** true si TODAS las monedas quedan clavadas con el PDF después de aplicar. */
+  allMatch: boolean
+}
+
+export interface BuildReconcilePlanInput {
+  parsed: ParsedStatement
+  /** Movimientos del ciclo tal como están cargados hoy (los mismos que se le pasaron a reconcileStatement). */
+  cycleMovements: ReconcileMovement[]
+  /** Líneas faltantes tildadas para agregar. */
+  additions: StatementReviewLine[]
+  /** Diferencias de importe tildadas para corregir. */
+  fixes: StatementMismatch[]
+  /** Movimientos tildados para eliminar. */
+  deletions: ReconcileMovement[]
+}
+
+/** Mismo criterio de neteo que `signedAmount` en cards.ts: un reintegro (income) resta. */
+function signedMovement(m: { amount: number; type: "expense" | "income" }): number {
+  return m.type === "income" ? -m.amount : m.amount
+}
+
+function signedLine(l: { amount: number; is_refund?: boolean }): number {
+  return l.is_refund === true ? -l.amount : l.amount
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * Función PURA: proyecta cómo van a quedar los importes del resumen si se
+ * aplica lo que el usuario tildó del diff, y los compara contra el PDF (la
+ * fuente de verdad de lo que hay que pagar). Es lo que la pantalla muestra
+ * ANTES de tocar nada: cuántos movimientos se agregan, cuántos se corrigen,
+ * cuántos se eliminan, y con qué total queda cada moneda.
+ *
+ * Sólo cuenta la ocurrencia de ESTE ciclo de cada línea agregada: una cuota
+ * tildada proyecta también sus cuotas futuras (ver buildReconcileApplyPayload),
+ * pero ésas caen en resúmenes siguientes y no mueven el total de éste.
+ */
+export function buildReconcilePlan(input: BuildReconcilePlanInput): ReconcilePlan {
+  const current: CurrencyTotals = { ARS: 0, USD: 0 }
+  for (const m of input.cycleMovements) current[m.currency] += signedMovement(m)
+
+  const after: CurrencyTotals = { ARS: current.ARS, USD: current.USD }
+  for (const l of input.additions) after[l.currency] += signedLine(l)
+  for (const d of input.deletions) after[d.currency] -= signedMovement(d)
+  for (const f of input.fixes) {
+    after[f.movement.currency] -= signedMovement(f.movement)
+    after[f.line.currency] += signedLine(f.line)
+  }
+
+  // Total del PDF por moneda: el declarado en el encabezado manda; si el PDF
+  // no lo trae (o la IA no lo leyó), se cae a la suma de sus propias líneas.
+  const pdfLines: CurrencyTotals = { ARS: 0, USD: 0 }
+  for (const l of input.parsed.lines) pdfLines[l.currency] += signedLine(l)
+  const declared: Record<"ARS" | "USD", number | null> = {
+    ARS: input.parsed.total_ars,
+    USD: input.parsed.total_usd,
+  }
+
+  const currencies: ("ARS" | "USD")[] = ["ARS", "USD"]
+  const totals: ReconcileTotalsRow[] = currencies
+    .filter((c) => current[c] !== 0 || after[c] !== 0 || pdfLines[c] !== 0 || (declared[c] ?? 0) !== 0)
+    .map((currency) => {
+      const pdfFromLines = declared[currency] == null
+      const pdf = round2(pdfFromLines ? pdfLines[currency] : declared[currency]!)
+      const afterRounded = round2(after[currency])
+      const difference = round2(afterRounded - pdf)
+      return {
+        currency,
+        current: round2(current[currency]),
+        after: afterRounded,
+        pdf,
+        difference,
+        matches: Math.abs(difference) < AMOUNT_EPSILON,
+        pdfFromLines,
+      }
+    })
+
+  return {
+    additions: input.additions.length,
+    fixes: input.fixes.length,
+    deletions: input.deletions.length,
+    empty: input.additions.length === 0 && input.fixes.length === 0 && input.deletions.length === 0,
+    totals,
+    allMatch: totals.length > 0 && totals.every((t) => t.matches),
+  }
 }
