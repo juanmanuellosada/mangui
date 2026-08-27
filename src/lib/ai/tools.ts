@@ -595,7 +595,7 @@ const RITMO_DIAS = 90
 async function pagosTarjetaHasta(
   supabase: SessionClient,
   hoy: string,
-  hasta: string
+  horizonte: string
 ): Promise<ProjectionCardPayment[]> {
   const { data: cards } = await supabase
     .from("accounts")
@@ -629,32 +629,39 @@ async function pagosTarjetaHasta(
     )
     if (cycles.length === 0) continue
 
-    const cycle = cycles[defaultCycleIndex(cycles)]
-    if (cycle.statement?.status === "pagado") continue
-    if (cycle.dueDate && cycle.dueDate > hasta) continue
-
     const moneda: Moneda = card.currency === "USD" ? "USD" : "ARS"
     const otra: Moneda = moneda === "ARS" ? "USD" : "ARS"
 
-    // `cycle.total` está en la moneda de la tarjeta y deja afuera los consumos
-    // en la otra moneda sin equivalente guardado ("USD puro"): esos se suman
-    // aparte para no perderlos ni contarlos dos veces.
-    let montoOtraMoneda = 0
-    for (const m of cycle.movements) {
-      if (m.original_currency !== otra) continue
-      if (m.converted_amount != null) continue
-      montoOtraMoneda += m.type === "income" ? -m.amount : m.amount
-    }
+    // Desde el ciclo "A pagar" en adelante: el resumen pendiente más los que
+    // vencen dentro del horizonte (el ciclo en curso, y los futuros que ya
+    // tienen cuotas cargadas). Arrancar en `defaultCycleIndex` evita revivir
+    // ciclos viejos que nunca tuvieron un statement registrado.
+    for (let i = defaultCycleIndex(cycles); i < cycles.length; i++) {
+      const cycle = cycles[i]
+      if (cycle.statement?.status === "pagado") continue
+      if (!cycle.dueDate || cycle.dueDate > horizonte) continue
 
-    pagos.push({
-      tarjeta: card.name,
-      moneda,
-      monto: cycle.statement?.total_amount ?? cycle.total,
-      vencimiento: cycle.dueDate,
-      vencido: cycle.dueDate != null && cycle.dueDate < hoy,
-      monto_otra_moneda: montoOtraMoneda,
-      otra_moneda: otra,
-    })
+      // `cycle.total` está en la moneda de la tarjeta y deja afuera los consumos
+      // en la otra moneda sin equivalente guardado ("USD puro"): esos se suman
+      // aparte para no perderlos ni contarlos dos veces.
+      let montoOtraMoneda = 0
+      for (const m of cycle.movements) {
+        if (m.original_currency !== otra) continue
+        if (m.converted_amount != null) continue
+        montoOtraMoneda += m.type === "income" ? -m.amount : m.amount
+      }
+
+      pagos.push({
+        tarjeta: card.name,
+        moneda,
+        monto: cycle.statement?.total_amount ?? cycle.total,
+        vencimiento: cycle.dueDate,
+        vencido: cycle.dueDate < hoy,
+        cicloAbierto: toDateString(cycle.cycleEnd) > hoy,
+        monto_otra_moneda: montoOtraMoneda,
+        otra_moneda: otra,
+      })
+    }
   }
 
   return pagos
@@ -670,6 +677,10 @@ export async function proyeccionFinDeMes(
 ): Promise<ProyeccionResult> {
   const hoy = todayAR()
   const hasta = params.hasta ?? toDateString(endOfMonth(parseISO(hoy)))
+  // La curva de liquidez mira más allá del corte: los compromisos del mes que
+  // viene caen antes de que entre el próximo sueldo, y son los que definen
+  // cuánto se puede sacar hoy sin quedar corto.
+  const horizonte = toDateString(endOfMonth(addMonths(parseISO(hasta), 1)))
 
   const ritmoDesde = toDateString(subDays(parseISO(hoy), RITMO_DIAS))
   const ritmoHasta = toDateString(subDays(parseISO(hoy), 1))
@@ -685,7 +696,7 @@ export async function proyeccionFinDeMes(
         .select("account_id, type, date, amount, converted_amount, original_currency, note, installment_number, installment_total")
         .eq("is_future", true)
         .gte("date", hoy)
-        .lte("date", hasta),
+        .lte("date", horizonte),
       supabase.from("recurring_transactions").select("*").eq("status", "active"),
       supabase
         .from("movements")
@@ -696,7 +707,7 @@ export async function proyeccionFinDeMes(
         .is("recurring_id", null)
         .gte("date", ritmoDesde)
         .lte("date", ritmoHasta),
-      pagosTarjetaHasta(supabase, hoy, hasta),
+      pagosTarjetaHasta(supabase, hoy, horizonte),
     ])
 
   if (balancesRes.error) throw new Error(`Error al obtener saldos: ${balancesRes.error.message}`)
@@ -729,6 +740,7 @@ export async function proyeccionFinDeMes(
   return computeProjection({
     desde: hoy,
     hasta,
+    horizonte,
     cuentas,
     movimientosFuturos: (futurosRes.data ??
       []) as Parameters<typeof computeProjection>[0]["movimientosFuturos"],

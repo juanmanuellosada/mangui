@@ -59,6 +59,7 @@ function input(overrides: Partial<ProjectionInput> = {}): ProjectionInput {
   return {
     desde: "2026-08-27",
     hasta: "2026-08-31",
+    horizonte: "2026-09-30",
     cuentas: [banco],
     movimientosFuturos: [],
     recurrentes: [],
@@ -133,6 +134,7 @@ describe("computeProjection", () => {
             monto: 300_000,
             vencimiento: "2026-08-30",
             vencido: false,
+            cicloAbierto: false,
             monto_otra_moneda: 50,
             otra_moneda: "USD",
           },
@@ -303,5 +305,124 @@ describe("computeProjection", () => {
     expect(r.usd.egresos_comprometidos).toBe(100)
     expect(r.usd.saldo_proyectado).toBe(4_900)
     expect(r.ars.egresos_comprometidos).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Liquidez: cuánto se puede sacar hoy sin quedar en rojo
+// ---------------------------------------------------------------------------
+describe("computeProjection · liquidez", () => {
+  it("sin compromisos posteriores, el excedente es el saldo proyectado", () => {
+    const r = computeProjection(input())
+    expect(r.liquidez.ars.excedente_disponible).toBe(1_000_000)
+    expect(r.liquidez.ars.colchon_necesario).toBe(0)
+  })
+
+  it("no deja sacar la plata que hace falta para los compromisos del mes que viene", () => {
+    // El caso real: a fin de mes "sobran" $5M, pero el 5 vence el alquiler y
+    // el 10 la tarjeta. Sacar los $5M hoy deja en rojo en septiembre.
+    const r = computeProjection(
+      input({
+        cuentas: [{ ...banco, saldo: 5_000_000 }],
+        recurrentes: [
+          recurrente({ id: "r1", kind: "expense", day_of_month: 5, amount: 1_000_000, note: "Alquiler" }),
+        ],
+        pagosTarjeta: [
+          {
+            tarjeta: "Visa",
+            moneda: "ARS",
+            monto: 1_500_000,
+            vencimiento: "2026-09-10",
+            vencido: false,
+            cicloAbierto: false,
+            monto_otra_moneda: 0,
+            otra_moneda: "USD",
+          },
+        ],
+      })
+    )
+
+    // A fin de agosto no pasa nada: el saldo proyectado sigue siendo $5M.
+    expect(r.ars.saldo_proyectado).toBe(5_000_000)
+    // Pero el 10 de septiembre, después del alquiler y la tarjeta, quedan $2,5M.
+    expect(r.liquidez.ars.saldo_minimo).toBe(2_500_000)
+    expect(r.liquidez.ars.fecha_saldo_minimo).toBe("2026-09-10")
+    expect(r.liquidez.ars.excedente_disponible).toBe(2_500_000)
+    expect(r.liquidez.ars.colchon_necesario).toBe(2_500_000)
+    // Los compromisos de septiembre no ensucian los totales de agosto.
+    expect(r.ars.egresos_comprometidos).toBe(0)
+    expect(r.proximos_compromisos.map((c) => c.concepto)).toEqual([
+      "Alquiler",
+      "Resumen Visa",
+    ])
+  })
+
+  it("el colchón sale de los compromisos reales, no de un monto fijo", () => {
+    const chico = computeProjection(
+      input({
+        cuentas: [{ ...banco, saldo: 5_000_000 }],
+        recurrentes: [
+          recurrente({ id: "r1", kind: "expense", day_of_month: 5, amount: 200_000 }),
+        ],
+      })
+    )
+    const grande = computeProjection(
+      input({
+        cuentas: [{ ...banco, saldo: 5_000_000 }],
+        recurrentes: [
+          recurrente({ id: "r1", kind: "expense", day_of_month: 5, amount: 3_000_000 }),
+        ],
+      })
+    )
+    expect(chico.liquidez.ars.excedente_disponible).toBe(4_800_000)
+    expect(grande.liquidez.ars.excedente_disponible).toBe(2_000_000)
+  })
+
+  it("el ritmo de gasto también erosiona el excedente", () => {
+    const r = computeProjection(
+      input({
+        cuentas: [{ ...banco, saldo: 5_000_000 }],
+        gastoDiarioPromedio: { ARS: 50_000, USD: 0 },
+      })
+    )
+    // 34 días desde el 28/08 hasta el 30/09 × $50.000
+    expect(r.liquidez.ars.fecha_saldo_minimo).toBe("2026-09-30")
+    expect(r.liquidez.ars.excedente_disponible).toBe(3_300_000)
+  })
+
+  it("nunca sugiere un excedente negativo", () => {
+    const r = computeProjection(
+      input({
+        cuentas: [{ ...banco, saldo: 100_000 }],
+        recurrentes: [
+          recurrente({ id: "r1", kind: "expense", day_of_month: 5, amount: 500_000 }),
+        ],
+      })
+    )
+    expect(r.liquidez.ars.saldo_minimo).toBe(-400_000)
+    expect(r.liquidez.ars.excedente_disponible).toBe(0)
+  })
+
+  it("un vencimiento impago del pasado impacta hoy", () => {
+    const r = computeProjection(
+      input({
+        cuentas: [{ ...banco, saldo: 1_000_000 }],
+        pagosTarjeta: [
+          {
+            tarjeta: "Visa",
+            moneda: "ARS",
+            monto: 400_000,
+            vencimiento: "2026-08-10",
+            vencido: true,
+            cicloAbierto: false,
+            monto_otra_moneda: 0,
+            otra_moneda: "USD",
+          },
+        ],
+      })
+    )
+    expect(r.ars.egresos_comprometidos).toBe(400_000)
+    expect(r.liquidez.ars.excedente_disponible).toBe(600_000)
+    expect(r.egresos[0].concepto).toBe("Resumen Visa (vencido)")
   })
 })

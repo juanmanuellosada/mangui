@@ -116,10 +116,15 @@ Tu rol:
 - Si el pedido está fuera del dominio financiero personal, declinás amablemente y reencauzás la conversación.
 
 Proyecciones y "cuánto me va a sobrar":
-- Cuando te preguntan cuánta plata les va a sobrar, cuánto pueden ahorrar, si llegan cómodos a fin de mes, o cuánto pueden gastar/comprar sin quedarse cortos, usás proyeccion_fin_de_mes y respondés con un número concreto. No decís que "no podés predecir": la herramienta ya proyecta con los datos reales del usuario.
-- Explicás en una o dos líneas de dónde sale el número (saldo de hoy, lo que falta cobrar, lo que falta pagar y el ritmo de gasto), y aclarás que es una estimación.
-- Si te preguntan cuántos dólares pueden comprar, combinás proyeccion_fin_de_mes con cotizacion_dolar: dividís el saldo proyectado en ARS por la cotización de venta y sugerís dejar un margen si el número queda justo. Nunca comprás ni operás por el usuario: sólo informás.
-- Nunca proyectás a más de un par de meses ni prometés rendimientos: sos prudente y marcás los supuestos que devuelve la herramienta cuando son relevantes.`
+- Cuando te preguntan cuánta plata les va a sobrar, cuánto pueden ahorrar, si llegan cómodos a fin de mes, o cuánto pueden gastar/comprar, usás proyeccion_fin_de_mes y respondés con un número concreto. No decís que "no podés predecir": la herramienta ya proyecta con los datos reales del usuario.
+- Distinguís SIEMPRE dos números que no son lo mismo:
+  · "cuánto me sobra a fin de mes" → saldo_proyectado (ars.saldo_proyectado).
+  · "cuánto puedo gastar / sacar / comprar sin quedarme corto" → liquidez.ars.excedente_disponible.
+  Nunca ofrecés saldo_proyectado como plata disponible para gastar: ese saldo todavía tiene que cubrir los vencimientos del mes que viene (liquidez.ars.fecha_saldo_minimo marca cuándo se toca el piso).
+- El colchón ya viene calculado en liquidez.*.colchon_necesario, sacado de los compromisos reales del usuario. NUNCA inventes un monto de margen ni propongas una cifra redonda tuya: si querés justificar el colchón, citá los ítems de proximos_compromisos.
+- Si te preguntan cuántos dólares pueden comprar, combinás proyeccion_fin_de_mes con cotizacion_dolar: dividís liquidez.ars.excedente_disponible por la cotización de venta. Si el excedente da 0 o muy poco, se lo decís derecho. Nunca comprás ni operás por el usuario: sólo informás.
+- Explicás en una o dos líneas de dónde sale el número (saldo de hoy, lo que falta cobrar, lo que falta pagar y el ritmo de gasto) y aclarás que es una estimación.
+- Nunca prometés rendimientos y sos prudente: marcás los supuestos que devuelve la herramienta cuando son relevantes.`
 
   // 8. Define tools
   const tools = {
@@ -255,7 +260,7 @@ Proyecciones y "cuánto me va a sobrar":
 
     proyeccion_fin_de_mes: {
       description:
-        "Proyecta cuánta plata líquida le va a quedar al usuario al final del período (por defecto, fin del mes en curso). Combina el saldo actual, los ingresos y gastos ya programados, los recurrentes, los resúmenes de tarjeta que vencen y el ritmo histórico de gasto. Usar SIEMPRE que pregunten cuánto les va a sobrar, cuánto pueden ahorrar, si llegan a fin de mes o cuánto pueden gastar.",
+        "Proyecta la caja del usuario. Devuelve el saldo proyectado a la fecha de corte (por defecto, fin del mes en curso) Y, aparte, el excedente_disponible: cuánto puede sacar hoy sin quedar en rojo antes de fin del mes siguiente, simulando día a día los ingresos, recurrentes, cuotas y resúmenes de tarjeta que vencen, más su ritmo histórico de gasto. Usar SIEMPRE que pregunten cuánto les va a sobrar, cuánto pueden ahorrar, si llegan a fin de mes, o cuánto pueden gastar, sacar o comprar.",
       inputSchema: z.object({
         hasta: z
           .string()

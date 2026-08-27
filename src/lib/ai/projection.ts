@@ -1,23 +1,38 @@
 /**
- * Proyección de caja hasta fin de mes — el cálculo detrás de "¿cuánta plata
- * me va a sobrar a fin de mes?".
+ * Proyección de caja — el cálculo detrás de "¿cuánta plata me va a sobrar?" y
+ * "¿cuánto puedo sacar sin quedarme corto?".
  *
- * Criterio de CAJA (no devengado): cuenta la plata que efectivamente entra o
- * sale de las cuentas líquidas entre hoy y la fecha de corte.
+ * Criterio de CAJA (no devengado): la plata que efectivamente entra o sale de
+ * las cuentas líquidas.
  *
- *   saldo_proyectado = saldo líquido actual
- *                    + ingresos previstos      (futuros ya cargados + recurrentes)
- *                    - egresos comprometidos   (futuros ya cargados + recurrentes + pagos de tarjeta que vencen)
- *                    - gasto variable estimado (ritmo histórico × días que faltan)
+ * Devuelve DOS cosas distintas, porque responden preguntas distintas:
+ *
+ *   1. `saldo_proyectado` (a la fecha de corte, por defecto fin de mes):
+ *
+ *        saldo líquido de hoy
+ *        + ingresos previstos      (futuros ya cargados + recurrentes)
+ *        - egresos comprometidos   (futuros + recurrentes + resúmenes que vencen)
+ *        - gasto variable estimado (ritmo histórico × días que faltan)
+ *
+ *   2. `excedente_disponible` (cuánto se puede sacar HOY): el punto más bajo
+ *      de la curva de saldo simulada día a día hasta el horizonte (por defecto
+ *      fin del mes siguiente). Si dentro de tres semanas el saldo toca
+ *      $1.200.000 porque vencen el alquiler y la tarjeta, ése es el techo de
+ *      lo que se puede sacar hoy — no el saldo de fin de mes.
+ *
+ *      Esta es la distinción que importa: "me sobran $5M a fin de mes" NO
+ *      significa "puedo gastar $5M", porque los compromisos del mes siguiente
+ *      caen antes de que entre el próximo sueldo. El colchón sale de los
+ *      compromisos reales del usuario, nunca de un número fijo inventado.
  *
  * Reglas de corte (las que evitan contar dos veces la misma plata):
  *   - Las tarjetas de crédito no entran en el saldo líquido, y sus consumos
  *     (incluidas las cuotas futuras) no cuentan como egreso: la salida de caja
- *     es el pago del resumen, que se pasa aparte en `pagos_tarjeta`.
+ *     es el pago del resumen, que se pasa aparte en `pagosTarjeta`.
  *   - Los recurrentes NO generan movimientos por adelantado (el cron los crea
  *     recién cuando vence la fecha), así que proyectarlos no duplica nada.
  *     Las cuotas SÍ se materializan como movimientos con is_future = true, y
- *     por eso entran por `movimientos_futuros` y no se recalculan aparte.
+ *     por eso entran por `movimientosFuturos` y no se recalculan aparte.
  *   - El ritmo histórico excluye cuotas, recurrentes y consumos de tarjeta:
  *     esos ya están contados como compromisos.
  *
@@ -57,6 +72,8 @@ export interface ProjectionCardPayment {
   monto: number
   vencimiento: string | null
   vencido: boolean
+  /** El ciclo todavía no cerró: el total puede seguir creciendo. */
+  cicloAbierto: boolean
   /** Consumos del resumen en la otra moneda, sin equivalente guardado. */
   monto_otra_moneda: number
   otra_moneda: Moneda
@@ -64,9 +81,12 @@ export interface ProjectionCardPayment {
 
 export interface ProjectionInput {
   desde: string
+  /** Fecha de corte del resumen del período (por defecto, fin de mes). */
   hasta: string
+  /** Hasta dónde se simula la curva de saldo (por defecto, fin del mes siguiente). */
+  horizonte: string
   cuentas: ProjectionAccount[]
-  /** Movimientos con is_future = true entre `desde` y `hasta`. */
+  /** Movimientos con is_future = true entre `desde` y `horizonte`. */
   movimientosFuturos: ProjectionMovement[]
   recurrentes: Tables<"recurring_transactions">[]
   pagosTarjeta: ProjectionCardPayment[]
@@ -82,8 +102,23 @@ export interface ProyeccionMoneda {
   gasto_variable_estimado: number
   gasto_diario_promedio: number
   flujo_neto: number
-  /** Lo que queda a fin del período — la respuesta a "cuánto me sobra". */
+  /** Lo que queda a la fecha de corte — "cuánto me sobra a fin de mes". */
   saldo_proyectado: number
+}
+
+export interface ProyeccionLiquidez {
+  moneda: Moneda
+  /** El punto más bajo de la curva de saldo antes del horizonte. */
+  saldo_minimo: number
+  fecha_saldo_minimo: string
+  /**
+   * Cuánto se puede sacar HOY sin quedar en rojo antes del horizonte.
+   * Ésta es la cifra para "¿cuántos dólares puedo comprar?", NO el saldo
+   * proyectado.
+   */
+  excedente_disponible: number
+  /** Lo que hay que dejar quieto para cubrir los compromisos que vienen. */
+  colchon_necesario: number
 }
 
 export interface ProyeccionDetalleItem {
@@ -95,15 +130,19 @@ export interface ProyeccionDetalleItem {
 }
 
 export interface ProyeccionResult {
-  periodo: { desde: string; hasta: string; dias_restantes: number }
+  periodo: { desde: string; hasta: string; dias_restantes: number; horizonte: string }
   ars: ProyeccionMoneda
   usd: ProyeccionMoneda
+  liquidez: { ars: ProyeccionLiquidez; usd: ProyeccionLiquidez }
   ingresos: ProyeccionDetalleItem[]
   egresos: ProyeccionDetalleItem[]
+  /** Compromisos entre la fecha de corte y el horizonte: el porqué del colchón. */
+  proximos_compromisos: ProyeccionDetalleItem[]
   supuestos: string[]
 }
 
-const MAX_OCURRENCIAS = 45
+const MAX_OCURRENCIAS = 90
+const MAX_DIAS_CURVA = 400
 
 function toDateStr(d: Date): string {
   const y = d.getFullYear()
@@ -156,8 +195,19 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
+/** Un movimiento de caja fechado, ya imputado a una moneda. */
+interface Evento {
+  fecha: string
+  moneda: Moneda
+  /** Positivo entra, negativo sale. */
+  delta: number
+  item: ProyeccionDetalleItem
+}
+
 export function computeProjection(input: ProjectionInput): ProyeccionResult {
-  const { desde, hasta, cuentas, movimientosFuturos, recurrentes, pagosTarjeta } = input
+  const { desde, cuentas, movimientosFuturos, recurrentes, pagosTarjeta } = input
+  const hasta = input.hasta < desde ? desde : input.hasta
+  const horizonte = input.horizonte < hasta ? hasta : input.horizonte
 
   const diasRestantes = Math.max(0, differenceInCalendarDays(parseISO(hasta), parseISO(desde)))
 
@@ -165,8 +215,7 @@ export function computeProjection(input: ProjectionInput): ProyeccionResult {
     ARS: emptyMoneda("ARS"),
     USD: emptyMoneda("USD"),
   }
-  const ingresos: ProyeccionDetalleItem[] = []
-  const egresos: ProyeccionDetalleItem[] = []
+  const eventos: Evento[] = []
   const supuestos: string[] = []
 
   // 1. Saldo líquido actual — las tarjetas de crédito quedan afuera (su deuda
@@ -181,11 +230,11 @@ export function computeProjection(input: ProjectionInput): ProyeccionResult {
   //    Los de tarjeta se ignoran: se pagan vía resumen.
   let cuotasEnTarjeta = 0
   for (const m of movimientosFuturos) {
-    if (m.date < desde || m.date > hasta) continue
+    if (m.date < desde || m.date > horizonte) continue
     const cuenta = cuentaPorId.get(m.account_id)
     if (!cuenta) continue
     if (cuenta.tipo === "tarjeta_credito") {
-      cuotasEnTarjeta++
+      if (m.date <= hasta) cuotasEnTarjeta++
       continue
     }
     const monto = amountInCurrency(m, cuenta.moneda)
@@ -195,25 +244,23 @@ export function computeProjection(input: ProjectionInput): ProyeccionResult {
     const concepto = esCuota
       ? `${m.note ?? "Compra en cuotas"} (cuota ${m.installment_number}/${m.installment_total})`
       : (m.note ?? (m.type === "income" ? "Ingreso programado" : "Gasto programado"))
-    const item: ProyeccionDetalleItem = {
-      concepto,
-      monto: round2(monto),
-      moneda: cuenta.moneda,
-      fecha: m.date,
-      origen: esCuota ? "cuota" : "movimiento_futuro",
-    }
 
-    if (m.type === "income") {
-      totales[cuenta.moneda].ingresos_previstos += monto
-      ingresos.push(item)
-    } else {
-      totales[cuenta.moneda].egresos_comprometidos += monto
-      egresos.push(item)
-    }
+    eventos.push({
+      fecha: m.date,
+      moneda: cuenta.moneda,
+      delta: m.type === "income" ? monto : -monto,
+      item: {
+        concepto,
+        monto: round2(monto),
+        moneda: cuenta.moneda,
+        fecha: m.date,
+        origen: esCuota ? "cuota" : "movimiento_futuro",
+      },
+    })
   }
 
-  // 3. Recurrentes activos que caen en el período. Los que se debitan de una
-  //    tarjeta no son salida de caja: llegan en el resumen.
+  // 3. Recurrentes activos. Los que se debitan de una tarjeta no son salida de
+  //    caja: llegan en el resumen.
   let recurrentesEnTarjeta = 0
   for (const rec of recurrentes) {
     if (rec.status !== "active") continue
@@ -226,50 +273,78 @@ export function computeProjection(input: ProjectionInput): ProyeccionResult {
     }
 
     const moneda: Moneda = rec.currency === "USD" ? "USD" : "ARS"
-    for (const fecha of occurrencesBetween(rec, desde, hasta)) {
-      const item: ProyeccionDetalleItem = {
-        concepto: rec.note ?? `Recurrente ${rec.frequency}`,
-        monto: round2(rec.amount),
-        moneda,
+    for (const fecha of occurrencesBetween(rec, desde, horizonte)) {
+      eventos.push({
         fecha,
-        origen: "recurrente",
-      }
-      if (rec.kind === "income") {
-        totales[moneda].ingresos_previstos += rec.amount
-        ingresos.push(item)
-      } else {
-        totales[moneda].egresos_comprometidos += rec.amount
-        egresos.push(item)
-      }
+        moneda,
+        delta: rec.kind === "income" ? rec.amount : -rec.amount,
+        item: {
+          concepto: rec.note ?? `Recurrente ${rec.frequency}`,
+          monto: round2(rec.amount),
+          moneda,
+          fecha,
+          origen: "recurrente",
+        },
+      })
     }
   }
 
-  // 4. Pagos de tarjeta que vencen dentro del período (o ya vencidos e impagos).
+  // 4. Pagos de tarjeta que vencen dentro del horizonte (o ya vencidos e impagos).
+  let cicloAbiertoEnHorizonte = false
   for (const pago of pagosTarjeta) {
+    const fecha = pago.vencimiento ?? hasta
+    if (fecha > horizonte) continue
+    if (pago.cicloAbierto) cicloAbiertoEnHorizonte = true
+
     if (pago.monto > 0) {
-      totales[pago.moneda].egresos_comprometidos += pago.monto
-      egresos.push({
-        concepto: `Resumen ${pago.tarjeta}${pago.vencido ? " (vencido)" : ""}`,
-        monto: round2(pago.monto),
+      eventos.push({
+        fecha,
         moneda: pago.moneda,
-        fecha: pago.vencimiento ?? hasta,
-        origen: "tarjeta",
+        delta: -pago.monto,
+        item: {
+          concepto: `Resumen ${pago.tarjeta}${pago.vencido ? " (vencido)" : ""}`,
+          monto: round2(pago.monto),
+          moneda: pago.moneda,
+          fecha,
+          origen: "tarjeta",
+        },
       })
     }
     if (pago.monto_otra_moneda > 0) {
-      totales[pago.otra_moneda].egresos_comprometidos += pago.monto_otra_moneda
-      egresos.push({
-        concepto: `Resumen ${pago.tarjeta} — consumos en ${pago.otra_moneda}`,
-        monto: round2(pago.monto_otra_moneda),
+      eventos.push({
+        fecha,
         moneda: pago.otra_moneda,
-        fecha: pago.vencimiento ?? hasta,
-        origen: "tarjeta",
+        delta: -pago.monto_otra_moneda,
+        item: {
+          concepto: `Resumen ${pago.tarjeta} — consumos en ${pago.otra_moneda}`,
+          monto: round2(pago.monto_otra_moneda),
+          moneda: pago.otra_moneda,
+          fecha,
+          origen: "tarjeta",
+        },
       })
     }
   }
 
-  // 5. Gasto variable estimado: el ritmo histórico de gasto de caja por los
-  //    días que faltan.
+  // 5. Totales del período (hasta la fecha de corte) + gasto variable.
+  const ingresos: ProyeccionDetalleItem[] = []
+  const egresos: ProyeccionDetalleItem[] = []
+  const proximos_compromisos: ProyeccionDetalleItem[] = []
+
+  for (const ev of eventos) {
+    if (ev.fecha > hasta) {
+      proximos_compromisos.push(ev.item)
+      continue
+    }
+    if (ev.delta >= 0) {
+      totales[ev.moneda].ingresos_previstos += ev.delta
+      ingresos.push(ev.item)
+    } else {
+      totales[ev.moneda].egresos_comprometidos += -ev.delta
+      egresos.push(ev.item)
+    }
+  }
+
   for (const moneda of ["ARS", "USD"] as const) {
     const t = totales[moneda]
     const diario = input.gastoDiarioPromedio[moneda] ?? 0
@@ -284,12 +359,54 @@ export function computeProjection(input: ProjectionInput): ProyeccionResult {
     t.saldo_proyectado = round2(t.saldo_actual + t.flujo_neto)
   }
 
-  // 6. Supuestos — para que el asistente pueda explicar de dónde sale el número.
+  // 6. Curva de saldo día a día hasta el horizonte. El punto más bajo es el
+  //    techo de lo que se puede sacar hoy sin quedar en rojo.
+  const deltaPorDia: Record<Moneda, Map<string, number>> = { ARS: new Map(), USD: new Map() }
+  for (const ev of eventos) {
+    // Un vencimiento ya pasado impacta hoy: la plata igual tiene que salir.
+    const fecha = ev.fecha < desde ? desde : ev.fecha
+    const mapa = deltaPorDia[ev.moneda]
+    mapa.set(fecha, (mapa.get(fecha) ?? 0) + ev.delta)
+  }
+
+  const liquidez = {} as { ars: ProyeccionLiquidez; usd: ProyeccionLiquidez }
+  for (const moneda of ["ARS", "USD"] as const) {
+    const diario = input.gastoDiarioPromedio[moneda] ?? 0
+    let saldo = totales[moneda].saldo_actual + (deltaPorDia[moneda].get(desde) ?? 0)
+    let minimo = saldo
+    let fechaMinimo = desde
+
+    let cursor = addDays(parseISO(desde), 1)
+    for (let i = 0; i < MAX_DIAS_CURVA; i++) {
+      const dia = toDateStr(cursor)
+      if (dia > horizonte) break
+      saldo += deltaPorDia[moneda].get(dia) ?? 0
+      saldo -= diario
+      if (saldo < minimo) {
+        minimo = saldo
+        fechaMinimo = dia
+      }
+      cursor = addDays(cursor, 1)
+    }
+
+    liquidez[moneda === "ARS" ? "ars" : "usd"] = {
+      moneda,
+      saldo_minimo: round2(minimo),
+      fecha_saldo_minimo: fechaMinimo,
+      excedente_disponible: round2(Math.max(0, minimo)),
+      colchon_necesario: round2(Math.max(0, totales[moneda].saldo_actual - Math.max(0, minimo))),
+    }
+  }
+
+  // 7. Supuestos — para que el asistente pueda explicar de dónde sale el número.
   supuestos.push(
     "El saldo proyectado es plata líquida: no incluye las tarjetas de crédito como saldo, sino el pago de su resumen cuando vence."
   )
   supuestos.push(
     `El gasto variable estimado sale del ritmo de gasto de los últimos 90 días (excluye cuotas, recurrentes y consumos con tarjeta) multiplicado por los ${diasRestantes} días que faltan.`
+  )
+  supuestos.push(
+    `"excedente_disponible" es cuánto se puede sacar hoy sin quedar en rojo antes del ${horizonte}: es el punto más bajo del saldo proyectado día a día, no el saldo de fin de mes. Para "cuánto puedo gastar/comprar" se usa este número, nunca saldo_proyectado.`
   )
   if (cuotasEnTarjeta > 0) {
     supuestos.push(
@@ -301,19 +418,29 @@ export function computeProjection(input: ProjectionInput): ProyeccionResult {
       `Hay ${recurrentesEnTarjeta} recurrente(s) que se debitan de una tarjeta: llegan en el resumen, no como salida directa de caja.`
     )
   }
+  if (cicloAbiertoEnHorizonte) {
+    supuestos.push(
+      "Alguno de los resúmenes considerados todavía no cerró: su total puede subir con los consumos que falten, así que el excedente real puede ser algo menor."
+    )
+  }
   supuestos.push(
     "No se proyectan transferencias entre cuentas propias: no cambian el total."
   )
 
-  ingresos.sort((a, b) => a.fecha.localeCompare(b.fecha))
-  egresos.sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const porFecha = (a: ProyeccionDetalleItem, b: ProyeccionDetalleItem) =>
+    a.fecha.localeCompare(b.fecha)
+  ingresos.sort(porFecha)
+  egresos.sort(porFecha)
+  proximos_compromisos.sort(porFecha)
 
   return {
-    periodo: { desde, hasta, dias_restantes: diasRestantes },
+    periodo: { desde, hasta, dias_restantes: diasRestantes, horizonte },
     ars: totales.ARS,
     usd: totales.USD,
+    liquidez,
     ingresos,
     egresos,
+    proximos_compromisos,
     supuestos,
   }
 }
