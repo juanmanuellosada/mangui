@@ -47,6 +47,8 @@ const READ_TOOL_LABELS: Record<string, string> = {
   resumenes_tarjeta: "Consultando resúmenes de tarjetas",
   estado_presupuestos: "Revisando presupuestos",
   estado_metas: "Revisando metas",
+  proyeccion_fin_de_mes: "Proyectando el fin de mes",
+  cotizacion_dolar: "Consultando la cotización del dólar",
 }
 
 const READ_TOOL_DONE_LABELS: Record<string, string> = {
@@ -57,6 +59,8 @@ const READ_TOOL_DONE_LABELS: Record<string, string> = {
   resumenes_tarjeta: "Resúmenes consultados",
   estado_presupuestos: "Presupuestos revisados",
   estado_metas: "Metas revisadas",
+  proyeccion_fin_de_mes: "Fin de mes proyectado",
+  cotizacion_dolar: "Cotización consultada",
 }
 
 // ── ToolCallIndicator for read tools ──────────────────────────────────────────

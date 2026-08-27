@@ -7,7 +7,15 @@
  *
  * These are called from the route handler which injects the session client.
  */
-import { startOfMonth, format, addMonths, parseISO } from "date-fns"
+import {
+  startOfMonth,
+  endOfMonth,
+  format,
+  addMonths,
+  parseISO,
+  subDays,
+  differenceInCalendarDays,
+} from "date-fns"
 import {
   summaryTotals,
   categoryDistribution,
@@ -20,8 +28,17 @@ import {
 import { computeGoalProgress, type GoalScope } from "@/lib/goals"
 import { computeNextRun } from "@/lib/recurring"
 import { computeInstallmentDate } from "@/lib/installments"
-import { nextCardPayment, listCardCycles, toDateString } from "@/lib/cards"
+import { nextCardPayment, listCardCycles, defaultCycleIndex, toDateString } from "@/lib/cards"
 import { resolveEntity, normalizeText } from "@/lib/entity-resolver"
+import { amountInCurrency } from "@/lib/money"
+import { fetchDolarRates } from "@/lib/rates/dolar"
+import {
+  computeProjection,
+  type Moneda,
+  type ProjectionAccount,
+  type ProjectionCardPayment,
+  type ProyeccionResult,
+} from "@/lib/ai/projection"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/database.types"
 
@@ -558,4 +575,231 @@ export async function estadoMetas(
   })
 
   return { metas }
+}
+
+// ── proyeccion_fin_de_mes ─────────────────────────────────────────────────────
+
+export interface ProyeccionFinDeMesParams {
+  hasta?: string
+}
+
+/** Ventana histórica para estimar el ritmo de gasto variable. */
+const RITMO_DIAS = 90
+
+/**
+ * Resúmenes de tarjeta a pagar dentro del período: el ciclo "A pagar" de cada
+ * tarjeta (el mismo que muestra la vista Tarjetas) cuando su vencimiento cae
+ * antes de `hasta`. Los ya vencidos e impagos también entran: la plata igual
+ * tiene que salir.
+ */
+async function pagosTarjetaHasta(
+  supabase: SessionClient,
+  hoy: string,
+  hasta: string
+): Promise<ProjectionCardPayment[]> {
+  const { data: cards } = await supabase
+    .from("accounts")
+    .select("id, name, type, currency, closing_date, due_date")
+    .eq("type", "tarjeta_credito")
+    .eq("is_hidden", false)
+
+  const creditCards = cards ?? []
+  if (creditCards.length === 0) return []
+
+  const cardIds = creditCards.map((c) => c.id)
+  const [movsRes, statementsRes] = await Promise.all([
+    supabase
+      .from("movements")
+      .select("id, account_id, type, date, amount, converted_amount, original_currency, import_statement_id")
+      .in("account_id", cardIds)
+      .in("type", ["expense", "income"]),
+    supabase.from("card_statements").select("*").in("account_id", cardIds),
+  ])
+
+  const allMovements = movsRes.data ?? []
+  const allStatements = statementsRes.data ?? []
+  const pagos: ProjectionCardPayment[] = []
+
+  for (const card of creditCards) {
+    const cycles = listCardCycles(
+      card.id,
+      { closing_date: card.closing_date, due_date: card.due_date, currency: card.currency },
+      allMovements as Parameters<typeof listCardCycles>[2],
+      allStatements as Parameters<typeof listCardCycles>[3]
+    )
+    if (cycles.length === 0) continue
+
+    const cycle = cycles[defaultCycleIndex(cycles)]
+    if (cycle.statement?.status === "pagado") continue
+    if (cycle.dueDate && cycle.dueDate > hasta) continue
+
+    const moneda: Moneda = card.currency === "USD" ? "USD" : "ARS"
+    const otra: Moneda = moneda === "ARS" ? "USD" : "ARS"
+
+    // `cycle.total` está en la moneda de la tarjeta y deja afuera los consumos
+    // en la otra moneda sin equivalente guardado ("USD puro"): esos se suman
+    // aparte para no perderlos ni contarlos dos veces.
+    let montoOtraMoneda = 0
+    for (const m of cycle.movements) {
+      if (m.original_currency !== otra) continue
+      if (m.converted_amount != null) continue
+      montoOtraMoneda += m.type === "income" ? -m.amount : m.amount
+    }
+
+    pagos.push({
+      tarjeta: card.name,
+      moneda,
+      monto: cycle.statement?.total_amount ?? cycle.total,
+      vencimiento: cycle.dueDate,
+      vencido: cycle.dueDate != null && cycle.dueDate < hoy,
+      monto_otra_moneda: montoOtraMoneda,
+      otra_moneda: otra,
+    })
+  }
+
+  return pagos
+}
+
+/**
+ * Proyecta cuánta plata líquida va a quedar al final del período (por defecto,
+ * fin del mes en curso). Ver `@/lib/ai/projection` para el criterio de cálculo.
+ */
+export async function proyeccionFinDeMes(
+  supabase: SessionClient,
+  params: ProyeccionFinDeMesParams
+): Promise<ProyeccionResult> {
+  const hoy = todayAR()
+  const hasta = params.hasta ?? toDateString(endOfMonth(parseISO(hoy)))
+
+  const ritmoDesde = toDateString(subDays(parseISO(hoy), RITMO_DIAS))
+  const ritmoHasta = toDateString(subDays(parseISO(hoy), 1))
+
+  const [balancesRes, accountsRes, futurosRes, recurrentesRes, historicoRes, pagosTarjeta] =
+    await Promise.all([
+      supabase
+        .from("account_balances")
+        .select("account_id, account_name, account_type, currency, current_balance, is_hidden"),
+      supabase.from("accounts").select("id, type, currency").eq("is_hidden", false),
+      supabase
+        .from("movements")
+        .select("account_id, type, date, amount, converted_amount, original_currency, note, installment_number, installment_total")
+        .eq("is_future", true)
+        .gte("date", hoy)
+        .lte("date", hasta),
+      supabase.from("recurring_transactions").select("*").eq("status", "active"),
+      supabase
+        .from("movements")
+        .select("account_id, amount, converted_amount, original_currency, date")
+        .eq("type", "expense")
+        .eq("is_future", false)
+        .is("installment_purchase_id", null)
+        .is("recurring_id", null)
+        .gte("date", ritmoDesde)
+        .lte("date", ritmoHasta),
+      pagosTarjetaHasta(supabase, hoy, hasta),
+    ])
+
+  if (balancesRes.error) throw new Error(`Error al obtener saldos: ${balancesRes.error.message}`)
+
+  const cuentas: ProjectionAccount[] = (balancesRes.data ?? [])
+    .filter((b) => !b.is_hidden && b.account_id)
+    .map((b) => ({
+      id: b.account_id as string,
+      nombre: b.account_name ?? "",
+      tipo: b.account_type ?? "otro",
+      moneda: (b.currency === "USD" ? "USD" : "ARS") as Moneda,
+      saldo: b.current_balance ?? 0,
+    }))
+
+  // Ritmo de gasto: sólo caja, así que las tarjetas quedan afuera (su gasto
+  // sale cuando se paga el resumen).
+  const cuentaPorId = new Map((accountsRes.data ?? []).map((a) => [a.id, a]))
+  const ritmoDias = Math.max(
+    1,
+    differenceInCalendarDays(parseISO(ritmoHasta), parseISO(ritmoDesde)) + 1
+  )
+  const gastoTotal: Record<Moneda, number> = { ARS: 0, USD: 0 }
+  for (const m of historicoRes.data ?? []) {
+    const cuenta = cuentaPorId.get(m.account_id)
+    if (!cuenta || cuenta.type === "tarjeta_credito") continue
+    const moneda: Moneda = cuenta.currency === "USD" ? "USD" : "ARS"
+    gastoTotal[moneda] += amountInCurrency(m, moneda)
+  }
+
+  return computeProjection({
+    desde: hoy,
+    hasta,
+    cuentas,
+    movimientosFuturos: (futurosRes.data ??
+      []) as Parameters<typeof computeProjection>[0]["movimientosFuturos"],
+    recurrentes: (recurrentesRes.data ??
+      []) as Parameters<typeof computeProjection>[0]["recurrentes"],
+    pagosTarjeta,
+    gastoDiarioPromedio: {
+      ARS: gastoTotal.ARS / ritmoDias,
+      USD: gastoTotal.USD / ritmoDias,
+    },
+  })
+}
+
+// ── cotizacion_dolar ──────────────────────────────────────────────────────────
+
+const RATE_LABELS: Record<string, string> = {
+  oficial: "oficial",
+  blue: "blue",
+  mep: "MEP (bolsa)",
+  ccl: "contado con liqui",
+}
+
+export interface CotizacionDolarResult {
+  /** El tipo de cambio que el usuario eligió en Ajustes. */
+  preferida: { tipo: string; compra: number; venta: number } | null
+  cotizaciones: Array<{ tipo: string; compra: number; venta: number; actualizado: string }>
+  advertencia?: string
+}
+
+/**
+ * Cotización del dólar (DolarAPI, cacheada 30 min) más el tipo de cambio que
+ * el usuario tiene configurado como preferido.
+ */
+export async function cotizacionDolar(
+  supabase: SessionClient
+): Promise<CotizacionDolarResult> {
+  const [rates, prefsRes] = await Promise.all([
+    fetchDolarRates(),
+    supabase.from("user_preferences").select("rate_type, manual_rate").maybeSingle(),
+  ])
+
+  const cotizaciones = Object.entries(rates).map(([tipo, data]) => ({
+    tipo: RATE_LABELS[tipo] ?? tipo,
+    compra: data.buy,
+    venta: data.sell,
+    actualizado: data.fetchedAt,
+  }))
+
+  if (cotizaciones.length === 0) {
+    return {
+      preferida: null,
+      cotizaciones: [],
+      advertencia: "No pude obtener la cotización del dólar en este momento.",
+    }
+  }
+
+  const rateType = prefsRes.data?.rate_type ?? "blue"
+  const manualRate = prefsRes.data?.manual_rate ?? null
+
+  let preferida: CotizacionDolarResult["preferida"] = null
+  if (rateType === "manual") {
+    preferida =
+      manualRate != null && manualRate > 0
+        ? { tipo: "manual", compra: manualRate, venta: manualRate }
+        : null
+  } else {
+    const data = rates[rateType as keyof typeof rates]
+    if (data) {
+      preferida = { tipo: RATE_LABELS[rateType] ?? rateType, compra: data.buy, venta: data.sell }
+    }
+  }
+
+  return { preferida, cotizaciones }
 }
