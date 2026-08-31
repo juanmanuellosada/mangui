@@ -87,6 +87,7 @@ export function toStatementReviewLine(l: ReviewLine): StatementReviewLine {
     installment_total: l.installment_total,
     is_subscription: l.is_subscription,
     is_refund: l.is_refund,
+    settles_previous: l.settles_previous,
     category_id: l.category_id,
     selected: l.selected,
     createRecurring: l.createRecurring,
@@ -156,7 +157,7 @@ export function LineRow({
           <span className="tabular-nums">{format(parseISO(line.date), "d MMM", { locale: es })}</span>
           {line.is_refund && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-success/10 font-semibold text-success">
-              Reintegro
+              {line.settles_previous ? "Reintegro del resumen anterior" : "Reintegro"}
             </span>
           )}
           {isInstallment && (
@@ -168,6 +169,12 @@ export function LineRow({
             <span>≈ {formatCurrency(line.amount_ars, accountCurrency)}</span>
           )}
         </div>
+        {line.settles_previous && (
+          <p className="text-[10.5px] text-muted-foreground">
+            El banco lo acreditó contra el saldo del resumen anterior, así que no resta del total a pagar de
+            éste. Lo cargamos igual para que el saldo de la tarjeta quede bien.
+          </p>
+        )}
         <MangoSelect
           value={line.category_id ?? ""}
           onChange={(v) => onChange({ category_id: v || null })}
@@ -420,10 +427,14 @@ export function ImportStatementFlow({
   const expenseLines = lines.filter((l) => !l.is_refund)
   const selectedExpenseCount = expenseLines.filter((l) => l.selected).length
 
+  // Contra qué se compara el total del PDF: una devolución que cancela el
+  // saldo del resumen anterior (settles_previous) se importa igual, pero no
+  // integra el TOTAL A PAGAR de este resumen, así que no entra en la cuenta
+  // (mismo criterio que buildReconcilePlan en @/lib/statement-reconcile).
   const computedArsTotal = useMemo(() => {
     if (accountCurrency !== "ARS") return null
     return lines
-      .filter((l) => l.selected)
+      .filter((l) => l.selected && l.settles_previous !== true)
       .reduce((sum, l) => {
         const amount = amountInCurrency(
           { amount: l.amount, converted_amount: l.amount_ars, original_currency: l.currency },
@@ -584,6 +595,7 @@ export function ImportStatementFlow({
         installment_total: l.installment_total,
         is_subscription: l.is_subscription,
         is_refund: l.is_refund,
+        settles_previous: l.settles_previous,
         category_id: matchCategoryId(l.category_hint, expenseCategories),
         selected: true,
         createRecurring: false,

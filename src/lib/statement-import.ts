@@ -70,6 +70,15 @@ export interface StatementReviewLine {
    * aditivo; default false. Nunca aplica a una línea en cuotas.
    */
   is_refund?: boolean
+  /**
+   * true si la devolución cancela el saldo del resumen ANTERIOR y por eso no
+   * forma parte del TOTAL A PAGAR de éste (ver
+   * ParsedStatementLine.settles_previous en @/lib/ai/statement-schema). Se
+   * importa igual —es plata que el banco acreditó y sin ella el cargo que
+   * devuelve queda como gasto fantasma en la tarjeta— pero no se cuenta al
+   * comparar contra el total del PDF. Opcional/aditivo; default false.
+   */
+  settles_previous?: boolean
   /** Categoría elegida por el usuario (o sugerida y aceptada); null = sin categoría. */
   category_id: string | null
   /** false = el usuario deseleccionó esta línea (y, si es cuota, todas sus cuotas futuras); se excluye del payload. */

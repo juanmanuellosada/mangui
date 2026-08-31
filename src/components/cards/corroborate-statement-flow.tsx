@@ -480,6 +480,7 @@ export function CorroborateStatementFlow({
           installment_total: l.installment_total,
           is_subscription: l.is_subscription,
           is_refund: l.is_refund,
+          settles_previous: l.settles_previous,
           category_id: matchCategoryId(l.category_hint, expenseCategories),
           selected: true,
           createRecurring: false,

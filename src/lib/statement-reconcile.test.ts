@@ -19,6 +19,7 @@ function makeLine(overrides: Partial<ParsedStatementLine> = {}): ParsedStatement
     installment_total: null,
     is_subscription: false,
     is_refund: false,
+    settles_previous: false,
     category_hint: null,
     ...overrides,
   }
@@ -445,5 +446,98 @@ describe("buildReconcilePlan", () => {
     expect(plan.totals).toHaveLength(2)
     expect(plan.allMatch).toBe(true)
     expect(plan.totals.find((t) => t.currency === "USD")!.after).toBe(25.3)
+  })
+
+  // Caso real (Galicia VISA, cierre 27-ago-26): el banco acredita la
+  // "DEV.IMP. RG 5617" contra el SALDO ANTERIOR el mismo día del pago, así
+  // que cae dentro del ciclo pero NO integra el TOTAL A PAGAR de este
+  // resumen. Si contara, el resumen daría 89.418,91 menos que el PDF.
+  it("una devolución que cancela el saldo anterior no se cuenta contra el total del PDF", () => {
+    const devImp = makeLine({
+      description: "DEV.IMP. RG 5617 30%",
+      amount: 89418.91,
+      is_refund: true,
+      settles_previous: true,
+    })
+    const parsed = makeParsed([makeLine({ amount: 431289.23 }), devImp])
+    parsed.total_ars = 431289.23
+
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [makeMovement({ amount: 431289.23 })],
+      additions: [
+        reviewLine({
+          description: "DEV.IMP. RG 5617 30%",
+          amount: 89418.91,
+          is_refund: true,
+          settles_previous: true,
+        }),
+      ],
+      fixes: [],
+      deletions: [],
+    })
+
+    // Se sigue importando (additions la cuenta), pero el total queda clavado.
+    expect(plan.additions).toBe(1)
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.after).toBe(431289.23)
+    expect(ars.pdf).toBe(431289.23)
+    expect(ars.difference).toBe(0)
+    expect(plan.allMatch).toBe(true)
+  })
+
+  it("una devolución ya cargada como movimiento tampoco descuadra el ciclo al corroborar", () => {
+    const parsed = makeParsed([
+      makeLine({ amount: 431289.23 }),
+      makeLine({
+        description: "DEV.IMP. RG 5617 30%",
+        amount: 89418.91,
+        is_refund: true,
+        settles_previous: true,
+      }),
+    ])
+    parsed.total_ars = 431289.23
+
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [
+        makeMovement({ amount: 431289.23 }),
+        makeMovement({
+          id: "mov-dev",
+          description: "DEV.IMP. RG 5617 30%",
+          amount: 89418.91,
+          type: "income",
+        }),
+      ],
+      additions: [],
+      fixes: [],
+      deletions: [],
+    })
+
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.current).toBe(431289.23)
+    expect(ars.after).toBe(431289.23)
+    expect(ars.difference).toBe(0)
+    expect(plan.allMatch).toBe(true)
+  })
+
+  it("una devolución normal (no settles_previous) sí resta del total del ciclo", () => {
+    const parsed = makeParsed([
+      makeLine({ amount: 10000 }),
+      makeLine({ description: "Reintegro IVA", amount: 1000, is_refund: true }),
+    ])
+    parsed.total_ars = 9000
+
+    const plan = buildReconcilePlan({
+      parsed,
+      cycleMovements: [makeMovement({ amount: 10000 })],
+      additions: [reviewLine({ description: "Reintegro IVA", amount: 1000, is_refund: true })],
+      fixes: [],
+      deletions: [],
+    })
+
+    const ars = plan.totals.find((t) => t.currency === "ARS")!
+    expect(ars.after).toBe(9000)
+    expect(ars.difference).toBe(0)
   })
 })

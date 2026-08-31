@@ -298,13 +298,36 @@ function round2(n: number): number {
  * pero ésas caen en resúmenes siguientes y no mueven el total de éste.
  */
 export function buildReconcilePlan(input: BuildReconcilePlanInput): ReconcilePlan {
+  // Las devoluciones que cancelan el saldo del resumen ANTERIOR
+  // (settles_previous) se importan como movimiento y por eso caen dentro del
+  // ciclo, pero no forman parte del TOTAL A PAGAR del PDF. Se descuentan de
+  // las DOS puntas de la comparación —los movimientos ya cargados y las
+  // líneas del PDF— para que "no cuadra" siga significando siempre algo que
+  // hay que arreglar. Del lado de los movimientos no hay bandera guardada en
+  // la base: se los reconoce por la misma clave de matching que usa el diff.
+  const settlesPreviousKeys = new Set(
+    input.parsed.lines.filter((l) => l.settles_previous === true).map(lineMatchKey)
+  )
+  const skipMovement = (m: ReconcileMovement): boolean => settlesPreviousKeys.has(movementMatchKey(m))
+  const skipLine = (l: { settles_previous?: boolean }): boolean => l.settles_previous === true
+
   const current: CurrencyTotals = { ARS: 0, USD: 0 }
-  for (const m of input.cycleMovements) current[m.currency] += signedMovement(m)
+  for (const m of input.cycleMovements) {
+    if (skipMovement(m)) continue
+    current[m.currency] += signedMovement(m)
+  }
 
   const after: CurrencyTotals = { ARS: current.ARS, USD: current.USD }
-  for (const l of input.additions) after[l.currency] += signedLine(l)
-  for (const d of input.deletions) after[d.currency] -= signedMovement(d)
+  for (const l of input.additions) {
+    if (skipLine(l)) continue
+    after[l.currency] += signedLine(l)
+  }
+  for (const d of input.deletions) {
+    if (skipMovement(d)) continue
+    after[d.currency] -= signedMovement(d)
+  }
   for (const f of input.fixes) {
+    if (skipLine(f.line) || skipMovement(f.movement)) continue
     after[f.movement.currency] -= signedMovement(f.movement)
     after[f.line.currency] += signedLine(f.line)
   }
@@ -312,7 +335,10 @@ export function buildReconcilePlan(input: BuildReconcilePlanInput): ReconcilePla
   // Total del PDF por moneda: el declarado en el encabezado manda; si el PDF
   // no lo trae (o la IA no lo leyó), se cae a la suma de sus propias líneas.
   const pdfLines: CurrencyTotals = { ARS: 0, USD: 0 }
-  for (const l of input.parsed.lines) pdfLines[l.currency] += signedLine(l)
+  for (const l of input.parsed.lines) {
+    if (skipLine(l)) continue
+    pdfLines[l.currency] += signedLine(l)
+  }
   const declared: Record<"ARS" | "USD", number | null> = {
     ARS: input.parsed.total_ars,
     USD: input.parsed.total_usd,

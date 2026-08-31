@@ -16,10 +16,24 @@ export const parsedStatementLineSchema = z.object({
   /**
    * true si la línea es una devolución/reintegro de impuestos o percepciones
    * (monto siempre positivo, ver extract-statement.ts). Se carga como ingreso
-   * y se resta del total importado para que cuadre con el TOTAL A PAGAR del
-   * resumen, que ya neteó la devolución.
+   * y resta del saldo de la tarjeta.
    */
   is_refund: z.boolean().default(false),
+  /**
+   * true si la línea NO forma parte del TOTAL A PAGAR de este resumen porque
+   * cancela el saldo del resumen ANTERIOR: son los créditos que el banco
+   * imputa contra el "SALDO ANTERIOR", arriba del DETALLE DEL CONSUMO, junto
+   * con los pagos (ej. Galicia acredita "DEV.IMP. RG 5617 30%" el mismo día
+   * del pago, y saldo anterior − pago − devolución = 0).
+   *
+   * La línea igual se importa (si no, el cargo original que el banco después
+   * devuelve queda como gasto fantasma en el saldo de la tarjeta), pero queda
+   * FUERA del chequeo "las líneas suman el total del PDF": ver pdfLines /
+   * settlesPreviousKeys en buildReconcilePlan (statement-reconcile.ts) y
+   * computedArsTotal en import-statement-flow.tsx. Siempre va junto con
+   * is_refund: true.
+   */
+  settles_previous: z.boolean().default(false),
   category_hint: z.string().nullable().default(null),
 })
 
