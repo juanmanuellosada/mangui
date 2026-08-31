@@ -489,6 +489,20 @@ export function ImportStatementFlow({
   ])
 
   const allGroupsApproved = groups.length > 0 && groups.every((g) => approvedOffsets.has(g.cycleOffset))
+  const pendingGroups = groups.filter((g) => !approvedOffsets.has(g.cycleOffset))
+  // Los primeros períodos pendientes, para que el aviso diga QUÉ falta y no
+  // sólo cuántos: con muchas cuotas la lista sería larga, así que se corta.
+  const pendingLabels = pendingGroups
+    .slice(0, 3)
+    .map((g) => format(parseISO(g.closeDate), "MMM yy", { locale: es }))
+    .join(", ")
+    .concat(pendingGroups.length > 3 ? "…" : "")
+
+  function approveAllGroups() {
+    setApprovedOffsets(new Set(groups.map((g) => g.cycleOffset)))
+    setExpandedOffset(null)
+  }
+
   // Las filas projectedRecurring son sólo informativas (no se crean en este
   // import), así que no suman al conteo de "se crearán N ítems".
   const totalItemsToCreate = groups.reduce(
@@ -760,10 +774,26 @@ export function ImportStatementFlow({
                   ? "Guardando…"
                   : `Confirmar y guardar ${totalItemsToCreate} movimiento${totalItemsToCreate === 1 ? "" : "s"}`}
               </Button>
+              {/* Un resumen con varias compras en cuotas proyecta un grupo por
+                  ciclo futuro (12 cuotas = 12 grupos), y aprobarlos de a uno
+                  hacía que el botón quedara deshabilitado sin explicar qué
+                  faltaba: se perdía la extracción entera sin darse cuenta. */}
               {!allGroupsApproved && groups.length > 0 && (
-                <p className="text-[11px] text-muted-foreground text-center">
-                  Aprobá los {groups.length - approvedOffsets.size} resúmenes pendientes para confirmar
-                </p>
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Te {pendingGroups.length === 1 ? "queda" : "quedan"} {pendingGroups.length} de{" "}
+                    {groups.length} {groups.length === 1 ? "resumen" : "resúmenes"} por aprobar
+                    {pendingLabels && <> ({pendingLabels})</>}. Nada se guarda hasta que estén todos.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={approveAllGroups}
+                    className="w-full press-effect"
+                  >
+                    Aprobar {pendingGroups.length === 1 ? "el que falta" : `los ${pendingGroups.length} que faltan`}
+                  </Button>
+                </div>
               )}
             </div>
           ) : undefined

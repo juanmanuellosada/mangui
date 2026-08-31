@@ -636,3 +636,53 @@ describe("checkUpcomingInstallmentsTotal (Tarea 3.5)", () => {
     expect(mismatching?.difference).toBe(-500)
   })
 })
+
+// Caso real (VISA Galicia, cierre 30-ago-26): la tabla del PDF imprime
+// 168.316,58 donde las tres cuotas suman 168.316,62. Con TABLE_EPSILON en
+// 0,01 esos 4 centavos se leían como una compra dada de baja y el recorte
+// greedy borraba MUEBLES VALERIA ($133.000) para cerrar el hueco — y como el
+// corte es definitivo, se perdían también sus cuotas siguientes. Después
+// repetía el corte en los ciclos que seguían: MERPAGO 6/6 y NIKE 6/12..12/12.
+describe("capInstallmentOffsets — no recorta por diferencias de redondeo de la tabla", () => {
+  function proyeccion(table: number[] | null) {
+    const payload = buildStatementPayload(
+      makeInput({
+        close_date: "2026-08-30",
+        due_date: "2026-09-07",
+        lines: [
+          makeLine({ description: "MERPAGO*OFICINA", date: "2026-07-10", amount: 16650, installment_number: 2, installment_total: 6 }),
+          makeLine({ description: "MUEBLES VALERIA", date: "2026-07-31", amount: 133000, installment_number: 1, installment_total: 3 }),
+          makeLine({ description: "NIKE TERRAZAS", date: "2026-08-16", amount: 18666.62, installment_number: 1, installment_total: 12 }),
+        ],
+        upcoming_installments_table: table,
+      })
+    )
+    return Object.fromEntries(
+      payload.installment_purchases.map((p) => [
+        p.description,
+        p.installments.map((i) => i.installment_number),
+      ])
+    )
+  }
+
+  const tablaDelPdf = [168316.58, 168316.58, 35316.58, 35316.58, 18666.58, 18666.58, 93332.9]
+
+  it("proyecta las cuotas completas aunque la tabla difiera en centavos", () => {
+    expect(proyeccion(tablaDelPdf)).toEqual({
+      "MERPAGO*OFICINA": [2, 3, 4, 5, 6],
+      "MUEBLES VALERIA": [1, 2, 3],
+      "NIKE TERRAZAS": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    })
+  })
+
+  it("da lo mismo que la proyección por número: la tabla no debería quitar nada acá", () => {
+    expect(proyeccion(tablaDelPdf)).toEqual(proyeccion(null))
+  })
+
+  it("nunca corta una compra si sacarla deja el ciclo MÁS lejos del total del PDF", () => {
+    // Exceso real de $500 en el ciclo siguiente: sacar la compra de $133.000
+    // dejaría el ciclo 132.500 por debajo. Se prefiere no cortar nada.
+    const table = [168316.62 - 500, 168316.62 - 500, 35316.62, 35316.62]
+    expect(proyeccion(table)["MUEBLES VALERIA"]).toEqual([1, 2, 3])
+  })
+})

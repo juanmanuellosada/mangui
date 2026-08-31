@@ -265,7 +265,17 @@ function dayOfMonthFromISODate(dateStr: string): number {
  *
  * Devuelve un Map<purchaseKey, últimoCycleOffset a proyectar>.
  */
-const TABLE_EPSILON = 0.01
+/**
+ * Tolerancia al comparar la tabla "Cuotas a vencer" contra la suma de cuotas
+ * proyectadas. NO puede ser de centavos: el banco redondea la tabla distinto
+ * que las cuotas y una diferencia de monedas es normal (VISA cierre 30-ago-26
+ * imprime 168.316,58 donde las cuotas suman 168.316,62 — 4 centavos). Con
+ * 0.01 esos centavos se leían como "el banco dio de baja una compra" y el
+ * recorte de abajo borraba una compra de $133.000 para cerrar un hueco de
+ * $0,04. Un peso es holgado para el ruido de redondeo y sigue estando tres
+ * órdenes de magnitud por debajo de una cuota real faltante.
+ */
+const TABLE_EPSILON = 1
 
 /**
  * A qué cycleOffset corresponde el PRIMER monto de la tabla "Cuotas a
@@ -320,6 +330,12 @@ function capInstallmentOffsets(
     const sorted = [...active].sort((a, b) => a.naiveLastOffset - b.naiveLastOffset || a.amount - b.amount)
     for (const p of sorted) {
       if (excess <= EPSILON) break
+      // Cortar una compra sólo si ACERCA el ciclo al total del PDF. Si su
+      // cuota es bastante más grande que el exceso, sacarla deja el ciclo
+      // MÁS lejos del total que dejarla, y encima mata todas sus cuotas
+      // siguientes (el corte es definitivo). Sin este guard, un exceso de
+      // centavos alcanzaba para borrar una compra entera.
+      if (Math.abs(excess - p.amount) >= excess) continue
       capped.set(p.purchaseKey, offset - 1)
       excess = Math.round((excess - p.amount) * 100) / 100
     }
