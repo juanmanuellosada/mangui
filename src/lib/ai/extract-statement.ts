@@ -50,6 +50,8 @@ Por cada consumo/línea del detalle (ítems de compras, IMPUESTOS y CARGOS del r
 
 IMPORTANTE — moneda de la compra vs moneda del cobro: muchas filas muestran DENTRO de la referencia la moneda y el monto ORIGINAL de la compra (ej. "TEBEX.ORG USD 11,39", "RESEND USD 20,00", "Order o-y6es4pa EUR 17,67"). Ese número NO es necesariamente el importe de la línea: el importe es el que figura en la columna PESOS o DÓLARES de esa MISMA fila. Cuando la compra es en una moneda que no es ni pesos ni dólares (EUR, BRL, etc.), el banco igual la cobra en una de esas dos columnas y ahí suele haber otro número: si la referencia dice "EUR 17,67" pero la columna DÓLARES dice 20,45, la línea es amount=20.45 y currency="USD" (17,67 es el precio en euros, no lo que se paga). Ante cualquier diferencia entre el número de la referencia y el de la columna, GANA el de la columna.
 
+IMPORTANTE — una fila con importe en LAS DOS columnas: algunos cargos del banco se cobran en pesos Y en dólares a la vez, con un número en la columna PESOS y otro en la columna DÓLARES de la MISMA fila (ej. Mastercard: "IMPUESTO DE SELLOS  2.877,57  0,20"). Cada línea del resultado tiene UNA sola moneda, así que esa fila se devuelve como DOS líneas con la misma "description": una con amount=2877.57 y currency="ARS", y otra con amount=0.20 y currency="USD". No elijas una y descartes la otra, y NO corras el importe en dólares a la fila de abajo: si lo hacés, uno de los dos totales no va a cerrar.
+
 IMPORTANTE — impuestos y cargos: además de los consumos, el resumen SIEMPRE incluye impuestos y cargos que forman parte del TOTAL A PAGAR (ej. IVA como "DB IVA" o "IVA RG...", impuesto de sellos como "IMPUESTO DE SELLOS", percepciones como "PERCEPCION...", retenciones como "DB.RG 5617...", y cargos de servicio o administrativos como "GASTOS DE SERVICIO EMINENT"). Incluí CADA UNO de estos conceptos como una línea más, con su monto y moneda. NUNCA los omitas: son parte del total a pagar. Para estas líneas, "category_hint" = "Impuestos y comisiones" si esa categoría figura en la lista de categorías del usuario; si no figura, null.
 
 IMPORTANTE — devoluciones y reintegros de impuestos (ej. "DEV.IMP.", "DEVOLUCION", "REINTEGRO"): SÍ hay que incluirlas como una línea más, con "is_refund": true y el monto SIEMPRE en POSITIVO (sin importar el signo con que figuren impresas en el resumen). "category_hint" en estas líneas siempre null.
@@ -90,5 +92,28 @@ Devolvé SOLO los campos del esquema.`
       },
     ],
   })
-  return object
+  return clampLineDatesToClose(object)
+}
+
+/**
+ * Ninguna línea puede estar fechada DESPUÉS del cierre: un consumo posterior
+ * al corte entra en el resumen siguiente, no en éste.
+ *
+ * El modelo igual lo hace, y de forma recurrente, con los impuestos y cargos
+ * que no traen fecha impresa (el bloque de totales de Mastercard, por
+ * ejemplo): les pone la fecha de VENCIMIENTO. Esos movimientos quedaban en el
+ * ciclo equivocado, marcados como futuros, y atribuidos al mes siguiente en
+ * Estadísticas. Pedírselo al prompt no alcanzó —lo sigue haciendo—, así que se
+ * corrige acá, que es determinístico y no depende de la corrida.
+ *
+ * Las fechas son YYYY-MM-DD, así que comparar como string es comparar
+ * cronológicamente.
+ */
+export function clampLineDatesToClose(parsed: ParsedStatement): ParsedStatement {
+  const close = parsed.close_date
+  if (!close) return parsed
+  return {
+    ...parsed,
+    lines: parsed.lines.map((l) => (l.date > close ? { ...l, date: close } : l)),
+  }
 }
