@@ -136,6 +136,12 @@ export interface StatementImportPayloadLine {
   create_recurring: { day_of_month: number; subscription_key: string } | null
   /** true = la RPC debe insertar el movimiento con type='income' (devolución/reintegro), no 'expense'. */
   is_refund: boolean
+  /**
+   * true = la RPC marca el movimiento con `settles_previous` (migración 0060),
+   * para que `listCardCycles` lo deje fuera del total del ciclo. Ver
+   * StatementReviewLine.settles_previous.
+   */
+  settles_previous: boolean
 }
 
 export interface StatementImportPayloadInstallment {
@@ -439,6 +445,7 @@ export function buildStatementPayload(input: BuildStatementPayloadInput): Statem
         note: e.line.description,
         create_recurring,
         is_refund: e.line.is_refund === true,
+        settles_previous: e.line.settles_previous === true,
       }
     })
 

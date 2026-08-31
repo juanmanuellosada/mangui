@@ -27,6 +27,14 @@ export interface ReconcileMovement {
   type: "expense" | "income"
   installment_number: number | null
   installment_total: number | null
+  /**
+   * `movements.settles_previous` (migración 0060): la devolución cancela el
+   * saldo del resumen anterior, así que no cuenta contra el total de este
+   * ciclo. Opcional: los movimientos importados ANTES de 0060 lo tienen en
+   * false aunque lo sean — para ésos `buildReconcilePlan` cae al match por
+   * clave contra la línea del PDF, que sí viene marcada.
+   */
+  settles_previous?: boolean
 }
 
 /** Línea del PDF que matchea un movimiento cargado por comercio (y cuota), pero con importe distinto. */
@@ -303,12 +311,14 @@ export function buildReconcilePlan(input: BuildReconcilePlanInput): ReconcilePla
   // ciclo, pero no forman parte del TOTAL A PAGAR del PDF. Se descuentan de
   // las DOS puntas de la comparación —los movimientos ya cargados y las
   // líneas del PDF— para que "no cuadra" siga significando siempre algo que
-  // hay que arreglar. Del lado de los movimientos no hay bandera guardada en
-  // la base: se los reconoce por la misma clave de matching que usa el diff.
+  // hay que arreglar. Un movimiento importado con 0060 en adelante trae la
+  // bandera guardada; los anteriores no, así que se los reconoce además por la
+  // misma clave de matching que usa el diff contra la línea del PDF.
   const settlesPreviousKeys = new Set(
     input.parsed.lines.filter((l) => l.settles_previous === true).map(lineMatchKey)
   )
-  const skipMovement = (m: ReconcileMovement): boolean => settlesPreviousKeys.has(movementMatchKey(m))
+  const skipMovement = (m: ReconcileMovement): boolean =>
+    m.settles_previous === true || settlesPreviousKeys.has(movementMatchKey(m))
   const skipLine = (l: { settles_previous?: boolean }): boolean => l.settles_previous === true
 
   const current: CurrencyTotals = { ARS: 0, USD: 0 }

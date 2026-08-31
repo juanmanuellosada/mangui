@@ -755,3 +755,55 @@ describe("listCardCycles — proyección de recurrentes de tarjeta", () => {
     expect(mayCycle.total).toBe(100)
   })
 })
+
+// Caso real (VISA Galicia, cierre 30-ago-26): el banco acredita la
+// "DEV.IMP. RG 5617" contra el SALDO ANTERIOR el mismo día del pago del
+// resumen previo. Cae dentro de este ciclo por fecha, pero el TOTAL A PAGAR
+// de este resumen no la netea: restarla mostraba $341.870,32 en vez de los
+// $431.289,23 que pide el banco.
+describe("listCardCycles — devolución que cancela el saldo del resumen anterior", () => {
+  const account = { closing_date: "2020-01-30", due_date: "2020-02-07", currency: "ARS" }
+  const ref = new Date(2026, 8, 1) // 1 de septiembre 2026
+
+  function cycleFor(settlesPrevious: boolean) {
+    const movements = [
+      {
+        id: "m-consumos",
+        account_id: "card-1",
+        type: "expense",
+        date: "2026-08-26",
+        amount: 431289.23,
+        converted_amount: null,
+        original_currency: "ARS",
+      },
+      {
+        id: "m-dev",
+        account_id: "card-1",
+        type: "income",
+        date: "2026-08-07",
+        amount: 89418.91,
+        converted_amount: null,
+        original_currency: "ARS",
+        settles_previous: settlesPrevious,
+      },
+    ]
+    const cycles = listCardCycles("card-1", account, movements, [], ref)
+    return cycles.find((c) => c.closeDate === "2026-08-30")!
+  }
+
+  it("no resta del total del ciclo, pero el movimiento se sigue listando", () => {
+    const cycle = cycleFor(true)
+    expect(cycle.total).toBe(431289.23)
+    expect(cycle.totalsByCurrency.ARS).toBe(431289.23)
+    // Sigue siendo un movimiento del resumen: se muestra, sólo no suma.
+    expect(cycle.movements.map((m) => m.id).sort()).toEqual(["m-consumos", "m-dev"])
+  })
+
+  it("un reintegro normal del período sí resta (comportamiento sin la bandera)", () => {
+    const cycle = cycleFor(false)
+    // toBeCloseTo: cards.ts no redondea el total (431289.23 - 89418.91 da
+    // 341870.31999999995 en float); acá sólo importa que la devolución reste.
+    expect(cycle.total).toBeCloseTo(341870.32, 2)
+    expect(cycle.totalsByCurrency.ARS).toBeCloseTo(341870.32, 2)
+  })
+})

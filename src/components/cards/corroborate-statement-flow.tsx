@@ -106,6 +106,7 @@ function buildCycleMovements(
       type: m.type as "expense" | "income",
       installment_number: m.installment_number,
       installment_total: m.installment_total,
+      settles_previous: m.settles_previous === true,
     }))
 }
 

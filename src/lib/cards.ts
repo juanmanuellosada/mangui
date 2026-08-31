@@ -46,6 +46,8 @@ interface CardPaymentMovement {
   amount: number
   converted_amount?: number | null
   original_currency?: string | null
+  /** Devolución imputada al resumen anterior: no cuenta en el total del ciclo (ver signedAmount). */
+  settles_previous?: boolean | null
 }
 
 /**
@@ -92,9 +94,20 @@ function importedStatementCloseDate(
  * (`expense`) suma, una devolución/reintegro (`income`, ver is_refund en el
  * import de resúmenes) resta — así el total cuadra con el TOTAL A PAGAR real
  * del resumen, que ya netea la devolución.
+ *
+ * Excepción: una devolución marcada `settles_previous` (migración 0060) NO
+ * cuenta. El banco la imputa contra el saldo del resumen ANTERIOR, así que cae
+ * dentro de este ciclo por fecha pero no integra su TOTAL A PAGAR: restarla
+ * dejaba el resumen por debajo de lo que hay que pagar (el VISA de cierre
+ * 30-ago-26 mostraba $341.870,32 en vez de $431.289,23). Sigue contando en el
+ * saldo de la cuenta, que es plata que el banco acreditó de verdad.
  */
-function signedAmount(type: string, amount: number): number {
-  return type === "income" ? -amount : amount
+function signedAmount(
+  m: { type: string; settles_previous?: boolean | null },
+  amount: number
+): number {
+  if (m.settles_previous === true) return 0
+  return m.type === "income" ? -amount : amount
 }
 
 /**
@@ -174,6 +187,7 @@ export function nextCardPayment(
       converted_amount: m.converted_amount ?? null,
       original_currency: m.original_currency ?? null,
       import_statement_id: extra.import_statement_id ?? null,
+      settles_previous: m.settles_previous ?? false,
     }
   })
 
@@ -229,7 +243,7 @@ export function currentCycleSummary(
         (m.type === "expense" || m.type === "income") &&
         isInCycle(m.date, cycleStart, cycleEnd)
     )
-    .reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0)
+    .reduce((sum, m) => sum + signedAmount(m, towardAccountCurrency(m, account.currency)), 0)
 
   const closeDate = toDateString(cycleEnd)
 
@@ -399,6 +413,8 @@ interface CycleMovement {
   original_currency?: string | null
   /** Statement this movement was imported into (`card_statements.id`), if any. */
   import_statement_id?: string | null
+  /** Devolución imputada al resumen anterior: no cuenta en el total del ciclo (ver signedAmount). */
+  settles_previous?: boolean | null
 }
 
 /** Recurrente de tarjeta activa (recurring_transactions con is_card_recurring=true, status='active'), ya filtrada a esta cuenta por el caller. */
@@ -697,7 +713,7 @@ export function listCardCycles(
     const projectedRecurrings = projectRecurringsForCycle(cycleEnd, netMovements, recurrings, today)
 
     const total =
-      netMovements.reduce((sum, m) => sum + signedAmount(m.type, towardAccountCurrency(m, account.currency)), 0) +
+      netMovements.reduce((sum, m) => sum + signedAmount(m, towardAccountCurrency(m, account.currency)), 0) +
       projectedRecurrings.reduce(
         (sum, p) => sum + towardAccountCurrency({ amount: p.amount, converted_amount: null, original_currency: p.currency }, account.currency),
         0
@@ -706,7 +722,7 @@ export function listCardCycles(
     const totalsByCurrency: { ARS: number; USD: number } = { ARS: 0, USD: 0 }
     for (const m of netMovements) {
       const cur = m.original_currency === "USD" ? "USD" : "ARS"
-      totalsByCurrency[cur] += signedAmount(m.type, m.amount)
+      totalsByCurrency[cur] += signedAmount(m, m.amount)
     }
     for (const p of projectedRecurrings) {
       totalsByCurrency[p.currency] += p.amount
