@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef, useMemo } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Zap, X, ArrowLeftRight, Brain } from "lucide-react"
@@ -15,7 +14,6 @@ import { MoneyInput } from "@/components/ui/money-input"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { CurrencyToggle } from "@/components/ui/currency-toggle"
 import { MangoDatePicker } from "@/components/ui/mango-date-picker"
-import { AttachmentSlot } from "@/components/ui/attachment-slot"
 import { TagsInput } from "@/components/ui/tags-input"
 import { TransferForm, type TransferFormValues } from "@/components/transfers/transfer-form"
 import { cn } from "@/lib/utils"
@@ -37,6 +35,14 @@ import { useCategoryLearning } from "@/lib/hooks/use-category-learning"
 import { accountPriorBoost, suggestLearnedAccount } from "@/lib/account-learning"
 import { useAccountLearning } from "@/lib/hooks/use-account-learning"
 import { resolveEntity } from "@/lib/entity-resolver"
+import { AI_ACCOUNTS_CAP, resolveAiAccount } from "@/components/movements/movement-form-ai"
+import {
+  movementSchema,
+  movementToFormValues,
+  type MovementFormValues,
+  type MovementMode,
+  type PendingAttachments,
+} from "@/components/movements/movement-form-model"
 import type { MovementAttachment } from "@/lib/attachments"
 import { createClient } from "@/lib/supabase/client"
 import { computeInstallmentAmounts } from "@/lib/installments"
@@ -44,7 +50,7 @@ import { useIsDemo } from "@/lib/use-is-demo"
 import { AiFillBar, type AiExtractResult } from "@/components/movements/ai-fill-bar"
 import { usePlan } from "@/lib/use-plan"
 import { useMonthlyAttachmentCount } from "@/hooks/use-monthly-attachment-count"
-import { UpgradeLink } from "@/components/ui/upgrade-link"
+import { MovementAttachmentFields } from "@/components/movements/movement-attachment-fields"
 import { nextCloseDate, computeDueDate, formatStatementLabel, dayOfMonth } from "@/lib/cards"
 import { todayAR } from "@/lib/date-utils"
 
@@ -71,53 +77,8 @@ async function fetchRuleConditions(): Promise<AutoRuleCondition[]> {
   return data ?? []
 }
 
-// ── Form schema ──────────────────────────────────────────────────────────────
-
-export type MovementFormValues = {
-  type: "income" | "expense"
-  amount: number
-  original_currency: "ARS" | "USD"
-  account_id: string
-  category_id: string | null
-  date: string
-  note: string
-  tags: string[]
-  is_future: boolean
-  // cross-currency
-  dollar_type: DollarType | null
-  converted_amount: number | null
-  // cuotas — only meaningful for expense + tarjeta_credito
-  cuotas: number
-}
-
-const movementSchema = z.object({
-  type: z.enum(["income", "expense"]),
-  amount: z.coerce.number().positive("El monto debe ser mayor a 0"),
-  original_currency: z.enum(["ARS", "USD"]),
-  account_id: z.string().min(1, "Seleccioná una cuenta"),
-  category_id: z.string().nullable(),
-  date: z.string().min(1, "Seleccioná una fecha"),
-  note: z.string(),
-  tags: z.array(z.string()),
-  is_future: z.boolean(),
-  dollar_type: z
-    .enum(["oficial", "blue", "mep", "ccl", "tarjeta"])
-    .nullable(),
-  converted_amount: z.coerce.number().nullable(),
-  cuotas: z.coerce.number().int().min(1).max(60),
-})
-
-// ── Exported pending files type for parent (quick-add-provider) ──────────────
-
-export type PendingAttachments = {
-  factura: File | null
-  recibo: File | null
-  comprobante: File | null
-}
-
-// ── Modes for the 3-way type toggle ─────────────────────────────────────────
-
-export type MovementMode = "income" | "expense" | "transfer"
+export { movementToFormValues }
+export type { MovementFormValues, MovementMode, PendingAttachments }
 
 interface MovementFormProps {
   accounts: Account[]
@@ -143,35 +104,7 @@ interface MovementFormProps {
   initialAiResult?: AiExtractResult
 }
 
-/** Cap de cuentas mandadas al modelo en extract-movement (ver route.ts). */
-const AI_ACCOUNTS_CAP = 100
-
-/**
- * Resuelve la cuenta de un resultado de IA con precedencia índice > puntaje
- * (Decisión 1 de mejorar-deteccion-cuenta-ia): valida `cuenta_idx` contra
- * `sentAccounts` (la misma lista, en el mismo orden, que se mandó al modelo,
- * ya capada); si está ausente o fuera de rango, cae al resolver por nombre
- * sobre `allAccounts` excluyendo cuentas ocultas. `priorBoost` (opcional) es
- * el término de aprendizaje del puntaje (ver account-learning.ts, capa 3) —
- * solo se aplica en el fallback por nombre, nunca cuando hay índice válido.
- * Exportada para tests (5.7, 6.6).
- */
-export function resolveAiAccount<T extends { id: string; name: string; is_hidden: boolean }>(
-  result: { cuenta_idx: number | null | undefined; cuenta: string | null },
-  sentAccounts: readonly T[],
-  allAccounts: readonly T[],
-  priorBoost?: (candidate: T) => number
-): T | null {
-  const idx = result.cuenta_idx
-  if (idx != null && Number.isInteger(idx) && idx >= 0 && idx < sentAccounts.length) {
-    return sentAccounts[idx]
-  }
-  if (result.cuenta) {
-    const byName = resolveEntity(result.cuenta, allAccounts, { isHidden: (a) => a.is_hidden, priorBoost })
-    if (byName.resolved) return allAccounts.find((a) => a.id === byName.id) ?? null
-  }
-  return null
-}
+export { resolveAiAccount } from "@/components/movements/movement-form-ai"
 
 export function MovementForm({
   accounts,
@@ -199,7 +132,7 @@ export function MovementForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<MovementFormValues>({
@@ -222,17 +155,19 @@ export function MovementForm({
     },
   })
 
-  const type = watch("type")
-  const amount = watch("amount")
-  const originalCurrency = watch("original_currency")
-  const accountId = watch("account_id")
-  const dollarType = watch("dollar_type")
-  const convertedAmount = watch("converted_amount")
-  const note = watch("note")
-  const tags = watch("tags")
-  const categoryId = watch("category_id")
-  const dateStr = watch("date")
-  const cuotas = watch("cuotas")
+  const {
+    type,
+    amount,
+    original_currency: originalCurrency,
+    account_id: accountId,
+    dollar_type: dollarType,
+    converted_amount: convertedAmount,
+    note,
+    tags,
+    category_id: categoryId,
+    date: dateStr,
+    cuotas,
+  } = useWatch({ control }) as MovementFormValues
 
   // Local state for the "Otro" cuotas custom input
   const [customCuotas, setCustomCuotas] = useState("")
@@ -311,7 +246,6 @@ export function MovementForm({
   useEffect(() => {
     if (!showCuotas) {
       setValue("cuotas", 1, { shouldValidate: false })
-      setCustomCuotas("")
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showCuotas])
@@ -330,13 +264,10 @@ export function MovementForm({
   }, [type])
 
   // ── Rule auto-fill (create mode only) ─────────────────────────────────────
-  const [ruleHint, setRuleHint] = useState<{ ruleName: string; ruleId: string } | null>(null)
-  const [learnHint, setLearnHint] = useState<{ categoryId: string } | null>(null)
-  const [accountLearnHint, setAccountLearnHint] = useState<{ accountId: string } | null>(null)
-  const userSetCategory = useRef(false)
+  const [userSetCategory, setUserSetCategory] = useState(false)
   // Precedencia usuario > índice del modelo > resolver por nombre: si el
   // usuario ya tocó el campo cuenta a mano, un resultado de IA no lo pisa.
-  const userSetAccount = useRef(false)
+  const [userSetAccount, setUserSetAccount] = useState(false)
 
   const { data: activeRules = [] } = useQuery({
     queryKey: RULES_KEY,
@@ -364,44 +295,37 @@ export function MovementForm({
     return map
   }, [ruleConditions])
 
+  const ruleDraft = {
+    note: note ?? undefined,
+    amount: amount ?? undefined,
+    account_id: accountId ?? undefined,
+    type,
+  }
+  const matchedRule = activeRules.length > 0
+    ? findMatchingRule(activeRules, condsByRule, ruleDraft)
+    : null
+  const learnedCategoryId = !matchedRule?.action_category_id
+    ? suggestLearnedCategory(learnings, note ?? null, type, categories)
+    : null
+  const ruleHint = isCreateMode && !userSetCategory && matchedRule
+    ? { ruleName: matchedRule.name, ruleId: matchedRule.id }
+    : null
+  const learnHint = isCreateMode && !userSetCategory && !matchedRule?.action_category_id && learnedCategoryId
+    ? { categoryId: learnedCategoryId }
+    : null
+
   useEffect(() => {
-    if (!isCreateMode) return
-    if (userSetCategory.current) return
-
-    const draft = {
-      note: note ?? undefined,
-      amount: amount ?? undefined,
-      account_id: accountId ?? undefined,
-      type,
+    if (!isCreateMode || userSetCategory) return
+    if (matchedRule?.action_category_id) {
+      setValue("category_id", matchedRule.action_category_id)
     }
-    const matched = activeRules.length > 0 ? findMatchingRule(activeRules, condsByRule, draft) : null
-    if (matched) {
-      if (matched.action_category_id) {
-        setValue("category_id", matched.action_category_id)
-      }
-      if (matched.action_account_id) {
-        setValue("account_id", matched.action_account_id)
-      }
-      setRuleHint({ ruleName: matched.name, ruleId: matched.id })
-    } else {
-      setRuleHint((prev) => (prev ? null : prev))
+    if (matchedRule?.action_account_id) {
+      setValue("account_id", matchedRule.action_account_id)
     }
-
-    // Sugerencia aprendida: solo cuando la regla no fijó ya una categoría
-    // (la regla explícita del usuario siempre gana sobre lo aprendido).
-    if (!matched?.action_category_id) {
-      const learnedId = suggestLearnedCategory(learnings, note ?? null, type, categories)
-      if (learnedId) {
-        setValue("category_id", learnedId)
-        setLearnHint({ categoryId: learnedId })
-      } else {
-        setLearnHint((prev) => (prev ? null : prev))
-      }
-    } else {
-      setLearnHint((prev) => (prev ? null : prev))
+    if (learnedCategoryId) {
+      setValue("category_id", learnedCategoryId)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note, amount, accountId, type, isCreateMode, activeRules, condsByRule, learnings, categories])
+  }, [isCreateMode, userSetCategory, matchedRule, learnedCategoryId, setValue])
 
   // ── Learned account suggestion (create mode only) ─────────────────────────
   // Precedencia usuario > índice del modelo > puntaje con prior (design
@@ -410,39 +334,35 @@ export function MovementForm({
   // para el contexto, se muestra como sugerencia descartable — nunca se
   // completa el campo en silencio. Mismo patrón que el learnHint de
   // categorías, arriba.
-  useEffect(() => {
-    if (!isCreateMode) return
-    if (userSetAccount.current || accountId) {
-      setAccountLearnHint((prev) => (prev ? null : prev))
-      return
-    }
-    const suggestedId = suggestLearnedAccount(accountLearnings, {
-      categoryId,
-      currency: originalCurrency,
-      note: note ?? null,
-    })
-    if (suggestedId) {
-      setAccountLearnHint({ accountId: suggestedId })
-    } else {
-      setAccountLearnHint((prev) => (prev ? null : prev))
-    }
-  }, [note, categoryId, originalCurrency, accountId, isCreateMode, accountLearnings])
+  const suggestedAccountId = isCreateMode && !userSetAccount && !accountId
+    ? suggestLearnedAccount(accountLearnings, {
+        categoryId,
+        currency: originalCurrency,
+        note: note ?? null,
+      })
+    : null
+  const accountLearnHint = suggestedAccountId ? { accountId: suggestedAccountId } : null
 
   // ── Live rate preview for cross-currency ─────────────────────────────────
-  const [liveRate, setLiveRate] = useState<number | null>(null)
+  const [rateResult, setRateResult] = useState<{ key: string; value: number } | null>(null)
+  const rateKey = isCrossCurrency && dollarType
+    ? `${originalCurrency}:${accountCurrency}:${dollarType}`
+    : null
+  const liveRate = rateResult?.key === rateKey ? rateResult.value : null
+  const convertedAmountRef = useRef(convertedAmount)
   useEffect(() => {
-    if (!isCrossCurrency || !dollarType || dollarType === null) {
-      setLiveRate(null)
-      return
-    }
+    convertedAmountRef.current = convertedAmount
+  }, [convertedAmount])
+  useEffect(() => {
+    if (!rateKey || !dollarType) return
     let cancelled = false
     fetchDolarRates().then((rates) => {
       if (cancelled) return
       const data = rates[dollarType as Exclude<DollarType, "tarjeta">]
       if (data) {
         const rate = originalCurrency === "ARS" ? data.sell : data.buy
-        setLiveRate(rate)
-        if (!convertedAmount) {
+        setRateResult({ key: rateKey, value: rate })
+        if (!convertedAmountRef.current) {
           const converted = originalCurrency === "ARS"
             ? amount / rate
             : amount * rate
@@ -451,20 +371,18 @@ export function MovementForm({
       }
     })
     return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCrossCurrency, dollarType, amount, originalCurrency])
+  }, [rateKey, dollarType, amount, originalCurrency, setValue])
 
   // ── Pending attachments (create mode) ─────────────────────────────────────
   const [pendingFactura, setPendingFactura] = useState<File | null>(null)
   const [pendingRecibo, setPendingRecibo] = useState<File | null>(null)
   const [pendingComprobante, setPendingComprobante] = useState<File | null>(null)
 
-  // Reset pending files when mode changes (e.g. gasto → ingreso)
-  useEffect(() => {
+  const clearPendingAttachments = () => {
     setPendingFactura(null)
     setPendingRecibo(null)
     setPendingComprobante(null)
-  }, [mode])
+  }
 
   // ── Derived helpers ───────────────────────────────────────────────────────
 
@@ -478,11 +396,6 @@ export function MovementForm({
       ? amount / liveRate
       : amount * liveRate
   })()
-
-  // Existing attachments by kind (edit mode)
-  const existingFactura = existingAttachments?.find((a) => a.kind === "factura") ?? null
-  const existingRecibo = existingAttachments?.find((a) => a.kind === "recibo") ?? null
-  const existingComprobante = existingAttachments?.find((a) => a.kind === "comprobante") ?? null
 
   // Submit handler — wraps pending files + defense-in-depth checks
   const handleFormSubmit = handleSubmit(async (values) => {
@@ -526,6 +439,10 @@ export function MovementForm({
 
   function handleAiResult(r: AiExtractResult) {
     // type / visual mode
+    if (r.type !== mode) {
+      clearPendingAttachments()
+      setCustomCuotas("")
+    }
     setMode(r.type)
     setValue("type", r.type, { shouldValidate: false })
     // category (match within the right type) — resuelta antes que la cuenta
@@ -538,7 +455,7 @@ export function MovementForm({
       if (catMatch.resolved) resolvedCategoryId = catMatch.id
     }
     // account: usuario > índice del modelo > puntaje (con prior aprendido)
-    if (!userSetAccount.current) {
+    if (!userSetAccount) {
       const sentAccounts = accounts.slice(0, AI_ACCOUNTS_CAP)
       const resolved = resolveAiAccount(
         { cuenta_idx: r.cuenta_idx, cuenta: r.cuenta },
@@ -560,7 +477,7 @@ export function MovementForm({
       setValue("category_id", resolvedCategoryId, { shouldValidate: false })
       // Mark as user-set so the rule/learned auto-fill effect doesn't overwrite
       // the AI's suggestion (it otherwise runs on every note/amount/account change).
-      userSetCategory.current = true
+      setUserSetCategory(true)
     }
     // date + is_future
     if (r.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r.fecha)) {
@@ -583,6 +500,10 @@ export function MovementForm({
               key={t}
               type="button"
               onClick={() => {
+                if (t !== mode) {
+                  clearPendingAttachments()
+                  setCustomCuotas("")
+                }
                 setMode(t)
                 if (t !== "transfer") {
                   setValue("type", t, { shouldValidate: true })
@@ -618,6 +539,10 @@ export function MovementForm({
               key={t}
               type="button"
               onClick={() => {
+                if (t !== mode) {
+                  clearPendingAttachments()
+                  setCustomCuotas("")
+                }
                 setValue("type", t, { shouldValidate: true })
                 setValue("category_id", null)
                 setMode(t)
@@ -772,7 +697,11 @@ export function MovementForm({
               value={accountId}
               onChange={(v) => {
                 if (!v) return
-                userSetAccount.current = true
+                const nextAccount = accounts.find((a) => a.id === v)
+                if (type !== "expense" || nextAccount?.type !== "tarjeta_credito") {
+                  setCustomCuotas("")
+                }
+                setUserSetAccount(true)
                 setValue("account_id", v, { shouldValidate: true })
               }}
               options={(type === "income" ? incomeAccounts : accounts).map((a) => ({
@@ -791,15 +720,14 @@ export function MovementForm({
 
           {/* Learned account hint chip — sugerencia descartable, nunca autocompleta
               (requirement "Precedencia de señales y ausencia de adivinanza") */}
-          {accountLearnHint && !userSetAccount.current && !accountId && (
+          {accountLearnHint && !userSetAccount && !accountId && (
             <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2">
               <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
               <button
                 type="button"
                 onClick={() => {
-                  userSetAccount.current = true
+                  setUserSetAccount(true)
                   setValue("account_id", accountLearnHint.accountId, { shouldValidate: true })
-                  setAccountLearnHint(null)
                 }}
                 className="text-xs text-primary flex-1 text-left cursor-pointer"
               >
@@ -810,8 +738,7 @@ export function MovementForm({
               <button
                 type="button"
                 onClick={() => {
-                  userSetAccount.current = true
-                  setAccountLearnHint(null)
+                  setUserSetAccount(true)
                 }}
                 className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
                 aria-label="Descartar sugerencia"
@@ -825,13 +752,13 @@ export function MovementForm({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between min-h-4">
               <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
-              {ruleHint && !userSetCategory.current && (
+              {ruleHint && !userSetCategory && (
                 <span className="text-[10px] text-primary font-medium flex items-center gap-0.5">
                   <Zap className="h-2.5 w-2.5" />
                   Auto
                 </span>
               )}
-              {!ruleHint && learnHint && !userSetCategory.current && (
+              {!ruleHint && learnHint && !userSetCategory && (
                 <span className="text-[10px] text-primary font-medium flex items-center gap-0.5">
                   <Brain className="h-2.5 w-2.5" />
                   Auto
@@ -842,9 +769,7 @@ export function MovementForm({
             <MangoSelect
               value={categoryId ?? "none"}
               onChange={(v) => {
-                userSetCategory.current = true
-                setRuleHint(null)
-                setLearnHint(null)
+                setUserSetCategory(true)
                 setValue("category_id", v === "none" ? null : v)
               }}
               options={[
@@ -858,13 +783,13 @@ export function MovementForm({
               placeholder="Categoría"
               showSearch
               triggerClassName={cn(
-                (ruleHint || learnHint) && !userSetCategory.current && "border-primary/50 ring-1 ring-primary/20"
+                (ruleHint || learnHint) && !userSetCategory && "border-primary/50 ring-1 ring-primary/20"
               )}
             />
           </div>
 
           {/* Rule hint chip */}
-          {ruleHint && !userSetCategory.current && (
+          {ruleHint && !userSetCategory && (
             <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2">
               <Zap className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="text-xs text-primary flex-1">
@@ -873,8 +798,7 @@ export function MovementForm({
               <button
                 type="button"
                 onClick={() => {
-                  userSetCategory.current = true
-                  setRuleHint(null)
+                  setUserSetCategory(true)
                   setValue("category_id", null)
                 }}
                 className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
@@ -886,7 +810,7 @@ export function MovementForm({
           )}
 
           {/* Learned category hint chip (only when no rule already suggested one) */}
-          {!ruleHint && learnHint && !userSetCategory.current && (
+          {!ruleHint && learnHint && !userSetCategory && (
             <div className="flex items-center gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2">
               <Brain className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="text-xs text-primary flex-1">
@@ -895,8 +819,7 @@ export function MovementForm({
               <button
                 type="button"
                 onClick={() => {
-                  userSetCategory.current = true
-                  setLearnHint(null)
+                  setUserSetCategory(true)
                   setValue("category_id", null)
                 }}
                 className="text-primary/70 hover:text-primary transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
@@ -1032,132 +955,22 @@ export function MovementForm({
           </div>
 
           {/* 4.2 — Attachment slots by movement type */}
-          {(() => {
-            if (!userIsPremium) {
-              const attachLimit = limits.attachments
-              const pendingCount = (pendingFactura ? 1 : 0) + (pendingRecibo ? 1 : 0) + (pendingComprobante ? 1 : 0)
-              const usedThisMonth = monthlyAttachmentCount
-              const totalUsed = usedThisMonth + pendingCount
-              const atCap = totalUsed >= attachLimit
-
-              if (type === "expense") {
-                return (
-                  <div className="space-y-3">
-                    <AttachmentSlot
-                      label="Factura o ticket"
-                      pendingFile={pendingFactura}
-                      existingAttachment={existingFactura}
-                      onSelect={setPendingFactura}
-                      onClearPending={() => setPendingFactura(null)}
-                      onDeleted={onAttachmentDeleted}
-                      disabled={isLoading || isDemo || (!pendingFactura && atCap)}
-                    />
-                    <AttachmentSlot
-                      label="Recibo / comprobante de pago"
-                      pendingFile={pendingRecibo}
-                      existingAttachment={existingRecibo}
-                      onSelect={setPendingRecibo}
-                      onClearPending={() => setPendingRecibo(null)}
-                      onDeleted={onAttachmentDeleted}
-                      disabled={isLoading || isDemo || (!pendingRecibo && atCap)}
-                    />
-                    {atCap ? (
-                      <p className="text-xs text-muted-foreground px-0.5">
-                        Adjuntos: {Math.min(totalUsed, attachLimit)}/{attachLimit} este mes ·{" "}
-                        <UpgradeLink
-                          feature="attachments"
-                          placement="list_limit"
-                          className="text-primary font-semibold hover:underline"
-                        >
-                          pasá a Premium para ilimitados
-                        </UpgradeLink>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground px-0.5">
-                        {totalUsed}/{attachLimit} este mes
-                      </p>
-                    )}
-                  </div>
-                )
-              }
-
-              if (type === "income") {
-                return (
-                  <div className="space-y-3">
-                    <AttachmentSlot
-                      label="Comprobante"
-                      pendingFile={pendingComprobante}
-                      existingAttachment={existingComprobante}
-                      onSelect={setPendingComprobante}
-                      onClearPending={() => setPendingComprobante(null)}
-                      onDeleted={onAttachmentDeleted}
-                      disabled={isLoading || isDemo || (!pendingComprobante && atCap)}
-                    />
-                    {atCap ? (
-                      <p className="text-xs text-muted-foreground px-0.5">
-                        Adjuntos: {Math.min(totalUsed, attachLimit)}/{attachLimit} este mes ·{" "}
-                        <UpgradeLink
-                          feature="attachments"
-                          placement="list_limit"
-                          className="text-primary font-semibold hover:underline"
-                        >
-                          pasá a Premium para ilimitados
-                        </UpgradeLink>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground px-0.5">
-                        {totalUsed}/{attachLimit} este mes
-                      </p>
-                    )}
-                  </div>
-                )
-              }
-
-              return null
-            }
-
-            // Premium: unlimited, original behavior
-            if (type === "expense") {
-              return (
-                <div className="space-y-3">
-                  <AttachmentSlot
-                    label="Factura o ticket"
-                    pendingFile={pendingFactura}
-                    existingAttachment={existingFactura}
-                    onSelect={setPendingFactura}
-                    onClearPending={() => setPendingFactura(null)}
-                    onDeleted={onAttachmentDeleted}
-                    disabled={isLoading || isDemo}
-                  />
-                  <AttachmentSlot
-                    label="Recibo / comprobante de pago"
-                    pendingFile={pendingRecibo}
-                    existingAttachment={existingRecibo}
-                    onSelect={setPendingRecibo}
-                    onClearPending={() => setPendingRecibo(null)}
-                    onDeleted={onAttachmentDeleted}
-                    disabled={isLoading || isDemo}
-                  />
-                </div>
-              )
-            }
-
-            if (type === "income") {
-              return (
-                <AttachmentSlot
-                  label="Comprobante"
-                  pendingFile={pendingComprobante}
-                  existingAttachment={existingComprobante}
-                  onSelect={setPendingComprobante}
-                  onClearPending={() => setPendingComprobante(null)}
-                  onDeleted={onAttachmentDeleted}
-                  disabled={isLoading || isDemo}
-                />
-              )
-            }
-
-            return null
-          })()}
+          <MovementAttachmentFields
+            type={type}
+            isPremium={userIsPremium}
+            attachmentLimit={limits.attachments}
+            monthlyAttachmentCount={monthlyAttachmentCount}
+            pendingFactura={pendingFactura}
+            setPendingFactura={setPendingFactura}
+            pendingRecibo={pendingRecibo}
+            setPendingRecibo={setPendingRecibo}
+            pendingComprobante={pendingComprobante}
+            setPendingComprobante={setPendingComprobante}
+            existingAttachments={existingAttachments}
+            onAttachmentDeleted={onAttachmentDeleted}
+            isLoading={isLoading}
+            isDemo={isDemo}
+          />
 
           {/* Submit */}
           <Button
@@ -1177,24 +990,4 @@ export function MovementForm({
       )}
     </div>
   )
-}
-
-/** Convert a DB movement row to form default values */
-export function movementToFormValues(
-  movement: Tables<"movements">
-): MovementFormValues {
-  return {
-    type: movement.type,
-    amount: movement.amount,
-    original_currency: movement.original_currency,
-    account_id: movement.account_id,
-    category_id: movement.category_id,
-    date: movement.date,
-    note: movement.note ?? "",
-    tags: movement.tags ?? [],
-    is_future: movement.is_future,
-    dollar_type: (movement.dollar_type as DollarType | null) ?? null,
-    converted_amount: movement.converted_amount ?? null,
-    cuotas: 1,
-  }
 }

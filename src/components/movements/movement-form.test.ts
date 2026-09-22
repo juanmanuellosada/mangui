@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { resolveAiAccount } from "./movement-form"
+import { resolveAiAccount } from "./movement-form-ai"
+import { resolveAiAccount as resolveAiAccountFromForm } from "./movement-form"
 
 interface Account {
   id: string
@@ -42,5 +43,20 @@ describe("resolveAiAccount", () => {
     const withHidden = [acc("hidden", "Santander Río - Visa Signature", true), acc("other", "Banco Ciudad")]
     const result = resolveAiAccount({ cuenta_idx: null, cuenta: "Santander Visa" }, withHidden, withHidden)
     expect(result).toBeNull()
+  })
+
+  it("aplica el prior opcional solo en el fallback por nombre", () => {
+    const candidates = [acc("default", "Banco Uno A"), acc("preferred", "Banco Dos B")]
+    const result = resolveAiAccount(
+      { cuenta_idx: null, cuenta: "Banco" },
+      candidates,
+      candidates,
+      (candidate) => candidate.id === "preferred" ? 0.2 : 0
+    )
+    expect(result).toEqual(candidates[1])
+  })
+
+  it("mantiene la re-exportación de compatibilidad desde movement-form", () => {
+    expect(resolveAiAccountFromForm).toBe(resolveAiAccount)
   })
 })
