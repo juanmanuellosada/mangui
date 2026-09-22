@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { parseISO } from "date-fns"
@@ -21,7 +21,6 @@ import {
   type Account,
 } from "@/lib/accounts"
 import { toDateString } from "@/lib/cards"
-import { cn } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
 
 // Explicit type — avoids inference issues with z.coerce in zod v4
@@ -127,7 +126,7 @@ export function AccountForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<AccountFormValues>({
@@ -148,10 +147,10 @@ export function AccountForm({
     },
   })
 
-  const selectedType = watch("type")
-  const selectedIcon = watch("icon")
-  const selectedCurrency = watch("currency")
-  const isHidden = watch("is_hidden")
+  const selectedType = useWatch({ control, name: "type" })
+  const selectedIcon = useWatch({ control, name: "icon" })
+  const selectedCurrency = useWatch({ control, name: "currency" })
+  const isHidden = useWatch({ control, name: "is_hidden" })
   const isCreditCard = selectedType === "tarjeta_credito"
 
   // Local Date state for the two calendar pickers, parsed from the stored

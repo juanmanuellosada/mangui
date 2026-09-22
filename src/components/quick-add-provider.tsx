@@ -154,7 +154,7 @@ async function createInstallmentPurchaseWithMovements(
 
 export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = React.useState(false)
-  const [mode, setMode] = React.useState<QuickAddMode>("movement")
+  const [, setMode] = React.useState<QuickAddMode>("movement")
   const [defaultType, setDefaultType] = React.useState<"income" | "expense">("expense")
   const [preset, setPreset] = React.useState<QuickAddPreset | undefined>(undefined)
   const [pendingAiResult, setPendingAiResult] = React.useState<AiExtractResult | null>(null)
@@ -198,8 +198,8 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   // Helper: enqueue a movement payload for offline sync and register background sync.
   // Returns a sentinel so onSuccess closes the form without trying to read server data.
   const enqueueOfflineMovement = React.useCallback(
-    async (payload: Record<string, unknown>): Promise<{ __offline: true }> => {
-      await enqueueMovement(payload)
+    async (payload: Record<string, unknown>, userId: string): Promise<{ __offline: true }> => {
+      await enqueueMovement(payload, userId)
       toast.success("Movimiento guardado sin conexión", {
         description: "Se sincroniza solo cuando vuelva la señal.",
       })
@@ -270,7 +270,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
 
       // Offline: skip Supabase entirely, enqueue and close
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        return enqueueOfflineMovement(movementInsert as Record<string, unknown>)
+        return enqueueOfflineMovement(movementInsert as Record<string, unknown>, user.id)
       }
 
       let movementId: string
@@ -285,7 +285,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         // Network failure (TypeError = fetch failed, no response) → fall back to offline queue
         if (err instanceof TypeError) {
-          return enqueueOfflineMovement(movementInsert as Record<string, unknown>)
+          return enqueueOfflineMovement(movementInsert as Record<string, unknown>, user.id)
         }
         throw err
       }

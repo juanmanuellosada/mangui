@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { parseISO, startOfDay, format } from "date-fns"
@@ -23,7 +23,6 @@ import { CategoryIconChip } from "@/lib/categories"
 import type { Tables } from "@/lib/database.types"
 import {
   computeNextRun,
-  frequencyLabel,
   FREQUENCY_LABELS,
   WEEKEND_HANDLING_LABELS,
   DAY_OF_WEEK_LABELS,
@@ -163,7 +162,7 @@ export function RecurringForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<RecurringFormValues>({
@@ -191,21 +190,24 @@ export function RecurringForm({
     },
   })
 
-  const kind = watch("kind")
-  const amount = watch("amount")
-  const currency = watch("currency")
-  const accountId = watch("account_id")
-  const toAccountId = watch("to_account_id")
-  const toAmount = watch("to_amount")
-  const frequency = watch("frequency")
-  const startDate = watch("start_date")
-  const endDate = watch("end_date")
-  const weekendHandling = watch("weekend_handling")
-  const dayOfWeek = watch("day_of_week")
-  const dayOfMonth = watch("day_of_month")
-  const monthOfYear = watch("month_of_year")
-  const isCardRecurring = watch("is_card_recurring")
-  const intervalDays = watch("interval_days")
+  const {
+    kind,
+    amount,
+    currency,
+    account_id: accountId,
+    to_account_id: toAccountId,
+    to_amount: toAmount,
+    category_id: categoryId,
+    frequency,
+    start_date: startDate,
+    end_date: endDate,
+    weekend_handling: weekendHandling,
+    day_of_week: dayOfWeek,
+    day_of_month: dayOfMonth,
+    month_of_year: monthOfYear,
+    is_card_recurring: isCardRecurring,
+    interval_days: intervalDays,
+  } = useWatch({ control }) as RecurringFormValues
 
   const fromAccount = accounts.find((a) => a.id === accountId)
   const toAccount = accounts.find((a) => a.id === toAccountId)
@@ -255,9 +257,13 @@ export function RecurringForm({
   }, [isTransfer, accountId, toAccountId, amount])
 
   // Live implied rate for cross-currency transfers
-  const [impliedRate, setImpliedRate] = useState<number | null>(null)
+  const [impliedRateResult, setImpliedRateResult] = useState<{ key: string; value: number } | null>(null)
+  const impliedRateKey = isCrossCurrency
+    ? `${fromAccount?.currency}:${toAccount?.currency}`
+    : null
+  const impliedRate = impliedRateResult?.key === impliedRateKey ? impliedRateResult.value : null
   useEffect(() => {
-    if (!isCrossCurrency) { setImpliedRate(null); return }
+    if (!impliedRateKey) return
     let cancelled = false
     fetchDolarRates().then((rates) => {
       if (cancelled) return
@@ -265,12 +271,14 @@ export function RecurringForm({
       if (!data) return
       const fc = fromAccount?.currency
       const tc = toAccount?.currency
-      if (fc === "ARS" && tc === "USD") setImpliedRate(data.sell)
-      else if (fc === "USD" && tc === "ARS") setImpliedRate(data.buy)
+      if (fc === "ARS" && tc === "USD") {
+        setImpliedRateResult({ key: impliedRateKey, value: data.sell })
+      } else if (fc === "USD" && tc === "ARS") {
+        setImpliedRateResult({ key: impliedRateKey, value: data.buy })
+      }
     })
     return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCrossCurrency, accountId, toAccountId])
+  }, [impliedRateKey, fromAccount?.currency, toAccount?.currency])
 
   // Effective rate display
   const effectiveRate = (() => {
@@ -504,7 +512,7 @@ export function RecurringForm({
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
           <MangoSelect
-            value={watch("category_id") ?? "none"}
+            value={categoryId ?? "none"}
             onChange={(v) => setValue("category_id", v === "none" ? null : v)}
             options={[
               { value: "none", label: "Sin categoría" },

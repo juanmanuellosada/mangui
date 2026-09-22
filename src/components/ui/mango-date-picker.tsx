@@ -38,18 +38,11 @@ export function MangoDatePicker({
   "aria-invalid": ariaInvalid,
 }: MangoDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [mounted, setMounted] = React.useState(false)
   const [pos, setPos] = React.useState({ top: 0, left: 0, width: 0, placeAbove: false })
-  // `posReady` is set in useLayoutEffect so position is correct before first paint.
-  // `revealed` is set in useEffect so the opacity/scale transition plays after the
-  // first paint — the popover appears at the right spot, then gently fades/scales in.
-  const [posReady, setPosReady] = React.useState(false)
-  const [revealed, setRevealed] = React.useState(false)
 
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const popoverRef = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => { setMounted(true) }, [])
+  const dialogId = React.useId()
 
   // Position the popover relative to the trigger
   const updatePos = React.useCallback(() => {
@@ -66,17 +59,10 @@ export function MangoDatePicker({
     })
   }, [])
 
-  // useLayoutEffect: compute position synchronously before browser paint.
-  // The element mounts invisible (opacity-0) but already at the correct coordinates,
-  // eliminating the "slide from top" jump that occurred with useEffect.
+  // Compute portal position synchronously before browser paint to prevent a visible jump.
   React.useLayoutEffect(() => {
-    if (!open) {
-      setPosReady(false)
-      setRevealed(false)
-      return
-    }
+    if (!open) return
     updatePos()
-    setPosReady(true)
     window.addEventListener("scroll", updatePos, true)
     window.addEventListener("resize", updatePos)
     return () => {
@@ -84,13 +70,6 @@ export function MangoDatePicker({
       window.removeEventListener("resize", updatePos)
     }
   }, [open, updatePos])
-
-  // useEffect: trigger reveal transition AFTER the first paint so the
-  // opacity/scale animation is visible (not collapsed into pre-paint batch).
-  React.useEffect(() => {
-    if (!posReady) return
-    setRevealed(true)
-  }, [posReady])
 
   // Close on outside click
   React.useEffect(() => {
@@ -136,8 +115,8 @@ export function MangoDatePicker({
         id={id}
         type="button"
         aria-haspopup="dialog"
+        aria-controls={dialogId}
         aria-expanded={open}
-        aria-invalid={ariaInvalid}
         onClick={() => setOpen((o) => !o)}
         className={cn(
           "flex w-full min-h-[44px] items-center gap-2.5 rounded-md border px-3 py-2",
@@ -158,20 +137,15 @@ export function MangoDatePicker({
         </span>
       </button>
 
-      {mounted && open && createPortal(
+      {typeof document !== "undefined" && open && createPortal(
         <div
           ref={popoverRef}
+          id={dialogId}
           role="dialog"
           aria-label="Seleccionar fecha"
           className={cn(
             "fixed z-[200] rounded-xl border border-border/60 bg-popover p-3 shadow-lg",
-            // Position is set before paint (useLayoutEffect). Visibility transitions after
-            // first paint (useEffect on posReady→revealed). This eliminates the first-open
-            // jump: the popover appears at the correct spot, then gently fades/scales in.
-            // prefers-reduced-motion: transition-none skips animation; opacity is still 0
-            // until revealed, so it snaps in place instantly.
-            "transition-[opacity,scale] duration-[150ms] ease-out motion-reduce:transition-none",
-            revealed ? "opacity-100 scale-100" : "opacity-0 scale-[0.97] pointer-events-none"
+            "animate-in fade-in-0 zoom-in-95 duration-150 motion-reduce:animate-none"
           )}
           style={{
             top: pos.top,

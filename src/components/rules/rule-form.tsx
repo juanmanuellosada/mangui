@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Plus, Trash2, X } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,8 +15,6 @@ import {
   FIELD_LABELS,
   OPERATOR_LABELS,
   ruleMatches,
-  RULES_KEY,
-  RULE_CONDITIONS_KEY,
   type AutoRule,
   type AutoRuleCondition,
   type RuleField,
@@ -25,7 +23,6 @@ import {
   type Category,
   type Account,
 } from "@/lib/rules"
-import { ACCOUNTS_KEY, CATEGORIES_KEY } from "@/lib/movements"
 import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip } from "@/lib/categories"
 import { formatCurrency } from "@/lib/utils"
@@ -348,7 +345,7 @@ export function RuleForm({
     initialValues?.action_account_id ?? null
   )
   const [priority, setPriority] = useState<number>(initialValues?.priority ?? 10)
-  const [isActive, setIsActive] = useState<boolean>(initialValues?.is_active ?? true)
+  const [isActive] = useState<boolean>(initialValues?.is_active ?? true)
   const [formError, setFormError] = useState<string | null>(null)
   const isDemo = useIsDemo()
 

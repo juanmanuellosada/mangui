@@ -9,6 +9,8 @@ export type QueuedMovement = {
   id: string
   kind: "movement"
   payload: Record<string, unknown>
+  /** Undefined only for queue records created before user isolation was added. */
+  userId?: string
   createdAt: number
 }
 
@@ -38,13 +40,14 @@ function dispatchQueueChanged(): void {
   }
 }
 
-export async function enqueueMovement(payload: Record<string, unknown>): Promise<void> {
+export async function enqueueMovement(payload: Record<string, unknown>, userId: string): Promise<void> {
   if (typeof indexedDB === "undefined") return
   const db = await openDB()
   const item: QueuedMovement = {
     id: crypto.randomUUID(),
     kind: "movement",
     payload,
+    userId,
     createdAt: Date.now(),
   }
   await new Promise<void>((resolve, reject) => {
@@ -82,6 +85,19 @@ export async function removeQueued(id: string): Promise<void> {
   dispatchQueueChanged()
 }
 
+/**
+ * Returns whether a queued record belongs to userId.
+ *
+ * Modern records use item.userId. Legacy records may only have payload.user_id;
+ * ownerless legacy records remain visible and drainable for compatibility.
+ */
+export function isQueuedMovementRelevantToUser(item: QueuedMovement, userId: string): boolean {
+  if (item.userId !== undefined) return item.userId === userId
+
+  const legacyUserId = item.payload.user_id
+  return typeof legacyUserId !== "string" || legacyUserId === userId
+}
+
 export async function countQueued(): Promise<number> {
   if (typeof indexedDB === "undefined") return 0
   const db = await openDB()
@@ -91,4 +107,10 @@ export async function countQueued(): Promise<number> {
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
+}
+
+/** Counts only records relevant to an authenticated user, including ownerless legacy records. */
+export async function countQueuedForUser(userId: string): Promise<number> {
+  const items = await getQueuedMovements()
+  return items.filter((item) => isQueuedMovementRelevantToUser(item, userId)).length
 }

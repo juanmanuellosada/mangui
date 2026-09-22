@@ -4,12 +4,13 @@
  * SSR-safe: returns early if IndexedDB is unavailable.
  */
 
-import { getQueuedMovements, removeQueued } from "@/lib/offline-queue"
+import { getQueuedMovements, isQueuedMovementRelevantToUser, removeQueued } from "@/lib/offline-queue"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/database.types"
 
 interface DrainOpts {
   supabase: SupabaseClient<Database>
+  userId: string
   onSynced?: () => void
 }
 
@@ -18,7 +19,7 @@ interface DrainResult {
   failed: number
 }
 
-export async function drainQueue({ supabase, onSynced }: DrainOpts): Promise<DrainResult> {
+export async function drainQueue({ supabase, userId, onSynced }: DrainOpts): Promise<DrainResult> {
   if (typeof indexedDB === "undefined") return { synced: 0, failed: 0 }
 
   const items = await getQueuedMovements()
@@ -26,6 +27,10 @@ export async function drainQueue({ supabase, onSynced }: DrainOpts): Promise<Dra
   let failed = 0
 
   for (const item of items) {
+    // Legacy payload.user_id is ownership metadata too. Ownerless legacy records
+    // remain compatible; any record owned by another user stays queued and is not a failure.
+    if (!isQueuedMovementRelevantToUser(item, userId)) continue
+
     try {
       const { error } = await supabase.from("movements").insert(item.payload as never)
       if (error) {

@@ -33,7 +33,7 @@ export function OfflineSyncManager() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { synced } = await drainQueue({ supabase })
+      const { synced } = await drainQueue({ supabase, userId: user.id })
 
       if (synced > 0) {
         queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { assertCronAuth } from "@/lib/cron-auth"
-import { advanceNextRun, computeNextRun } from "@/lib/recurring"
-import { parseISO, startOfDay, isAfter, isBefore, isEqual } from "date-fns"
+import { advanceNextRun } from "@/lib/recurring"
+import { todayAR } from "@/lib/date-utils"
+import { parseISO, startOfDay, isAfter } from "date-fns"
 import type { Tables } from "@/lib/database.types"
 
 type RecurringTransaction = Tables<"recurring_transactions">
@@ -34,22 +35,28 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const today = startOfDay(new Date())
-  const todayStr = today.toISOString().split("T")[0]
+  const todayStr = todayAR()
 
   let processed = 0
-  let offset = 0
+  let lastProcessedId: string | undefined
   const errors: string[] = []
 
-  // Process in batches to avoid memory issues on large datasets
+  // Keyset pagination remains stable while each processed row advances next_run.
   while (true) {
-    const { data: batch, error: fetchErr } = await supabase
+    let query = supabase
       .from("recurring_transactions")
       .select("*")
       .eq("status", "active")
       .lte("next_run", todayStr)
       .not("next_run", "is", null)
-      .range(offset, offset + BATCH_SIZE - 1)
+      .order("id", { ascending: true })
+      .limit(BATCH_SIZE)
+
+    if (lastProcessedId) {
+      query = query.gt("id", lastProcessedId)
+    }
+
+    const { data: batch, error: fetchErr } = await query
 
     if (fetchErr) {
       console.error("[generate-occurrences] Fetch error:", fetchErr)
@@ -57,6 +64,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (!batch || batch.length === 0) break
+
+    lastProcessedId = batch[batch.length - 1].id
 
     for (const rec of batch as RecurringTransaction[]) {
       try {
@@ -122,7 +131,6 @@ export async function GET(req: NextRequest) {
     }
 
     if (batch.length < BATCH_SIZE) break
-    offset += BATCH_SIZE
   }
 
   console.log(`[generate-occurrences] Done. processed=${processed} errors=${errors.length}`)

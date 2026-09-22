@@ -26,7 +26,7 @@ const chartConfig = {
   },
 }
 
-export function WeekdayPatternChart({ data, currency = "ARS" }: WeekdayPatternChartProps) {
+export function WeekdayPatternChart({ data }: WeekdayPatternChartProps) {
   const hasData = data.some((d) => d.total > 0)
   const maxVal = Math.max(...data.map((d) => d.total))
   const maxDay = data.find((d) => d.total === maxVal)

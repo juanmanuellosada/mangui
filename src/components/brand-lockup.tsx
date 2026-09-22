@@ -31,7 +31,7 @@ interface BrandLockupProps {
  * to keep the mango itself optically matched to the wordmark height).
  * Gap = size × 0.35 (~10 px at size=28).
  */
-export function BrandLockup({ size = 28, showWord: _showWord, wordClassName, className }: BrandLockupProps) {
+export function BrandLockup({ size = 28, wordClassName, className }: BrandLockupProps) {
   const wordmarkW = Math.round(size * (LOGO_INTRINSIC_W / LOGO_INTRINSIC_H));
   const markH = Math.round(size * 1.45);
   const markW = Math.round(markH * (MARK_INTRINSIC_W / MARK_INTRINSIC_H));

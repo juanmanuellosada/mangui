@@ -8,6 +8,8 @@ import type { Database } from "@/lib/database.types"
 
 const DB_NAME = "mangui-offline"
 const STORE = "mutations"
+const CURRENT_USER_ID = "user-current"
+const OTHER_USER_ID = "user-other"
 
 // ---------------------------------------------------------------------------
 // Reset the queue before every test so state never leaks between tests.
@@ -58,30 +60,112 @@ describe("drainQueue", () => {
   it("returns synced: 0, failed: 0 for an empty queue without calling supabase", async () => {
     const supabase = makeSupabase(async () => ({ error: null }))
 
-    const result = await drainQueue({ supabase })
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
 
     expect(result).toEqual({ synced: 0, failed: 0 })
     expect(supabase.from).not.toHaveBeenCalled()
   })
 
-  it("syncs every item, removes it from the queue, and calls onSynced", async () => {
-    await enqueueMovement({ label: "a" })
-    await enqueueMovement({ label: "b" })
+  it("syncs every same-user item, removes it from the queue, and calls onSynced", async () => {
+    await enqueueMovement({ label: "a" }, CURRENT_USER_ID)
+    await enqueueMovement({ label: "b" }, CURRENT_USER_ID)
 
     const supabase = makeSupabase(async () => ({ error: null }))
     const onSynced = vi.fn()
 
-    const result = await drainQueue({ supabase, onSynced })
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID, onSynced })
 
     expect(result).toEqual({ synced: 2, failed: 0 })
     expect(onSynced).toHaveBeenCalledTimes(2)
     await expect(getQueuedMovements()).resolves.toEqual([])
   })
 
+  it("skips and preserves different-user items while draining matching items after them", async () => {
+    await insertRaw({
+      id: "foreign",
+      kind: "movement",
+      payload: { label: "foreign" },
+      userId: OTHER_USER_ID,
+      createdAt: 100,
+    })
+    await insertRaw({
+      id: "current",
+      kind: "movement",
+      payload: { label: "current" },
+      userId: CURRENT_USER_ID,
+      createdAt: 200,
+    })
+
+    const seenPayloads: unknown[] = []
+    const supabase = makeSupabase(async (payload) => {
+      seenPayloads.push(payload)
+      return { error: null }
+    })
+
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
+
+    expect(result).toEqual({ synced: 1, failed: 0 })
+    expect(seenPayloads).toEqual([{ label: "current" }])
+    await expect(getQueuedMovements()).resolves.toMatchObject([
+      { id: "foreign", userId: OTHER_USER_ID, payload: { label: "foreign" } },
+    ])
+  })
+
+  it("drains ownerless legacy items for compatibility", async () => {
+    await insertRaw({
+      id: "legacy",
+      kind: "movement",
+      payload: { label: "legacy" },
+      createdAt: 100,
+    })
+
+    const supabase = makeSupabase(async () => ({ error: null }))
+
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
+
+    expect(result).toEqual({ synced: 1, failed: 0 })
+    await expect(getQueuedMovements()).resolves.toEqual([])
+  })
+
+  it("drains a legacy payload owned by the current user", async () => {
+    await insertRaw({
+      id: "legacy-current",
+      kind: "movement",
+      payload: { label: "legacy-current", user_id: CURRENT_USER_ID },
+      createdAt: 100,
+    })
+
+    const supabase = makeSupabase(async () => ({ error: null }))
+
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
+
+    expect(result).toEqual({ synced: 1, failed: 0 })
+    await expect(getQueuedMovements()).resolves.toEqual([])
+  })
+
+  it("preserves a legacy payload owned by another user without attempting an insert", async () => {
+    await insertRaw({
+      id: "legacy-foreign",
+      kind: "movement",
+      payload: { label: "legacy-foreign", user_id: OTHER_USER_ID },
+      createdAt: 100,
+    })
+
+    const supabase = makeSupabase(async () => ({ error: { message: "row-level security violation" } }))
+
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
+
+    expect(result).toEqual({ synced: 0, failed: 0 })
+    expect(supabase.from).not.toHaveBeenCalled()
+    await expect(getQueuedMovements()).resolves.toMatchObject([
+      { id: "legacy-foreign", payload: { label: "legacy-foreign", user_id: OTHER_USER_ID } },
+    ])
+  })
+
   it("processes items in FIFO (createdAt) order", async () => {
-    await insertRaw({ id: "id-c", kind: "movement", payload: { label: "third" }, createdAt: 300 })
-    await insertRaw({ id: "id-a", kind: "movement", payload: { label: "first" }, createdAt: 100 })
-    await insertRaw({ id: "id-b", kind: "movement", payload: { label: "second" }, createdAt: 200 })
+    await insertRaw({ id: "id-c", kind: "movement", payload: { label: "third" }, userId: CURRENT_USER_ID, createdAt: 300 })
+    await insertRaw({ id: "id-a", kind: "movement", payload: { label: "first" }, userId: CURRENT_USER_ID, createdAt: 100 })
+    await insertRaw({ id: "id-b", kind: "movement", payload: { label: "second" }, userId: CURRENT_USER_ID, createdAt: 200 })
 
     const seenOrder: unknown[] = []
     const supabase = makeSupabase(async (payload) => {
@@ -89,14 +173,14 @@ describe("drainQueue", () => {
       return { error: null }
     })
 
-    await drainQueue({ supabase })
+    await drainQueue({ supabase, userId: CURRENT_USER_ID })
 
     expect(seenOrder).toEqual(["first", "second", "third"])
   })
 
   it("discards an item on a permanent (server-side) error and keeps draining", async () => {
-    await enqueueMovement({ label: "bad" })
-    await enqueueMovement({ label: "good" })
+    await enqueueMovement({ label: "bad" }, CURRENT_USER_ID)
+    await enqueueMovement({ label: "good" }, CURRENT_USER_ID)
 
     const supabase = makeSupabase(async (payload) => {
       if ((payload as { label: string }).label === "bad") {
@@ -105,7 +189,7 @@ describe("drainQueue", () => {
       return { error: null }
     })
 
-    const result = await drainQueue({ supabase })
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
 
     expect(result).toEqual({ synced: 1, failed: 1 })
     await expect(getQueuedMovements()).resolves.toEqual([])
@@ -124,7 +208,7 @@ describe("drainQueue", () => {
     })
     const onSynced = vi.fn()
 
-    const result = await drainQueue({ supabase, onSynced })
+    const result = await drainQueue({ supabase, userId: CURRENT_USER_ID, onSynced })
 
     // "first" synced and removed; "second" threw so draining stopped there;
     // "third" was never attempted and remains queued.
@@ -142,7 +226,7 @@ describe("drainQueue", () => {
 
     try {
       const supabase = makeSupabase(async () => ({ error: null }))
-      const result = await drainQueue({ supabase })
+      const result = await drainQueue({ supabase, userId: CURRENT_USER_ID })
 
       expect(result).toEqual({ synced: 0, failed: 0 })
       expect(supabase.from).not.toHaveBeenCalled()

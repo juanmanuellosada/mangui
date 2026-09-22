@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState, useSyncExternalStore } from "react"
 import { Mic, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -21,21 +21,20 @@ export function VoiceInputButton({
   className?: string
 }) {
   const isDemo = useIsDemo()
-  const [mounted, setMounted] = useState(false)
   const [state, setState] = useState<RecState>("idle")
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
 
-  useEffect(() => { setMounted(true) }, [])
+  const supported = useSyncExternalStore(
+    () => () => {},
+    () =>
+      !!navigator.mediaDevices?.getUserMedia &&
+      typeof MediaRecorder !== "undefined",
+    () => false,
+  )
 
-  const supported =
-    typeof window !== "undefined" &&
-    typeof navigator !== "undefined" &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    typeof MediaRecorder !== "undefined"
-
-  if (!mounted || isDemo || !supported) return null
+  if (isDemo || !supported) return null
 
   function cleanupStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop())

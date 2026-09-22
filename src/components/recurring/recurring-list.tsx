@@ -86,7 +86,6 @@ async function fetchPendingOccurrences(): Promise<OccurrenceWithRec[]> {
 
 function RecurringRow({
   rec,
-  accounts,
   onEdit,
   selectionMode,
   isSelected,
@@ -94,7 +93,6 @@ function RecurringRow({
   isDemo,
 }: {
   rec: RecurringTransaction
-  accounts: Account[]
   onEdit: (r: RecurringTransaction) => void
   selectionMode?: boolean
   isSelected?: boolean
@@ -103,7 +101,6 @@ function RecurringRow({
 }) {
   const queryClient = useQueryClient()
 
-  const account = accounts.find((a) => a.id === rec.account_id)
   const nextRun = rec.next_run
     ? format(parseISO(rec.next_run), "d MMM yyyy", { locale: es })
     : "—"
@@ -929,7 +926,6 @@ export function RecurringList() {
             <RecurringRow
               key={r.id}
               rec={r}
-              accounts={accounts}
               onEdit={openEdit}
               selectionMode={ms.selectionMode}
               isSelected={ms.isSelected(r.id)}

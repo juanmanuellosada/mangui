@@ -14,6 +14,7 @@
  */
 
 import * as React from "react"
+import Image from "next/image"
 import { Paperclip, X, FileText, Loader2 } from "lucide-react"
 import { validateAttachmentFile, getAttachmentUrl, deleteAttachment } from "@/lib/attachments"
 import type { MovementAttachment } from "@/lib/attachments"
@@ -49,31 +50,43 @@ export function AttachmentSlot({
   disabled,
 }: AttachmentSlotProps) {
   const inputRef = React.useRef<HTMLInputElement>(null)
-  // Tracks the resolved signed URL keyed by the attachment id so we can
-  // clear it when the attachment changes without calling setState in an effect.
+  // Resolved signed URLs are cached by attachment ID for the component lifetime.
   const [signedUrlMap, setSignedUrlMap] = React.useState<Record<string, string | null>>({})
-  const [loadingId, setLoadingId] = React.useState<string | null>(null)
+  const [signedUrlRetry, setSignedUrlRetry] = React.useState(0)
+  const requestedAttachmentIds = React.useRef(new Set<string>())
   const [deleting, setDeleting] = React.useState(false)
 
-  // Resolve signed URL for existing image attachments.
-  // The map is keyed by attachment id — no synchronous setState needed on cleanup.
+  // Resolve signed URLs after render. The pending map entry itself represents loading,
+  // so this effect only updates state from the asynchronous external request.
   React.useEffect(() => {
     if (!existingAttachment?.mime_type?.startsWith("image/")) return
-    const id = existingAttachment.id
-    if (signedUrlMap[id] !== undefined) return // already fetched
+    const { id, file_url: fileUrl } = existingAttachment
+    if (requestedAttachmentIds.current.has(id)) return
+    requestedAttachmentIds.current.add(id)
+
     let cancelled = false
-    setLoadingId(id)
-    getAttachmentUrl(existingAttachment.file_url).then((url) => {
-      if (cancelled) return
-      setSignedUrlMap((prev) => ({ ...prev, [id]: url }))
-      setLoadingId((prev) => (prev === id ? null : prev))
-    })
+    void getAttachmentUrl(fileUrl)
+      .catch(() => null)
+      .then((url) => {
+        if (!cancelled) setSignedUrlMap((prev) => ({ ...prev, [id]: url }))
+      })
     return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingAttachment])
+  }, [existingAttachment, signedUrlRetry])
+
+  function retrySignedUrl() {
+    if (!existingAttachment) return
+    requestedAttachmentIds.current.delete(existingAttachment.id)
+    setSignedUrlMap((prev) => {
+      const next = { ...prev }
+      delete next[existingAttachment.id]
+      return next
+    })
+    setSignedUrlRetry((retry) => retry + 1)
+  }
 
   const previewUrl = existingAttachment ? (signedUrlMap[existingAttachment.id] ?? null) : null
-  const loadingSignedUrl = loadingId === existingAttachment?.id
+  const loadingSignedUrl = !!existingAttachment?.mime_type?.startsWith("image/") &&
+    signedUrlMap[existingAttachment.id] === undefined
 
   // Local object URL for pending image
   const pendingObjectUrl = React.useMemo(() => {
@@ -154,10 +167,12 @@ export function AttachmentSlot({
               rel="noopener noreferrer"
               className="block rounded-lg overflow-hidden flex-shrink-0"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={displayImage}
                 alt={fileName ?? "Adjunto"}
+                width={56}
+                height={56}
+                unoptimized
                 className="h-14 w-14 object-cover rounded-lg"
               />
             </a>
@@ -165,6 +180,15 @@ export function AttachmentSlot({
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-xs font-medium truncate">{fileName}</span>
+              {hasExisting && (
+                <button
+                  type="button"
+                  onClick={retrySignedUrl}
+                  className="text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Reintentar vista previa
+                </button>
+              )}
             </div>
           )}
           {/* Remove button */}

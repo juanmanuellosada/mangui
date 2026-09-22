@@ -92,7 +92,6 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
             {resolvedPrefix}
           </span>
         )}
-        {/* eslint-disable-next-line react/no-unknown-property */}
         <input
           ref={ref}
           type="number"

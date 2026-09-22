@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -97,7 +97,7 @@ function CategoryForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<CategoryFormValues>({
@@ -111,8 +111,8 @@ function CategoryForm({
     },
   })
 
-  const type = watch("type")
-  const icon = watch("icon")
+  const type = useWatch({ control, name: "type" })
+  const icon = useWatch({ control, name: "icon" })
 
   return (
     <>

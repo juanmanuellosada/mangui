@@ -53,10 +53,6 @@ export default async function DashboardPage() {
   }
 
   const hasAccounts = (count ?? 0) > 0
-  const firstName =
-    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ??
-    "acá"
-
   const prefs = prefsResult.data
   const defaultCurrency = (prefs?.default_currency ?? "ARS") as "ARS" | "USD"
   const rateType = prefs?.rate_type ?? "blue"

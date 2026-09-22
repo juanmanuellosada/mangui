@@ -58,3 +58,5 @@ next-env.d.ts
 
 # QA / mockups (no versionar imágenes)
 design-mockups/**/*.png
+# Local Pi runtime state
+.atl/

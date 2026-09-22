@@ -25,6 +25,7 @@
  *  - Mobile-light: icons with mobile:false are hidden on xs screens.
  */
 
+import Image from "next/image";
 import { useEffect, useRef } from "react";
 
 // Tile size (px) — all icons share the same square dimension.
@@ -225,16 +226,13 @@ export function FloatingIcons() {
           }}
         >
           {/* Logo centered with padding inside the tile */}
-          <img
+          <Image
             src={`/icons/ar/bancos-billeteras/${file}.svg`}
             alt=""
             width={TILE - 14}
             height={TILE - 14}
+            unoptimized
             className="absolute inset-0 m-auto block object-contain"
-            style={{
-              width: TILE - 14,
-              height: TILE - 14,
-            }}
           />
         </div>
       ))}

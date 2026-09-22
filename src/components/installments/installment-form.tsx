@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -69,7 +69,7 @@ export function InstallmentForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<InstallmentFormValues>({
@@ -87,38 +87,43 @@ export function InstallmentForm({
     },
   })
 
-  const total = watch("total_amount")
-  const count = watch("installments_count")
-  const currency = watch("currency")
-  const accountId = watch("account_id")
-  const dollarType = watch("dollar_type")
+  const {
+    total_amount: total,
+    installments_count: count,
+    currency,
+    account_id: accountId,
+    dollar_type: dollarType,
+    start_date: firstInstallmentDate,
+    category_id: categoryId,
+  } = useWatch({ control }) as InstallmentFormValues
   const [customCount, setCustomCount] = useState("")
-  const [liveRate, setLiveRate] = useState<number | null>(null)
+  const [rateResult, setRateResult] = useState<{ key: string; value: number } | null>(null)
 
   const selectedAccount = accounts.find((a) => a.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? "ARS"
   const isCrossCurrency = currency !== accountCurrency
+  const rateKey = isCrossCurrency && dollarType
+    ? `${currency}:${accountCurrency}:${dollarType}`
+    : null
+  const liveRate = rateResult?.key === rateKey ? rateResult.value : null
 
   // Expense categories only
   const expenseCategories = categories.filter((c) => c.type === "expense")
 
   // Live rate for cross-currency preview
   useEffect(() => {
-    if (!isCrossCurrency || !dollarType) {
-      setLiveRate(null)
-      return
-    }
+    if (!rateKey || !dollarType) return
     let cancelled = false
     fetchDolarRates().then((rates) => {
       if (cancelled) return
       const data = rates[dollarType as Exclude<DollarType, "tarjeta">]
       if (data) {
         const rate = currency === "ARS" ? data.sell : data.buy
-        setLiveRate(rate)
+        setRateResult({ key: rateKey, value: rate })
       }
     })
     return () => { cancelled = true }
-  }, [isCrossCurrency, dollarType, currency])
+  }, [rateKey, dollarType, currency])
 
   // Compute installment preview
   const safeCount = Number.isInteger(count) && count >= 2 ? count : 0
@@ -128,7 +133,6 @@ export function InstallmentForm({
       ? computeInstallmentAmounts(safeTotal, safeCount)
       : { perAmount: 0, lastAmount: 0 }
 
-  const firstInstallmentDate = watch("start_date")
   const lastInstallmentDate = (() => {
     if (!firstInstallmentDate || safeCount < 2) return ""
     const d = new Date(firstInstallmentDate)
@@ -263,7 +267,7 @@ export function InstallmentForm({
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground font-medium">Categoría</Label>
           <MangoSelect
-            value={watch("category_id") ?? "none"}
+            value={categoryId ?? "none"}
             onChange={(v) => setValue("category_id", v === "none" ? null : v)}
             options={[
               { value: "none", label: "Sin categoría" },

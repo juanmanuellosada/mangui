@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
@@ -128,10 +129,12 @@ function RateLogo({ logo, nombre }: { logo?: string | null; nombre: string }) {
   const [errored, setErrored] = useState(false)
   if (logo && !errored) {
     return (
-      <img
+      <Image
         src={logo}
         alt=""
-        loading="lazy"
+        width={28}
+        height={28}
+        unoptimized
         onError={() => setErrored(true)}
         className="h-7 w-7 rounded-md object-contain bg-white p-0.5 flex-shrink-0"
       />

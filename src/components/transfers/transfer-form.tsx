@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { parseISO } from "date-fns"
@@ -111,7 +111,7 @@ export function TransferForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<TransferFormValues>({
@@ -129,11 +129,13 @@ export function TransferForm({
     },
   })
 
-  const fromAccountId = watch("from_account_id")
-  const toAccountId = watch("to_account_id")
-  const fromAmount = watch("from_amount")
-  const toAmount = watch("to_amount")
-  const dateStr = watch("date")
+  const {
+    from_account_id: fromAccountId,
+    to_account_id: toAccountId,
+    from_amount: fromAmount,
+    to_amount: toAmount,
+    date: dateStr,
+  } = useWatch({ control }) as TransferFormValues
 
   const fromAccount = accounts.find((a) => a.id === fromAccountId)
   const toAccount = accounts.find((a) => a.id === toAccountId)
@@ -155,9 +157,6 @@ export function TransferForm({
     queryFn: fetchDolarRates,
     staleTime: 30 * 60 * 1000, // 30 min
   })
-
-  // Numeric rate being applied (for display)
-  const [appliedRate, setAppliedRate] = useState<number | null>(null)
 
   // Tracks which amount field the user last edited — prevents bidirectional loop
   const lastEdited = useRef<"from" | "to">("from")
@@ -204,28 +203,21 @@ export function TransferForm({
     return Math.round((amount / rateData.buy) * 100) / 100
   }
 
-  // Update appliedRate whenever relevant inputs change
-  useEffect(() => {
-    if (!isCrossCurrency) {
-      setAppliedRate(null)
-      return
-    }
-    if (configuredRateType === "manual") {
-      setAppliedRate(configuredManualRate)
-      return
-    }
-    if (!ratesMap) return
+  // Numeric rate being applied (for display)
+  const appliedRate = (() => {
+    if (!isCrossCurrency) return null
+    if (configuredRateType === "manual") return configuredManualRate
+    if (!ratesMap) return null
     const rateData = ratesMap[configuredRateType]
-    if (!rateData) return
-    const fromCur = fromAccount?.currency
-    const toCur = toAccount?.currency
-    if (fromCur === "ARS" && toCur === "USD") {
-      setAppliedRate(rateData.sell)
-    } else if (fromCur === "USD" && toCur === "ARS") {
-      setAppliedRate(rateData.buy)
+    if (!rateData) return null
+    if (fromAccount?.currency === "ARS" && toAccount?.currency === "USD") {
+      return rateData.sell
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCrossCurrency, configuredRateType, configuredManualRate, ratesMap, fromAccountId, toAccountId])
+    if (fromAccount?.currency === "USD" && toAccount?.currency === "ARS") {
+      return rateData.buy
+    }
+    return null
+  })()
 
   // When accounts change (currency switch), re-seed the non-edited field from scratch
   useEffect(() => {
@@ -307,6 +299,8 @@ export function TransferForm({
     )
   })
 
+  const { ref: fromAmountRef, ...fromAmountInput } = register("from_amount")
+  const { ref: toAmountRef, ...toAmountInput } = register("to_amount")
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -403,9 +397,9 @@ export function TransferForm({
                 currency={fromAccount?.currency as "ARS" | "USD" | undefined}
                 className="tabular-nums w-full"
                 value={fromAmount || ""}
-                onBlur={register("from_amount").onBlur}
-                name={register("from_amount").name}
-                ref={register("from_amount").ref}
+                onBlur={fromAmountInput.onBlur}
+                name={fromAmountInput.name}
+                ref={fromAmountRef}
                 onChange={(e) => {
                   lastEdited.current = "from"
                   const raw = parseFloat(e.target.value)
@@ -437,9 +431,9 @@ export function TransferForm({
                 currency={toAccount?.currency as "ARS" | "USD" | undefined}
                 className="tabular-nums w-full"
                 value={toAmount || ""}
-                onBlur={register("to_amount").onBlur}
-                name={register("to_amount").name}
-                ref={register("to_amount").ref}
+                onBlur={toAmountInput.onBlur}
+                name={toAmountInput.name}
+                ref={toAmountRef}
                 onChange={(e) => {
                   lastEdited.current = "to"
                   const raw = parseFloat(e.target.value)
@@ -504,7 +498,8 @@ export function TransferForm({
             placeholder="0,00"
             currency={fromAccount?.currency as "ARS" | "USD" | undefined}
             className="tabular-nums w-full"
-            {...register("from_amount")}
+            {...fromAmountInput}
+            ref={fromAmountRef}
             aria-invalid={!!errors.from_amount}
           />
           {errors.from_amount && (

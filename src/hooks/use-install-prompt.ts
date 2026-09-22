@@ -1,10 +1,30 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>
+}
+
+let installedViaAppEvent = false
+
+function subscribeToInstalledState(notify: () => void) {
+  const displayMode = window.matchMedia("(display-mode: standalone)")
+  const appInstalled = () => {
+    installedViaAppEvent = true
+    notify()
+  }
+  window.addEventListener("appinstalled", appInstalled)
+  displayMode.addEventListener("change", notify)
+  return () => {
+    window.removeEventListener("appinstalled", appInstalled)
+    displayMode.removeEventListener("change", notify)
+  }
+}
+
+function getInstalledSnapshot() {
+  return installedViaAppEvent || window.matchMedia("(display-mode: standalone)").matches
 }
 
 /**
@@ -16,14 +36,14 @@ export function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null)
   const [canInstall, setCanInstall] = useState(false)
-  const [isInstalled, setIsInstalled] = useState(false)
+  const isInstalled = useSyncExternalStore(
+    subscribeToInstalledState,
+    getInstalledSnapshot,
+    () => false,
+  )
 
   useEffect(() => {
-    // Check if already running as standalone (installed)
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsInstalled(true)
-      return
-    }
+    if (isInstalled) return
 
     const handler = (e: Event) => {
       e.preventDefault()
@@ -34,7 +54,6 @@ export function useInstallPrompt() {
     window.addEventListener("beforeinstallprompt", handler)
 
     const appInstalled = () => {
-      setIsInstalled(true)
       setCanInstall(false)
       setDeferredPrompt(null)
     }
@@ -44,14 +63,14 @@ export function useInstallPrompt() {
       window.removeEventListener("beforeinstallprompt", handler)
       window.removeEventListener("appinstalled", appInstalled)
     }
-  }, [])
+  }, [isInstalled])
 
   const triggerInstall = async () => {
     if (!deferredPrompt) return false
     await deferredPrompt.prompt()
     const { outcome } = await deferredPrompt.userChoice
     if (outcome === "accepted") {
-      setIsInstalled(true)
+      installedViaAppEvent = true
       setCanInstall(false)
     }
     setDeferredPrompt(null)

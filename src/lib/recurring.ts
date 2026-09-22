@@ -11,7 +11,6 @@ import {
   isEqual,
   format,
 } from "date-fns"
-import { es } from "date-fns/locale"
 import type { Tables, Enums } from "@/lib/database.types"
 import { defaultDateRange, type DateRangeValue } from "@/components/ui/date-range-filter"
 
@@ -99,38 +98,6 @@ function applyWeekendHandling(date: Date, handling: WeekendHandling): Date {
   let d = addDays(date, -1)
   while (!isBusinessDay(d)) d = addDays(d, -1)
   return d
-}
-
-/**
- * Compute the raw candidate date based on frequency and day fields.
- * This is the "ideal" date before weekend adjustment.
- */
-function rawCandidateDate(rec: RecurringTransaction, base: Date): Date {
-  const y = base.getFullYear()
-  const m = base.getMonth() + 1 // 1-based
-
-  switch (rec.frequency) {
-    case "weekly":
-    case "biweekly": {
-      // day_of_week 0=Sun…6=Sat (JS convention)
-      // Already handled by advanceNextRun step logic; raw = base itself
-      return base
-    }
-    case "monthly":
-    case "bimonthly": {
-      const dom = rec.day_of_month ?? 1
-      const clamped = clampDay(y, m, dom)
-      return startOfDay(new Date(y, m - 1, clamped))
-    }
-    case "annual": {
-      const dom = rec.day_of_month ?? 1
-      const moy = rec.month_of_year ?? 1
-      const clamped = clampDay(y, moy, dom)
-      return startOfDay(new Date(y, moy - 1, clamped))
-    }
-    case "custom":
-      return base
-  }
 }
 
 /**

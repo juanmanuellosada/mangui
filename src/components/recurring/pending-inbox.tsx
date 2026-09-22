@@ -52,7 +52,6 @@ interface PendingInboxProps {
 
 async function confirmOccurrence(
   occ: OccurrenceWithRec,
-  accounts: Account[],
   overrideAmount?: number
 ): Promise<void> {
   const supabase = createClient()
@@ -61,8 +60,6 @@ async function confirmOccurrence(
 
   const rec = occ.recurring
   const finalAmount = overrideAmount ?? occ.amount_override ?? rec.amount
-  const account = accounts.find((a) => a.id === rec.account_id)
-
   let movementId: string | null = null
   let transferId: string | null = null
 
@@ -85,10 +82,6 @@ async function confirmOccurrence(
     if (error) throw error
     transferId = data.id
   } else {
-    // Check if cross-currency: account currency vs rec.currency
-    const accountCurrency = account?.currency ?? rec.currency
-    const isCross = rec.currency !== accountCurrency
-
     const { data, error } = await supabase
       .from("movements")
       .insert({
@@ -130,12 +123,10 @@ async function confirmOccurrence(
 
 function EditOccurrenceDialog({
   occ,
-  accounts,
   open,
   onOpenChange,
 }: {
   occ: OccurrenceWithRec
-  accounts: Account[]
   open: boolean
   onOpenChange: (v: boolean) => void
 }) {
@@ -148,7 +139,7 @@ function EditOccurrenceDialog({
     mutationFn: async () => {
       const amt = parseFloat(overrideAmount)
       if (!amt || amt <= 0) throw new Error("Monto inválido")
-      await confirmOccurrence(occ, accounts, amt)
+      await confirmOccurrence(occ, amt)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: OCCURRENCES_KEY })
@@ -214,11 +205,9 @@ function EditOccurrenceDialog({
 
 function OccurrenceCard({
   occ,
-  accounts,
   isDemo,
 }: {
   occ: OccurrenceWithRec
-  accounts: Account[]
   isDemo?: boolean
 }) {
   const queryClient = useQueryClient()
@@ -229,7 +218,7 @@ function OccurrenceCard({
   const formattedDate = format(parseISO(occ.scheduled_date), "d MMM", { locale: es })
 
   const confirmMutation = useMutation({
-    mutationFn: () => confirmOccurrence(occ, accounts),
+    mutationFn: () => confirmOccurrence(occ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: OCCURRENCES_KEY })
       queryClient.invalidateQueries({ queryKey: MOVEMENTS_KEY })
@@ -342,7 +331,6 @@ function OccurrenceCard({
 
       <EditOccurrenceDialog
         occ={occ}
-        accounts={accounts}
         open={editOpen}
         onOpenChange={setEditOpen}
       />
@@ -352,10 +340,7 @@ function OccurrenceCard({
 
 // ── Public component ───────────────────────────────────────────────────────────
 
-export function PendingInbox({
-  occurrences,
-  accounts,
-}: PendingInboxProps) {
+export function PendingInbox({ occurrences }: PendingInboxProps) {
   const isDemo = useIsDemo()
 
   if (occurrences.length === 0) return null
@@ -375,7 +360,7 @@ export function PendingInbox({
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
         {occurrences.map((occ) => (
           <div key={occ.id} className="px-4">
-            <OccurrenceCard occ={occ} accounts={accounts} isDemo={isDemo} />
+            <OccurrenceCard occ={occ} isDemo={isDemo} />
           </div>
         ))}
       </div>

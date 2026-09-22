@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { parseISO, format } from "date-fns"
@@ -303,7 +303,7 @@ export function GoalForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<GoalFormValues>({
@@ -329,7 +329,7 @@ export function GoalForm({
     },
   })
 
-  const v = watch()
+  const v = useWatch({ control }) as GoalFormValues
   const goalType = v.type
   const isGlobal = v.is_global
 

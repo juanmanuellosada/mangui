@@ -57,19 +57,15 @@ export function MangoMultiSelect({
   "aria-label": ariaLabel,
 }: MangoMultiSelectProps) {
   const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, placeAbove: false })
-  const [posReady, setPosReady] = useState(false)
-  const [revealed, setRevealed] = useState(false)
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const [searchQuery, setSearchQuery] = useState("")
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const listboxId = React.useId()
   const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { setMounted(true) }, [])
 
   // When showSearch is active, filter by normalized label; otherwise use all options.
   const filteredOptions =
@@ -96,13 +92,8 @@ export function MangoMultiSelect({
   }, [])
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPosReady(false)
-      setRevealed(false)
-      return
-    }
+    if (!open) return
     updatePos()
-    setPosReady(true)
     window.addEventListener("scroll", updatePos, true)
     window.addEventListener("resize", updatePos)
     return () => {
@@ -110,11 +101,6 @@ export function MangoMultiSelect({
       window.removeEventListener("resize", updatePos)
     }
   }, [open, updatePos])
-
-  useEffect(() => {
-    if (!posReady) return
-    setRevealed(true)
-  }, [posReady])
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -191,12 +177,16 @@ export function MangoMultiSelect({
     items?.[focusedIndex]?.focus()
   }, [open, focusedIndex, showSearch])
 
-  // When the search query changes, reset focusedIndex to the first result.
-  useEffect(() => {
-    if (!open || !showSearch) return
-    setFocusedIndex(filteredOptions.length > 0 ? 0 : -1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery])
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const nextSearchQuery = e.target.value
+    setSearchQuery(nextSearchQuery)
+    const nextFilteredOptions = nextSearchQuery
+      ? options.filter((option) =>
+          normalizeLabel(option.label).includes(normalizeLabel(nextSearchQuery))
+        )
+      : options
+    setFocusedIndex(nextFilteredOptions.length > 0 ? 0 : -1)
+  }
 
   function handleTriggerKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
@@ -318,9 +308,9 @@ export function MangoMultiSelect({
         type="button"
         role="combobox"
         aria-haspopup="listbox"
+        aria-controls={listboxId}
         aria-expanded={open}
         aria-label={ariaLabel}
-        aria-multiselectable="true"
         disabled={disabled}
         onClick={() => (open ? closeDropdown() : openDropdown())}
         onKeyDown={handleTriggerKeyDown}
@@ -372,17 +362,17 @@ export function MangoMultiSelect({
       </button>
 
       {/* Portal popover */}
-      {mounted && open && createPortal(
+      {typeof document !== "undefined" && open && createPortal(
         <div
           ref={popoverRef}
+          id={listboxId}
           role="listbox"
           aria-multiselectable="true"
           aria-label={ariaLabel ?? "Opciones"}
           className={cn(
             "fixed z-[200] rounded-lg border border-border/80",
             "bg-popover text-popover-foreground shadow-lg",
-            "transition-[opacity,scale] duration-[150ms] ease-out motion-reduce:transition-none",
-            revealed ? "opacity-100 scale-100" : "opacity-0 scale-[0.97] pointer-events-none",
+            "animate-in fade-in-0 zoom-in-95 duration-150 motion-reduce:animate-none",
             pos.placeAbove ? "origin-bottom" : "origin-top",
           )}
           style={{
@@ -406,7 +396,7 @@ export function MangoMultiSelect({
                 aria-label="Buscar opción"
                 autoComplete="off"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Buscar…"
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"

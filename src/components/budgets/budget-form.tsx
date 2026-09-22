@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useForm, type Resolver } from "react-hook-form"
+import { useForm, useWatch, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { format, parseISO } from "date-fns"
@@ -175,7 +175,7 @@ export function BudgetForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<BudgetFormValues>({
@@ -198,7 +198,7 @@ export function BudgetForm({
     },
   })
 
-  const watchedValues = watch()
+  const watchedValues = useWatch({ control }) as BudgetFormValues
 
   // ── Single-currency restriction ───────────────────────────────────────────
   // The currency of a budget is determined by the non-card accounts it covers.

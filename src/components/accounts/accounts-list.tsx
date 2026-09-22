@@ -948,7 +948,10 @@ export function AccountsList({ rateType, manualRate, rates }: AccountsListProps)
   const [bulkPending, setBulkPending] = useState(false)
   const queryClient = useQueryClient()
 
-  const balanceMap = new Map(balances.map((b) => [b.account_id, b]))
+  const balanceMap = useMemo(
+    () => new Map(balances.map((balance) => [balance.account_id, balance])),
+    [balances],
+  )
 
   // Compute credit-card next-payment for each tarjeta_credito account
   const cardPaymentMap = useMemo(() => {

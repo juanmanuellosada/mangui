@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import { WifiOff, RefreshCw } from "lucide-react"
-import { countQueued } from "@/lib/offline-queue"
+import { countQueuedForUser } from "@/lib/offline-queue"
+import { createClient } from "@/lib/supabase/client"
 
 /**
  * Shows a sticky banner when the browser reports being offline.
@@ -12,41 +13,61 @@ import { countQueued } from "@/lib/offline-queue"
  * Hidden when online and queue is empty, or in SSR.
  */
 export function OfflineBanner() {
-  const [isOnline, setIsOnline] = useState(true)
-  const [mounted, setMounted] = useState(false)
+  const isOnline = useSyncExternalStore(
+    (notify) => {
+      window.addEventListener("online", notify)
+      window.addEventListener("offline", notify)
+      return () => {
+        window.removeEventListener("online", notify)
+        window.removeEventListener("offline", notify)
+      }
+    },
+    () => navigator.onLine,
+    () => true,
+  )
   const [pendingCount, setPendingCount] = useState(0)
+  const [userId, setUserId] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
-    setMounted(true)
-    setIsOnline(navigator.onLine)
+    const supabase = createClient()
+    let active = true
+    let receivedAuthStateChange = false
 
-    async function refreshCount() {
-      const n = await countQueued()
-      setPendingCount(n)
-    }
-    refreshCount()
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (active && !receivedAuthStateChange) setUserId(user?.id ?? null)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      receivedAuthStateChange = true
+      if (active) setUserId(session?.user.id ?? null)
+    })
 
-    const handleOnline = () => {
-      setIsOnline(true)
-      refreshCount()
-    }
-    const handleOffline = () => {
-      setIsOnline(false)
-      refreshCount()
-    }
-    const handleQueueChanged = () => refreshCount()
-
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
-    window.addEventListener("mangui-queue-changed", handleQueueChanged)
     return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
-      window.removeEventListener("mangui-queue-changed", handleQueueChanged)
+      active = false
+      subscription.unsubscribe()
     }
   }, [])
 
-  if (!mounted) return null
+  useEffect(() => {
+    let active = true
+
+    async function refreshCount() {
+      // Do not reveal another user's pending records while auth is unresolved.
+      const n = userId ? await countQueuedForUser(userId) : 0
+      if (active) setPendingCount(n)
+    }
+    void refreshCount()
+
+    const handleConnectionChange = () => void refreshCount()
+    window.addEventListener("online", handleConnectionChange)
+    window.addEventListener("offline", handleConnectionChange)
+    window.addEventListener("mangui-queue-changed", handleConnectionChange)
+    return () => {
+      active = false
+      window.removeEventListener("online", handleConnectionChange)
+      window.removeEventListener("offline", handleConnectionChange)
+      window.removeEventListener("mangui-queue-changed", handleConnectionChange)
+    }
+  }, [userId])
 
   return (
     <>

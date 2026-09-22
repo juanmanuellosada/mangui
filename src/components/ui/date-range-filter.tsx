@@ -229,18 +229,13 @@ const DAY_PICKER_CLASSNAMES = {
 
 export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props) {
   const [open, setOpen] = React.useState(false)
-  const [mounted, setMounted] = React.useState(false)
   const [pos, setPos] = React.useState({ top: 0, left: 0, placeAbove: false, flipH: false })
-  const [posReady, setPosReady] = React.useState(false)
-  const [revealed, setRevealed] = React.useState(false)
 
   // Draft state — mutated while popover is open; only committed on Aplicar
   const [draft, setDraft] = React.useState<DraftState>(() => draftFromValue(value))
 
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const popoverRef = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => { setMounted(true) }, [])
 
   // ── Positioning (portal to body, same pattern as MangoDatePicker) ──
 
@@ -276,13 +271,8 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
   }, [])
 
   React.useLayoutEffect(() => {
-    if (!open) {
-      setPosReady(false)
-      setRevealed(false)
-      return
-    }
+    if (!open) return
     updatePos()
-    setPosReady(true)
     window.addEventListener("scroll", updatePos, true)
     window.addEventListener("resize", updatePos)
     return () => {
@@ -290,11 +280,6 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
       window.removeEventListener("resize", updatePos)
     }
   }, [open, updatePos])
-
-  React.useEffect(() => {
-    if (!posReady) return
-    setRevealed(true)
-  }, [posReady])
 
   // ── Open / close ──
 
@@ -388,8 +373,6 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
   // ── Calendar selection ──
 
   const isSingleMode = draft.operator === "is" || draft.operator === "before" || draft.operator === "after"
-  const isRangeMode = draft.operator === "between" && !draft.preset && !draft.lastn
-
   // ── Render ──
 
   return (
@@ -424,15 +407,14 @@ export function DateRangeFilter({ value, onChange, id, triggerClassName }: Props
       </button>
 
       {/* Portal popover */}
-      {mounted && open && createPortal(
+      {typeof document !== "undefined" && open && createPortal(
         <div
           ref={popoverRef}
           role="dialog"
           aria-label="Filtro de fecha"
           className={cn(
             "fixed z-[200] rounded-xl border border-border/60 bg-popover shadow-lg",
-            "transition-[opacity,scale] duration-[150ms] ease-out motion-reduce:transition-none",
-            revealed ? "opacity-100 scale-100" : "opacity-0 scale-[0.97] pointer-events-none",
+            "animate-in fade-in-0 zoom-in-95 duration-150 motion-reduce:animate-none",
           )}
           style={{
             top: pos.top,

@@ -39,7 +39,7 @@ export function AppBottomNav() {
         aria-label="Navegación principal"
       >
         <div className="flex items-center justify-around h-16 px-2">
-          {BOTTOM_NAV.map((item, index) => {
+          {BOTTOM_NAV.map((item) => {
             // Center slot: quick-add button
             if (item === null) {
               return (

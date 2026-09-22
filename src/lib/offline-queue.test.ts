@@ -1,10 +1,11 @@
 import "fake-indexeddb/auto"
 import { describe, it, expect, beforeEach } from "vitest"
-import { enqueueMovement, getQueuedMovements, removeQueued, countQueued } from "./offline-queue"
+import { enqueueMovement, getQueuedMovements, removeQueued, countQueued, countQueuedForUser } from "./offline-queue"
 import type { QueuedMovement } from "./offline-queue"
 
 const DB_NAME = "mangui-offline"
 const STORE = "mutations"
+const USER_ID = "user-a"
 
 // Inserts a record directly into the store with an explicit createdAt,
 // bypassing the wall clock — used to deterministically test the FIFO sort
@@ -47,14 +48,15 @@ describe("getQueuedMovements", () => {
 })
 
 describe("enqueueMovement", () => {
-  it("adds an item with kind, id, createdAt and the given payload", async () => {
-    await enqueueMovement({ amount: 100, description: "coffee" })
+  it("adds an item with kind, id, createdAt, userId and the given payload", async () => {
+    await enqueueMovement({ amount: 100, description: "coffee" }, USER_ID)
 
     const items = await getQueuedMovements()
     expect(items).toHaveLength(1)
     expect(items[0]).toMatchObject({
       kind: "movement",
       payload: { amount: 100, description: "coffee" },
+      userId: USER_ID,
     })
     expect(typeof items[0].id).toBe("string")
     expect(items[0].id.length).toBeGreaterThan(0)
@@ -62,8 +64,8 @@ describe("enqueueMovement", () => {
   })
 
   it("appends multiple items to the queue", async () => {
-    await enqueueMovement({ label: "one" })
-    await enqueueMovement({ label: "two" })
+    await enqueueMovement({ label: "one" }, USER_ID)
+    await enqueueMovement({ label: "two" }, USER_ID)
 
     const items = await getQueuedMovements()
     expect(items).toHaveLength(2)
@@ -83,9 +85,9 @@ describe("getQueuedMovements ordering", () => {
 
 describe("removeQueued", () => {
   it("removes only the targeted item, leaving the rest", async () => {
-    await enqueueMovement({ label: "keep-1" })
-    await enqueueMovement({ label: "remove-me" })
-    await enqueueMovement({ label: "keep-2" })
+    await enqueueMovement({ label: "keep-1" }, USER_ID)
+    await enqueueMovement({ label: "remove-me" }, USER_ID)
+    await enqueueMovement({ label: "keep-2" }, USER_ID)
 
     const before = await getQueuedMovements()
     const toRemove = before.find((i) => i.payload.label === "remove-me")!
@@ -108,21 +110,48 @@ describe("countQueued", () => {
   })
 
   it("returns the number of queued items", async () => {
-    await enqueueMovement({ label: "a" })
-    await enqueueMovement({ label: "b" })
-    await enqueueMovement({ label: "c" })
+    await enqueueMovement({ label: "a" }, USER_ID)
+    await enqueueMovement({ label: "b" }, USER_ID)
+    await enqueueMovement({ label: "c" }, USER_ID)
 
     await expect(countQueued()).resolves.toBe(3)
   })
 
   it("reflects removals", async () => {
-    await enqueueMovement({ label: "a" })
-    await enqueueMovement({ label: "b" })
+    await enqueueMovement({ label: "a" }, USER_ID)
+    await enqueueMovement({ label: "b" }, USER_ID)
     const [first] = await getQueuedMovements()
 
     await removeQueued(first.id)
 
     await expect(countQueued()).resolves.toBe(1)
+  })
+})
+
+describe("countQueuedForUser", () => {
+  it("includes explicit same-user, legacy payload same-user, and ownerless legacy records only", async () => {
+    await enqueueMovement({ label: "current" }, USER_ID)
+    await insertRaw({
+      id: "legacy-current",
+      kind: "movement",
+      payload: { label: "legacy-current", user_id: USER_ID },
+      createdAt: 100,
+    })
+    await insertRaw({
+      id: "legacy-ownerless",
+      kind: "movement",
+      payload: { label: "legacy-ownerless" },
+      createdAt: 200,
+    })
+    await enqueueMovement({ label: "foreign" }, "user-other")
+    await insertRaw({
+      id: "legacy-foreign",
+      kind: "movement",
+      payload: { label: "legacy-foreign", user_id: "user-other" },
+      createdAt: 300,
+    })
+
+    await expect(countQueuedForUser(USER_ID)).resolves.toBe(3)
   })
 })
 
@@ -133,7 +162,7 @@ describe("SSR safety (indexedDB unavailable)", () => {
     delete globalThis.indexedDB
 
     try {
-      await expect(enqueueMovement({ label: "ssr" })).resolves.toBeUndefined()
+      await expect(enqueueMovement({ label: "ssr" }, USER_ID)).resolves.toBeUndefined()
       await expect(getQueuedMovements()).resolves.toEqual([])
       await expect(removeQueued("whatever")).resolves.toBeUndefined()
       await expect(countQueued()).resolves.toBe(0)

@@ -26,6 +26,25 @@ type MovementRow = Pick<
   | "original_currency"
 >
 
+const ARGENTINA_TIME_ZONE = "America/Argentina/Buenos_Aires"
+
+/** Returns the local hour (0–23) in the notification contract's time zone. */
+export function argentinaHour(date: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: ARGENTINA_TIME_ZONE,
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(date)
+  )
+}
+
+/** True when currentHour falls within notifyHour's one-hour local-time window. */
+export function shouldProcessNotificationsAtHour(currentHour: number, notifyHour: number) {
+  const difference = Math.abs(currentHour - notifyHour)
+  return Math.min(difference, 24 - difference) <= 1
+}
+
 /**
  * GET /api/cron/send-notifications
  *
@@ -38,10 +57,9 @@ type MovementRow = Pick<
  * Dedup: UNIQUE(user_id, event_key) on notification_log. If insert succeeds →
  * send. If it fails (duplicate) → already sent, skip.
  *
- * NOTE: notify_hour is stored per-user for future per-user timing. For MVP,
- * all notifications fire during this cron window (run hourly). To respect
- * notify_hour, compare the current UTC hour against user preference before
- * processing that user.
+ * NOTE: cron runs hourly and processes users only during their preferred
+ * notify_hour window. notify_hour is an America/Argentina/Buenos_Aires local
+ * hour, where 0 means midnight.
  *
  * ESCALA: hoy hay pocos usuarios, así que se hace ~1 query de movimientos
  * (~12 meses, reusada por los bloques de tarjeta/presupuesto/cargo inusual)
@@ -82,21 +100,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, processed: 0, prefsErr: prefsErr?.message })
   }
 
-  const currentHour = new Date().getUTCHours()
+  const currentHour = argentinaHour(new Date())
   let totalSent = 0
 
   for (const prefs of usersPrefs) {
     const userId = prefs.user_id
 
-    // MVP: only send during the user's preferred hour (or if notify_hour is 0)
-    // Allow a 1-hour window. Skip if not in window.
+    // Only send during the user's preferred America/Argentina/Buenos_Aires
+    // local hour. The one-hour window wraps around midnight.
     const notifyHour = prefs.notify_hour ?? 9
-    if (notifyHour !== 0 && Math.abs(currentHour - notifyHour) > 1) {
-      // Allow processing if hour matches; otherwise skip.
-      // For MVP we allow all hours if notifyHour is 0.
-      // Comment: In production, remove this skip to send regardless of hour,
-      // or configure per-user cron triggers.
-    }
+    if (!shouldProcessNotificationsAtHour(currentHour, notifyHour)) continue
 
     // ── Shared data: movements from the last ~12 months, fetched once and
     // reused by the card close projection, budget alerts, and unusual charge

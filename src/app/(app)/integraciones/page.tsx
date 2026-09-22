@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useSyncExternalStore } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { MangoSelect } from "@/components/ui/mango-select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Separator } from "@/components/ui/separator"
 import { createClient } from "@/lib/supabase/client"
 import { useIsDemo } from "@/lib/use-is-demo"
 import {
@@ -34,7 +33,6 @@ import {
 import { useInstallPrompt } from "@/hooks/use-install-prompt"
 import { cn } from "@/lib/utils"
 import type { Tables } from "@/lib/database.types"
-import type { Metadata } from "next"
 
 type UserPreferences = Tables<"user_preferences">
 type PushSubscription_ = Tables<"push_subscriptions">
@@ -189,23 +187,20 @@ function Row({
 // ── Online indicator badge ─────────────────────────────────────────────────────
 
 function OnlineIndicator() {
-  const [online, setOnline] = useState(true)
-  const [mounted, setMounted] = useState(false)
+  const online = useSyncExternalStore(
+    (notify) => {
+      window.addEventListener("online", notify)
+      window.addEventListener("offline", notify)
+      return () => {
+        window.removeEventListener("online", notify)
+        window.removeEventListener("offline", notify)
+      }
+    },
+    () => navigator.onLine,
+    () => null,
+  )
 
-  useEffect(() => {
-    setMounted(true)
-    setOnline(navigator.onLine)
-    const on = () => setOnline(true)
-    const off = () => setOnline(false)
-    window.addEventListener("online", on)
-    window.addEventListener("offline", off)
-    return () => {
-      window.removeEventListener("online", on)
-      window.removeEventListener("offline", off)
-    }
-  }, [])
-
-  if (!mounted) return null
+  if (online === null) return null
 
   return (
     <span

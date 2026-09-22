@@ -29,28 +29,24 @@ import { cn } from "@/lib/utils"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function useMediaQuery(query: string): boolean {
+  return React.useSyncExternalStore(
+    (notify) => {
+      const mediaQuery = window.matchMedia(query)
+      mediaQuery.addEventListener("change", notify)
+      return () => mediaQuery.removeEventListener("change", notify)
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  )
+}
+
 function useReducedMotion(): boolean {
-  const [reduced, setReduced] = React.useState(false)
-  React.useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
-    setReduced(mq.matches)
-    const handler = () => setReduced(mq.matches)
-    mq.addEventListener("change", handler)
-    return () => mq.removeEventListener("change", handler)
-  }, [])
-  return reduced
+  return useMediaQuery("(prefers-reduced-motion: reduce)")
 }
 
 function useMobile(): boolean {
-  const [mobile, setMobile] = React.useState(false)
-  React.useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)")
-    setMobile(mq.matches)
-    const handler = () => setMobile(mq.matches)
-    mq.addEventListener("change", handler)
-    return () => mq.removeEventListener("change", handler)
-  }, [])
-  return mobile
+  return useMediaQuery("(max-width: 767px)")
 }
 
 // ── MangoSheet ────────────────────────────────────────────────────────────────
@@ -87,14 +83,6 @@ export function MangoSheet({
   const [isDragging, setIsDragging] = React.useState(false)
   const startY = React.useRef(0)
   const startTime = React.useRef(0)
-
-  // Reset drag on open/close
-  React.useEffect(() => {
-    if (open) {
-      setDragY(0)
-      setIsDragging(false)
-    }
-  }, [open])
 
   // Scroll lock
   React.useEffect(() => {

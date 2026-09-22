@@ -69,6 +69,7 @@ export function MangoSelect({
   const [searchQuery, setSearchQuery] = useState("")
   const triggerRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const listboxId = React.useId()
   const searchRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -132,12 +133,16 @@ export function MangoSelect({
     items?.[focusedIndex]?.focus()
   }, [open, focusedIndex, showSearch])
 
-  // When the search query changes, reset focusedIndex to the first result.
-  useEffect(() => {
-    if (!open || !showSearch) return
-    setFocusedIndex(filteredOptions.length > 0 ? 0 : -1)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery])
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const nextSearchQuery = e.target.value
+    setSearchQuery(nextSearchQuery)
+    const nextFilteredOptions = nextSearchQuery
+      ? options.filter((option) =>
+          normalizeLabel(option.label).includes(normalizeLabel(nextSearchQuery))
+        )
+      : options
+    setFocusedIndex(nextFilteredOptions.length > 0 ? 0 : -1)
+  }
 
   function handleTriggerKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
@@ -240,6 +245,7 @@ export function MangoSelect({
         type="button"
         role="combobox"
         aria-haspopup="listbox"
+        aria-controls={listboxId}
         aria-expanded={open}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
@@ -317,7 +323,7 @@ export function MangoSelect({
                   aria-label="Buscar opción"
                   autoComplete="off"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={handleSearchChange}
                   onKeyDown={handleSearchKeyDown}
                   placeholder="Buscar…"
                   className={cn(
@@ -328,6 +334,7 @@ export function MangoSelect({
             )}
             <ul
               ref={listRef}
+              id={listboxId}
               role="listbox"
               aria-label={ariaLabel ?? "Opciones"}
               className="max-h-60 overflow-y-auto"
