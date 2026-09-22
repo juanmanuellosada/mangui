@@ -469,7 +469,7 @@ function RegisterPaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Registrar pago</DialogTitle>
+          <DialogTitle>{isPaidCycle ? "Editar pago" : "Registrar pago"}</DialogTitle>
           <DialogDescription>
             {account.name}
             {" · "}cierre {format(cycle.cycleEnd, "d MMM", { locale: es })}
@@ -675,7 +675,7 @@ function RegisterPaymentDialog({
             title={isDemo ? "No disponible en el modo demo" : undefined}
             className="flex-1 press-effect cursor-pointer"
           >
-            {isDisabled ? "Guardando…" : "Registrar pago"}
+            {isDisabled ? "Guardando…" : isPaidCycle ? "Guardar cambios" : "Registrar pago"}
           </Button>
         </div>
       </DialogContent>
@@ -1051,13 +1051,14 @@ function CardBlock({
                   ? ` · ${formatCurrency(cycle.statement.paid_amount_usd, "USD")}`
                   : ""}
               </p>
-              {/* Allow viewing/editing attachments on paid cycle */}
+              {/* Único acceso al pago en un ciclo ya pagado: además de los
+                  adjuntos, permite corregir importes y cuentas de origen. */}
               <button
                 type="button"
                 onClick={() => setPaymentOpen(true)}
                 className="ml-1 text-[10px] text-success/70 hover:text-success underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
-                Ver adjuntos
+                Ver o editar pago
               </button>
             </div>
           ) : (

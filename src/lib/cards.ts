@@ -1,11 +1,9 @@
 import {
   addMonths,
-  subMonths,
   getDaysInMonth,
   parseISO,
   isAfter,
   isBefore,
-  isEqual,
   startOfDay,
   addDays,
   format,
