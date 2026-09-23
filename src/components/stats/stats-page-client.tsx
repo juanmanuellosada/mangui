@@ -39,6 +39,8 @@ import { es } from "date-fns/locale"
 import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
 import { QueryError } from "@/components/ui/query-error"
+import { ShareWrappedReport } from "@/components/wrapped/share-wrapped-report"
+import { todayAR } from "@/lib/date-utils"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -322,6 +324,8 @@ export function StatsPageClient() {
 
   const statsFilter = filterToStatsFilter(filter)
   const currency = filter.currency !== "all" ? filter.currency : "ARS"
+  const wrappedMonthRef = todayAR().slice(0, 7)
+  const wrappedMonthLabel = format(parseISO(`${wrappedMonthRef}-01`), "MMMM yyyy", { locale: es })
 
   const filtered = useMemo(() => filterMovements(movements, statsFilter), [movements, statsFilter])
   const totals = useMemo(() => summaryTotals(filtered, statsFilter.currency), [filtered, statsFilter.currency])
@@ -560,8 +564,16 @@ export function StatsPageClient() {
                 onClick={handleMonthlyReport}
               >
                 <FileText className="h-4 w-4" aria-hidden />
-                Reporte mensual
+                Descargar reporte
               </Button>
+              <ShareWrappedReport
+                monthRef={wrappedMonthRef}
+                monthLabel={wrappedMonthLabel}
+                label="Compartir resumen del mes"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              />
               <Button
                 variant="outline"
                 size="sm"

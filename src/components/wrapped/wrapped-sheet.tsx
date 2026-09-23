@@ -1,12 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { Share2, Loader2, TrendingDown, TrendingUp } from "lucide-react"
+import { TrendingDown, TrendingUp } from "lucide-react"
 import { format, parse, startOfMonth, endOfMonth } from "date-fns"
 import { MangoSheet } from "@/components/ui/mango-sheet"
-import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MoneyFlowSankeyChart } from "@/components/dashboard/money-flow-sankey-chart"
 import { useCategories } from "@/lib/hooks/use-categories"
@@ -17,6 +15,7 @@ import { filterMovements } from "@/lib/stats"
 import { buildWrappedData } from "@/lib/wrapped"
 import { formatCurrency, cn } from "@/lib/utils"
 import { renderCategoryIcon } from "@/lib/categories"
+import { ShareWrappedReport } from "./share-wrapped-report"
 
 interface WrappedSheetProps {
   open: boolean
@@ -28,8 +27,6 @@ interface WrappedSheetProps {
 const CATEGORY_BAR_COLORS = ["bg-primary", "bg-accent", "bg-sky-500"]
 
 export function WrappedSheet({ open, onOpenChange, monthRef }: WrappedSheetProps) {
-  const [sharing, setSharing] = useState(false)
-
   const { data: movements, isLoading: loadingMovements } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchAllMovements,
@@ -68,39 +65,6 @@ export function WrappedSheet({ open, onOpenChange, monthRef }: WrappedSheetProps
     wrapped.realVsNominal.deltaPct != null &&
     Math.abs(wrapped.realVsNominal.deltaPct) >= 1
 
-  async function handleShare() {
-    setSharing(true)
-    try {
-      const res = await fetch(`/api/og/wrapped?month=${monthRef}`)
-      if (!res.ok) throw new Error("No se pudo generar la imagen")
-      const blob = await res.blob()
-      const file = new File([blob], "mangui-wrapped.png", { type: "image/png" })
-      const shareData = {
-        files: [file],
-        title: "Mi resumen de mangui",
-        text: `Mi ${monthLabel} en mangui 🥭`,
-      }
-      if (navigator.canShare?.(shareData)) {
-        await navigator.share(shareData)
-      } else {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = "mangui-wrapped.png"
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        URL.revokeObjectURL(url)
-        toast.success("Imagen descargada")
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return // el usuario canceló el share sheet
-      toast.error("No pudimos generar tu resumen. Probá de nuevo.")
-    } finally {
-      setSharing(false)
-    }
-  }
-
   return (
     <MangoSheet
       open={open}
@@ -109,10 +73,11 @@ export function WrappedSheet({ open, onOpenChange, monthRef }: WrappedSheetProps
       description={wrapped?.hasData ? "Cerrado, con IA y con onda." : undefined}
       footer={
         wrapped?.hasData ? (
-          <Button className="w-full font-semibold gap-2 press-effect" onClick={handleShare} disabled={sharing}>
-            {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-            {sharing ? "Generando…" : "Compartir"}
-          </Button>
+          <ShareWrappedReport
+            monthRef={monthRef}
+            monthLabel={monthLabel}
+            className="w-full font-semibold gap-2 press-effect"
+          />
         ) : undefined
       }
     >
