@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildWrappedData, type Movement, type Category } from "./wrapped"
+import { buildWrappedData, getAvailableWrappedMonths, type Movement, type Category } from "./wrapped"
 
 function makeMovement(overrides: Partial<Movement>): Movement {
   return {
@@ -46,6 +46,34 @@ const CATEGORIES: Category[] = [
   makeCategory({ id: "cat-fun", name: "Diversión", icon: "🎉" }),
   makeCategory({ id: "cat-other", name: "Otros", icon: "📦" }),
 ]
+
+describe("getAvailableWrappedMonths", () => {
+  it("orders distinct months descending", () => {
+    const movements = [
+      makeMovement({ id: "1", date: "2026-04-01" }),
+      makeMovement({ id: "2", date: "2026-06-01" }),
+      makeMovement({ id: "3", date: "2026-05-01" }),
+      makeMovement({ id: "4", date: "2026-06-15" }),
+    ]
+
+    expect(getAvailableWrappedMonths(movements)).toEqual(["2026-06", "2026-05", "2026-04"])
+  })
+
+  it("excludes future movements", () => {
+    const movements = [
+      makeMovement({ id: "1", date: "2026-06-01" }),
+      makeMovement({ id: "2", date: "2026-07-01", is_future: true }),
+    ]
+
+    expect(getAvailableWrappedMonths(movements)).toEqual(["2026-06"])
+  })
+
+  it("includes months that only have income", () => {
+    const movements = [makeMovement({ id: "1", date: "2026-06-01", type: "income" })]
+
+    expect(getAvailableWrappedMonths(movements)).toEqual(["2026-06"])
+  })
+})
 
 describe("buildWrappedData", () => {
   it("computes totals for the given month, ignoring other months", () => {

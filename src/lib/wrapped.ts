@@ -13,6 +13,16 @@ import { adjustAmount, latestIpcMonth, type IpcMap } from "./inflation/adjust"
 export type Movement = Tables<"movements">
 export type Category = Tables<"categories">
 
+/**
+ * Returns distinct months with recorded movements, newest first.
+ * Future movements do not make a month available, while income-only months do.
+ */
+export function getAvailableWrappedMonths(movements: Movement[]): string[] {
+  return [...new Set(movements.filter((movement) => !movement.is_future).map((movement) => movement.date.slice(0, 7)))].sort(
+    (a, b) => b.localeCompare(a)
+  )
+}
+
 function monthRange(monthRef: string): { from: string; to: string } {
   const d = parse(`${monthRef}-01`, "yyyy-MM-dd", new Date())
   return {

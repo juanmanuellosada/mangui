@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   BarChart3,
+  CalendarDays,
   Download,
   FileText,
   TrendingUp,
@@ -40,6 +41,7 @@ import { useAccounts } from "@/lib/hooks/use-accounts"
 import { useCategories } from "@/lib/hooks/use-categories"
 import { QueryError } from "@/components/ui/query-error"
 import { ShareWrappedReport } from "@/components/wrapped/share-wrapped-report"
+import { WrappedSheet } from "@/components/wrapped/wrapped-sheet"
 import { todayAR } from "@/lib/date-utils"
 
 type Movement = Tables<"movements">
@@ -281,6 +283,7 @@ export function StatsPageClient() {
 
   const [filter, setFilter] = useState<FilterState>(() => defaultFilter())
   const [isExporting, setIsExporting] = useState(false)
+  const [isWrappedOpen, setIsWrappedOpen] = useState(false)
 
   const [period1, setPeriod1] = useState<DateRangeValue>(() => {
     const r = getPreset("this_month")
@@ -562,6 +565,15 @@ export function StatsPageClient() {
                 variant="outline"
                 size="sm"
                 className="gap-2"
+                onClick={() => setIsWrappedOpen(true)}
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden />
+                Ver resúmenes mensuales
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
                 onClick={handleMonthlyReport}
               >
                 <FileText className="h-4 w-4" aria-hidden />
@@ -605,6 +617,12 @@ export function StatsPageClient() {
           }}
         />
       )}
+
+      <WrappedSheet
+        open={isWrappedOpen}
+        onOpenChange={setIsWrappedOpen}
+        monthRef={wrappedMonthRef}
+      />
     </div>
   )
 }

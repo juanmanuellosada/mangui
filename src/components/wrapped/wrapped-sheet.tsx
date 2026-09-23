@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { TrendingDown, TrendingUp } from "lucide-react"
 import { format, parse, startOfMonth, endOfMonth } from "date-fns"
+import { es } from "date-fns/locale"
 import { MangoSheet } from "@/components/ui/mango-sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { MoneyFlowSankeyChart } from "@/components/dashboard/money-flow-sankey-chart"
@@ -12,7 +13,7 @@ import { useInflationIndex } from "@/lib/inflation/use-inflation-index"
 import { buildIpcMap } from "@/lib/inflation/adjust"
 import { fetchAllMovements } from "@/lib/movements"
 import { filterMovements } from "@/lib/stats"
-import { buildWrappedData } from "@/lib/wrapped"
+import { buildWrappedData, getAvailableWrappedMonths } from "@/lib/wrapped"
 import { formatCurrency, cn } from "@/lib/utils"
 import { renderCategoryIcon } from "@/lib/categories"
 import { ShareWrappedReport } from "./share-wrapped-report"
@@ -27,6 +28,7 @@ interface WrappedSheetProps {
 const CATEGORY_BAR_COLORS = ["bg-primary", "bg-accent", "bg-sky-500"]
 
 export function WrappedSheet({ open, onOpenChange, monthRef }: WrappedSheetProps) {
+  const [selectedMonthRef, setSelectedMonthRef] = useState(monthRef)
   const { data: movements, isLoading: loadingMovements } = useQuery({
     queryKey: ["movements", "stats-all"],
     queryFn: fetchAllMovements,
@@ -36,26 +38,30 @@ export function WrappedSheet({ open, onOpenChange, monthRef }: WrappedSheetProps
   const { data: inflationRows } = useInflationIndex()
 
   const ipc = useMemo(() => buildIpcMap(inflationRows ?? []), [inflationRows])
+  const availableMonthRefs = useMemo(() => getAvailableWrappedMonths(movements ?? []), [movements])
+  const activeMonthRef = availableMonthRefs.includes(selectedMonthRef)
+    ? selectedMonthRef
+    : (availableMonthRefs[0] ?? selectedMonthRef)
 
   const isLoading = loadingMovements || loadingCategories
 
   const wrapped = useMemo(() => {
     if (!movements || !categories) return null
-    return buildWrappedData(movements, categories, monthRef, {
+    return buildWrappedData(movements, categories, activeMonthRef, {
       currency: "ARS",
       ipc,
       previousMonthMovements: movements,
     })
-  }, [movements, categories, monthRef, ipc])
+  }, [movements, categories, activeMonthRef, ipc])
 
   const monthMovements = useMemo(() => {
     if (!movements) return []
-    const monthDate = parse(`${monthRef}-01`, "yyyy-MM-dd", new Date())
+    const monthDate = parse(`${activeMonthRef}-01`, "yyyy-MM-dd", new Date())
     return filterMovements(movements, {
       dateFrom: format(startOfMonth(monthDate), "yyyy-MM-dd"),
       dateTo: format(endOfMonth(monthDate), "yyyy-MM-dd"),
     })
-  }, [movements, monthRef])
+  }, [movements, activeMonthRef])
 
   const monthLabel = wrapped?.monthLabel ?? ""
   const title = monthLabel ? `Tu ${monthLabel} en mangui 🥭` : "Tu resumen en mangui"
@@ -70,17 +76,35 @@ export function WrappedSheet({ open, onOpenChange, monthRef }: WrappedSheetProps
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description={wrapped?.hasData ? "Cerrado, con IA y con onda." : undefined}
+      description={wrapped?.hasData ? "Resumen calculado con tus movimientos." : undefined}
       footer={
         wrapped?.hasData ? (
           <ShareWrappedReport
-            monthRef={monthRef}
+            monthRef={activeMonthRef}
             monthLabel={monthLabel}
             className="w-full font-semibold gap-2 press-effect"
           />
         ) : undefined
       }
     >
+      {!isLoading && availableMonthRefs.length > 0 && (
+        <label className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+          <span className="font-medium">Mes</span>
+          <select
+            aria-label="Elegir resumen mensual"
+            value={activeMonthRef}
+            onChange={(event) => setSelectedMonthRef(event.target.value)}
+            className="min-w-0 bg-transparent text-right font-medium outline-none"
+          >
+            {availableMonthRefs.map((availableMonthRef) => (
+              <option key={availableMonthRef} value={availableMonthRef}>
+                {format(parse(`${availableMonthRef}-01`, "yyyy-MM-dd", new Date()), "MMMM 'de' yyyy", { locale: es })}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {isLoading && (
         <div className="space-y-4">
           <Skeleton className="h-16 w-2/3 rounded-xl" />
