@@ -34,10 +34,11 @@ export async function GET(req: NextRequest) {
   // ISO week key: same for all users this week — per-user uniqueness from UNIQUE(user_id, event_key)
   const weekKey = `weekly_insights:${format(today, "RRRR-'W'II")}`
 
-  // Opted-in users
+  // Weekly email recipients are explicitly opted in. Push delivery also
+  // requires the user's separate master push opt-in.
   const { data: prefs } = await admin
     .from("user_preferences")
-    .select("user_id")
+    .select("user_id, push_enabled")
     .eq("weekly_insights_enabled", true)
 
   if (!prefs || prefs.length === 0) {
@@ -215,18 +216,20 @@ export async function GET(req: NextRequest) {
     }
 
     // ── push (top insights, cuerpo multi-línea) ─────────────────────────────
-    try {
-      const body = insights
-        .slice(0, 3)
-        .map((i) => `${i.emoji} ${i.body}`)
-        .join("\n")
-      await sendPushToUser(admin, userId, {
-        title: "Tu resumen semanal 🥭",
-        body,
-        url: "/estadisticas",
-      })
-    } catch (e) {
-      console.error("[generate-insights] push error", e)
+    if (p.push_enabled) {
+      try {
+        const body = insights
+          .slice(0, 3)
+          .map((i) => `${i.emoji} ${i.body}`)
+          .join("\n")
+        await sendPushToUser(admin, userId, {
+          title: "Tu resumen semanal 🥭",
+          body,
+          url: "/estadisticas",
+        })
+      } catch (e) {
+        console.error("[generate-insights] push error", e)
+      }
     }
 
     // ── email (full list) ───────────────────────────────────────────────────

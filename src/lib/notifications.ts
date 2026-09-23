@@ -85,35 +85,51 @@ export async function sendPushToUser(
 }
 
 /**
- * Try to log the event_key first (idempotency guard).
- * If the insert succeeds → run the send callback.
- * If the insert fails with a duplicate error → already sent, skip.
- * Returns true if the notification was sent.
+ * Sends an event at most once when a prior delivery was recorded.
+ *
+ * The log is written only after at least one device accepts the push, so a
+ * temporary VAPID or subscription outage does not consume the event. The
+ * pre-send lookup preserves normal duplicate suppression; concurrent cron
+ * executions may still race between delivery and the final insert.
  */
 export async function tryNotify(
   admin: AdminClient,
   userId: string,
   eventKey: string,
-  send: () => Promise<void>
+  send: () => Promise<number>
 ): Promise<boolean> {
-  const { error } = await admin.from("notification_log").insert({
+  const { data: existing, error: lookupError } = await admin
+    .from("notification_log")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("event_key", eventKey)
+    .maybeSingle()
+
+  if (lookupError) {
+    console.error("[notifications] tryNotify log lookup error:", lookupError)
+    return false
+  }
+  if (existing) return false
+
+  let successfulDeliveries: number
+  try {
+    successfulDeliveries = await send()
+  } catch (err) {
+    console.error("[notifications] tryNotify send error for", eventKey, err)
+    return false
+  }
+
+  if (successfulDeliveries < 1) return false
+
+  const { error: insertError } = await admin.from("notification_log").insert({
     user_id: userId,
     event_key: eventKey,
     channel: "push",
   })
 
-  if (error) {
-    // Duplicate key → already sent
-    if (error.code === "23505") return false
-    console.error("[notifications] tryNotify log insert error:", error)
-    return false
+  if (insertError && insertError.code !== "23505") {
+    console.error("[notifications] tryNotify log insert error:", insertError)
   }
 
-  try {
-    await send()
-    return true
-  } catch (err) {
-    console.error("[notifications] tryNotify send error for", eventKey, err)
-    return false
-  }
+  return true
 }

@@ -161,13 +161,13 @@ export async function GET(req: NextRequest) {
             )
             const amountStr = formatCurrency(summary.amount, card.currency)
 
-            const sent = await tryNotify(admin, userId, eventKey, async () => {
-              await sendPushToUser(admin, userId, {
+            const sent = await tryNotify(admin, userId, eventKey, () =>
+              sendPushToUser(admin, userId, {
                 title: `Cierre de ${card.name}`,
                 body: `Tu resumen de ${card.name} cierra ${when} y va ~${amountStr}.`,
                 url: "/tarjetas",
               })
-            })
+            )
             if (sent) totalSent++
           }
 
@@ -177,8 +177,8 @@ export async function GET(req: NextRequest) {
             const daysUntil = Math.round(
               (parseISO(dueDateStr).getTime() - today.getTime()) / 86_400_000
             )
-            const sent = await tryNotify(admin, userId, eventKey, async () => {
-              await sendPushToUser(admin, userId, {
+            const sent = await tryNotify(admin, userId, eventKey, () =>
+              sendPushToUser(admin, userId, {
                 title: `Vencimiento de ${card.name}`,
                 body:
                   daysUntil === 0
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
                     : `El pago de ${card.name} vence en ${daysUntil} día${daysUntil !== 1 ? "s" : ""}.`,
                 url: "/tarjetas",
               })
-            })
+            )
             if (sent) totalSent++
           }
         }
@@ -206,13 +206,13 @@ export async function GET(req: NextRequest) {
 
       for (const occ of occurrences ?? []) {
         const eventKey = `occurrence:${occ.id}`
-        const sent = await tryNotify(admin, userId, eventKey, async () => {
-          await sendPushToUser(admin, userId, {
+        const sent = await tryNotify(admin, userId, eventKey, () =>
+          sendPushToUser(admin, userId, {
             title: "Transacción recurrente pendiente",
             body: `Tenés una transacción recurrente programada para hoy (${format(parseISO(occ.scheduled_date), "d MMM")}).`,
             url: "/recurrentes",
           })
-        })
+        )
         if (sent) totalSent++
       }
     } catch (err) {
@@ -249,9 +249,9 @@ export async function GET(req: NextRequest) {
                   budget.alert_threshold !== 80 ? ` (avisamos desde el ${budget.alert_threshold}%)` : ""
                 }.`
 
-          const sent = await tryNotify(admin, userId, eventKey, async () => {
-            await sendPushToUser(admin, userId, { title, body, url: "/presupuestos" })
-          })
+          const sent = await tryNotify(admin, userId, eventKey, () =>
+            sendPushToUser(admin, userId, { title, body, url: "/presupuestos" })
+          )
           if (sent) totalSent++
         }
       } catch (err) {
@@ -288,13 +288,13 @@ export async function GET(req: NextRequest) {
           const catName = category?.name ?? "sin categoría"
           const eventKey = `unusual_charge:${best.movement.id}`
 
-          const sent = await tryNotify(admin, userId, eventKey, async () => {
-            await sendPushToUser(admin, userId, {
+          const sent = await tryNotify(admin, userId, eventKey, () =>
+            sendPushToUser(admin, userId, {
               title: "Cargo inusual",
               body: `Cargo inusual: ${formatCurrency(amount, "ARS")} en ${catName}, ~${Math.round(best!.ratio)}x tu promedio.`,
               url: "/movimientos",
             })
-          })
+          )
           if (sent) totalSent++
         }
       } catch (err) {

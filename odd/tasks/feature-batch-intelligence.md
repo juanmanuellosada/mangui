@@ -20,7 +20,7 @@ Implement the selected next features: financial health view, suggested rules, im
 - [x] Implement financial health view.
 - [ ] Implement suggested rules.
 - [x] Improve monthly reports.
-- [ ] Implement intelligent notifications.
+- [x] Implement intelligent notifications.
 - [ ] Run full verification, push to main, and notify via ntfy.
 
 ## Evidence
@@ -34,3 +34,7 @@ Implement the selected next features: financial health view, suggested rules, im
 - `WrappedSheet` provides a compact selector over available report months, uses the selected month for all metrics and PNG sharing, and its copy describes a calculated summary rather than AI-generated content.
 - Estadísticas now opens the navigable Wrapped history via `Ver resúmenes mensuales` while retaining direct PNG sharing and Markdown report download.
 - Verification passed: `npm test -- src/lib/wrapped.test.ts` (14 tests), `npm run lint`, `npm run typecheck`, `npm test` (35 files, 456 tests), `git diff --check`, and `npm run build`.
+- Intelligent notifications now describe the reminder hour as `America/Argentina/Buenos_Aires`; weekly email recipients remain explicitly opted in through `weekly_insights_enabled`, and their weekly push is skipped unless `push_enabled` is true.
+- `tryNotify` first checks existing event logs, sends, and writes the deduplication record only when `sendPushToUser` reports one or more accepted device deliveries. This preserves normal duplicate suppression while allowing retries after unavailable VAPID credentials or devices; overlapping cron executions retain a narrow post-send race.
+- Focused unit coverage in `src/lib/notifications.test.ts` verifies no record for zero deliveries or errors, duplicate suppression, and post-delivery recording order. The test failed against the prior implementation (4 expectations) and then passed after the change.
+- Validation passed: `npm test -- src/lib/notifications.test.ts` (4 tests), `npm run lint`, `npm run typecheck`, `npm test` (36 files, 460 tests), `git diff --check`, and `npm run build`.

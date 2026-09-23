@@ -550,7 +550,7 @@ export default function IntegracionesPage() {
           icon={Bell}
           iconClassName="bg-muted"
           label="Hora de notificación"
-          description="Hora preferida para recibir recordatorios diarios (UTC)"
+          description="Hora preferida para recibir recordatorios diarios (America/Argentina/Buenos_Aires)"
         >
           {loadingPrefs ? (
             <Skeleton className="h-9 w-28" />
