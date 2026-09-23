@@ -292,13 +292,17 @@ export function extractKeyword(normalized: string): string | null {
  *   - Group movements by keyword
  *   - When ≥3 movements share a keyword and ≥80% map to the same category,
  *     suggest a rule
- *   - Skip keywords already covered by an existing rule
+ *   - Skip keywords already covered by an existing rule condition
+ *
+ * When existing conditions are unavailable, rule names remain a backwards-
+ * compatible fallback for callers that have not fetched them yet.
  * Returns up to 6 suggestions.
  */
 export function suggestRules(
   movements: Movement[],
   categories: Category[],
-  existingRules: AutoRule[]
+  existingRules: AutoRule[],
+  existingConditions?: AutoRuleCondition[]
 ): SuggestedRule[] {
   // Only consider expense movements with a note and category
   const eligible = movements.filter(
@@ -322,12 +326,20 @@ export function suggestRules(
     catMap.set(m.category_id!, (catMap.get(m.category_id!) ?? 0) + 1)
   }
 
-  // Existing rule keywords to skip (rules that do note contains)
-  const existingKeywords = new Set<string>()
-  for (const rule of existingRules) {
-    // We don't have conditions here, but we can check rule names as a proxy
-    existingKeywords.add(rule.name.toLowerCase())
-  }
+  // Prefer the actual note-contains conditions whenever they are available.
+  // Rule names are only a fallback for callers that do not provide conditions.
+  const existingKeywords = new Set(
+    existingConditions
+      ? existingConditions
+          .filter(
+            (condition) =>
+              condition.field === "note" &&
+              condition.operator === "contains" &&
+              condition.value_text
+          )
+          .map((condition) => normalizeNote(condition.value_text!))
+      : existingRules.map((rule) => rule.name.toLowerCase())
+  )
 
   const suggestions: SuggestedRule[] = []
 

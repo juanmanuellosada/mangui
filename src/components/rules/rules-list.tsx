@@ -472,8 +472,8 @@ export function RulesList() {
   }, [conditions])
 
   const suggestions = useMemo(
-    () => suggestRules(movementsForSuggestions, categories, rules),
-    [movementsForSuggestions, categories, rules]
+    () => suggestRules(movementsForSuggestions, categories, rules, conditions),
+    [movementsForSuggestions, categories, rules, conditions]
   )
 
   const filteredRules = useMemo(() => {
