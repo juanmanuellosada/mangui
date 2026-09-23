@@ -18,6 +18,7 @@ import { BudgetsSummary } from "@/components/dashboard/budgets-summary"
 import { GoalsSummary } from "@/components/dashboard/goals-summary"
 import { RendirNudge } from "@/components/dashboard/rendir-nudge"
 import { WrappedNudge } from "@/components/dashboard/wrapped-nudge"
+import { SmartDashboardWidget } from "@/components/dashboard/smart-dashboard-widget"
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -126,6 +127,9 @@ export default async function DashboardPage() {
           <DashboardCharts />
         </DashboardFiltersProvider>
       )}
+
+      {/* Deterministic, read-only spending signals */}
+      {hasAccounts && <SmartDashboardWidget />}
 
       {/* Budgets summary widget */}
       {hasAccounts && <BudgetsSummary />}
