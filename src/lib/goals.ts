@@ -10,6 +10,7 @@ import {
   parseISO,
   format,
   isAfter,
+  differenceInCalendarDays,
 } from "date-fns"
 import type { Tables, Enums, TablesInsert } from "@/lib/database.types"
 import { amountInCurrency } from "@/lib/money"
@@ -66,6 +67,67 @@ export interface GoalProgress {
   target: number
   percent: number
   status: GoalProgressStatus
+}
+
+export interface GoalSmartGuidance {
+  status: "on_track" | "at_risk"
+  pace: "weekly" | "monthly"
+  suggestedContribution: number
+  remainingAmount: number
+  remainingDays: number
+}
+
+const SMART_GUIDANCE_AT_RISK_GAP = 15
+
+/**
+ * Suggest a deterministic saving pace for an active saving goal.
+ *
+ * Guidance is shown only while the goal is in its active date range and still
+ * has an amount outstanding. A goal is at risk when its progress is more than
+ * 15 percentage points behind the elapsed portion of its date range.
+ */
+export function getGoalSmartGuidance(
+  goal: Goal,
+  progress: GoalProgress,
+  ref: Date = new Date()
+): GoalSmartGuidance | null {
+  if (
+    goal.type !== "saving" ||
+    goal.status !== "active" ||
+    progress.target <= 0 ||
+    progress.value >= progress.target
+  ) {
+    return null
+  }
+
+  const refDate = format(ref, "yyyy-MM-dd")
+  if (refDate < goal.start_date || refDate > goal.end_date) return null
+
+  const start = parseISO(goal.start_date)
+  const end = parseISO(goal.end_date)
+  const current = parseISO(refDate)
+  const totalDays = differenceInCalendarDays(end, start) + 1
+  const remainingDays = differenceInCalendarDays(end, current) + 1
+  if (totalDays <= 0 || remainingDays <= 0) return null
+
+  const remainingAmount = Math.max(0, progress.target - progress.value)
+  const pace = remainingDays > 31 ? "monthly" : "weekly"
+  const cadenceDays = pace === "monthly" ? 30 : 7
+  const suggestedContribution =
+    Math.ceil((remainingAmount / remainingDays) * cadenceDays * 100) / 100
+  const elapsedDays = differenceInCalendarDays(current, start) + 1
+  const expectedProgress = (elapsedDays / totalDays) * 100
+
+  return {
+    status:
+      progress.percent < expectedProgress - SMART_GUIDANCE_AT_RISK_GAP
+        ? "at_risk"
+        : "on_track",
+    pace,
+    suggestedContribution,
+    remainingAmount,
+    remainingDays,
+  }
 }
 
 // ── Period helpers (task 2.2) ─────────────────────────────────────────────────

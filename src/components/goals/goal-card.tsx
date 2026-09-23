@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button"
 import { GoalProgressBar } from "@/components/goals/goal-progress-bar"
 import { RowCheckbox, selectedItemCn } from "@/components/ui/selection-bar"
 import { renderCategoryIcon } from "@/lib/categories"
-import { computeGoalProgress, type Goal, type GoalScope, type GoalType } from "@/lib/goals"
+import {
+  computeGoalProgress,
+  getGoalSmartGuidance,
+  type Goal,
+  type GoalScope,
+  type GoalType,
+} from "@/lib/goals"
 import type { Tables } from "@/lib/database.types"
 import { cn, formatCurrency } from "@/lib/utils"
 
@@ -64,6 +70,7 @@ export function GoalCard({
   isDemo?: boolean
 }) {
   const progress = computeGoalProgress(goal, movements, scope)
+  const smartGuidance = getGoalSmartGuidance(goal, progress)
   const isCompleted = goal.status === "completed"
 
   // Scope chips
@@ -217,6 +224,28 @@ export function GoalCard({
             status={progress.status}
             label={barLabel}
           />
+        )}
+
+        {smartGuidance && (
+          <p
+            className={cn(
+              "text-xs leading-relaxed",
+              smartGuidance.status === "at_risk"
+                ? "text-destructive"
+                : "text-muted-foreground"
+            )}
+          >
+            <span className="font-medium">
+              {smartGuidance.status === "at_risk"
+                ? "Venís por detrás del ritmo."
+                : "Ritmo sugerido."}
+            </span>{" "}
+            Para llegar, necesitás ahorrar {goal.currency}{" "}
+            <span className="font-medium tabular-nums">
+              {formatCurrency(smartGuidance.suggestedContribution, goal.currency)}
+            </span>{" "}
+            por {smartGuidance.pace === "monthly" ? "mes" : "semana"}.
+          </p>
         )}
       </div>
     </div>
