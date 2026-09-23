@@ -324,7 +324,8 @@ export function StatsPageClient() {
 
   const statsFilter = filterToStatsFilter(filter)
   const currency = filter.currency !== "all" ? filter.currency : "ARS"
-  const wrappedMonthRef = todayAR().slice(0, 7)
+  const referenceDate = todayAR()
+  const wrappedMonthRef = referenceDate.slice(0, 7)
   const wrappedMonthLabel = format(parseISO(`${wrappedMonthRef}-01`), "MMMM yyyy", { locale: es })
 
   const filtered = useMemo(() => filterMovements(movements, statsFilter), [movements, statsFilter])
@@ -460,10 +461,10 @@ export function StatsPageClient() {
           <HealthKpis
             totals={totals}
             movements={filtered}
-            accounts={accounts}
             currency={currency}
             dateFrom={filter.date.from ?? null}
             dateTo={filter.date.to ?? null}
+            referenceDate={referenceDate}
           />
 
           {/* Charts row 1: category distributions side-by-side on lg+ */}

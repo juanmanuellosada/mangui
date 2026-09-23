@@ -17,7 +17,7 @@ Implement the selected next features: financial health view, suggested rules, im
 
 ## Tasks
 - [ ] Map current health/radar, rules, reports, and notification surfaces.
-- [ ] Implement financial health view.
+- [x] Implement financial health view.
 - [ ] Implement suggested rules.
 - [ ] Improve monthly reports.
 - [ ] Implement intelligent notifications.
@@ -27,3 +27,6 @@ Implement the selected next features: financial health view, suggested rules, im
 - Suggested rules now suppress duplicates from existing `note contains` conditions when condition data is available, while retaining the rule-name fallback for existing callers.
 - `RulesList` passes fetched `auto_rule_conditions` to the suggestion helper; suggestions still require the explicit `Crear` action to open a prefilled form.
 - Focused suggestion tests cover condition-based duplicate suppression, the no-conditions fallback, and category dominance.
+- Financial health metrics now derive saving rate, daily expense pace, and analyzed days from filtered totals and dates; open or future date ranges are capped by the injected Argentina reference date, without projected-account queries or an opaque score.
+- Strict-TDD evidence: `npm test -- src/lib/financial-health.test.ts` failed before implementation because `./financial-health` did not exist, then passed with coverage for zero income, closed historical, future/open capped, and stable finite empty-range output.
+- Verification passed: `npm run lint`, `npm run typecheck`, `npm test` (35 files, 453 tests), `git diff --check`, and `npm run build`.
