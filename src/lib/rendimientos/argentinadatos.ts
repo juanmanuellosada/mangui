@@ -150,6 +150,10 @@ function adFetch<T>(path: string): Promise<T> {
   })
 }
 
+function fulfilledArray<T>(result: PromiseSettledResult<T[]>): T[] {
+  return result.status === "fulfilled" && Array.isArray(result.value) ? result.value : []
+}
+
 // ── Main fetcher ──────────────────────────────────────────────────────────────
 
 export async function getRendimientos(): Promise<Rendimientos> {
@@ -177,15 +181,15 @@ export async function getRendimientos(): Promise<Rendimientos> {
     adFetch<PfUvaPrecancelableRecord[]>("/v1/finanzas/tasas/plazoFijoPrecancelable"),
   ])
 
-  const plazoFijoRaw  = plazoFijoResult.status  === "fulfilled" ? plazoFijoResult.value  : []
-  const ultimoRaw     = ultimoResult.status     === "fulfilled" ? ultimoResult.value     : []
-  const penultimoRaw  = penultimoResult.status  === "fulfilled" ? penultimoResult.value  : []
-  const stablecoinRaw = stablecoinResult.status === "fulfilled" ? stablecoinResult.value : []
-  const cuentasUsdRaw = cuentasUsdResult.status === "fulfilled" ? cuentasUsdResult.value : []
-  const letrasRaw     = letrasResult.status     === "fulfilled" ? letrasResult.value     : []
-  const criptopesosRaw = criptopesosResult.status === "fulfilled" ? criptopesosResult.value : []
-  const pfUvaPagoPeriodicoRaw  = pfUvaPagoPeriodicoResult.status  === "fulfilled" ? pfUvaPagoPeriodicoResult.value  : []
-  const pfUvaPrecancelableRaw  = pfUvaPrecancelableResult.status  === "fulfilled" ? pfUvaPrecancelableResult.value  : []
+  const plazoFijoRaw = fulfilledArray(plazoFijoResult)
+  const ultimoRaw = fulfilledArray(ultimoResult)
+  const penultimoRaw = fulfilledArray(penultimoResult)
+  const stablecoinRaw = fulfilledArray(stablecoinResult)
+  const cuentasUsdRaw = fulfilledArray(cuentasUsdResult)
+  const letrasRaw = fulfilledArray(letrasResult)
+  const criptopesosRaw = fulfilledArray(criptopesosResult)
+  const pfUvaPagoPeriodicoRaw = fulfilledArray(pfUvaPagoPeriodicoResult)
+  const pfUvaPrecancelableRaw = fulfilledArray(pfUvaPrecancelableResult)
 
   // ── Plazo fijo ────────────────────────────────────────────────────────────
   const plazoFijo: RateItem[] = (plazoFijoRaw as PlazoFijoRecord[])
