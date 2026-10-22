@@ -19,10 +19,12 @@ import { AccountIconChip } from "@/lib/accounts"
 import { CategoryIconChip, renderCategoryIcon } from "@/lib/categories"
 import { cn, formatCurrency } from "@/lib/utils"
 import { useIsDemo } from "@/lib/use-is-demo"
+import { todayAR } from "@/lib/date-utils"
 import {
   periodLabel,
   computeBudgetProgress,
   calendarPeriodWindow,
+  budgetLimitSchema,
   type Budget,
   type BudgetPeriod,
 } from "@/lib/budgets"
@@ -38,6 +40,8 @@ export type BudgetFormValues = {
   name: string
   icon: string
   limit_amount: number
+  limit_mode: "fixed" | "percentage"
+  income_percentage: number | null
   currency: "ARS" | "USD"
   period: BudgetPeriod | null
   start_date: string
@@ -49,10 +53,9 @@ export type BudgetFormValues = {
   alert_threshold: number
 }
 
-const budgetBaseSchema = z.object({
+const budgetBaseSchema = budgetLimitSchema.safeExtend({
   name: z.string().min(1, "El nombre es obligatorio"),
   icon: z.string().optional(),
-  limit_amount: z.coerce.number().positive("El límite debe ser mayor a 0"),
   currency: z.enum(["ARS", "USD"]),
   period: z
     .enum(["weekly", "biweekly", "monthly", "quarterly", "annual"])
@@ -123,6 +126,8 @@ export function budgetToFormValues(budget: Budget): BudgetFormValues {
     name: budget.name,
     icon: budget.icon ?? "",
     limit_amount: budget.limit_amount,
+    limit_mode: budget.limit_mode ?? "fixed",
+    income_percentage: budget.income_percentage ?? 20,
     currency: budget.currency,
     period: budget.period,
     start_date: budget.start_date,
@@ -144,7 +149,7 @@ export function budgetToFormValues(budget: Budget): BudgetFormValues {
 function detectPreset(
   startDate: string,
   endDate: string,
-  ref: Date = new Date()
+  ref: Date = parseISO(todayAR())
 ): BudgetPeriod | null {
   if (!startDate || !endDate) return null
   for (const { value } of PERIOD_OPTIONS) {
@@ -166,7 +171,7 @@ export function BudgetForm({
   isLoading,
   submitLabel = "Guardar presupuesto",
 }: BudgetFormProps) {
-  const today = format(new Date(), "yyyy-MM-dd")
+  const today = todayAR()
   const initialPreset = calendarPeriodWindow("monthly")
 
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -185,6 +190,8 @@ export function BudgetForm({
       name: "",
       icon: "",
       limit_amount: 0,
+      limit_mode: "fixed",
+      income_percentage: 20,
       currency: "ARS",
       period: "monthly",
       start_date: initialPreset.from,
@@ -268,7 +275,11 @@ export function BudgetForm({
 
   // Live preview
   const liveProgress = useMemo(() => {
-    if (!watchedValues.limit_amount || watchedValues.limit_amount <= 0) return null
+    if (!budgetLimitSchema.safeParse({
+      limit_amount: watchedValues.limit_amount,
+      limit_mode: watchedValues.limit_mode,
+      income_percentage: watchedValues.income_percentage,
+    }).success) return null
 
     const fakeBudget: Budget = {
       id: "__preview__",
@@ -276,6 +287,8 @@ export function BudgetForm({
       name: watchedValues.name,
       icon: watchedValues.icon || null,
       limit_amount: watchedValues.limit_amount,
+      limit_mode: watchedValues.limit_mode,
+      income_percentage: watchedValues.income_percentage,
       currency: watchedValues.currency,
       period: watchedValues.period,
       start_date: watchedValues.start_date || today,
@@ -293,6 +306,8 @@ export function BudgetForm({
     return computeBudgetProgress(fakeBudget, movements)
   }, [
     watchedValues.limit_amount,
+    watchedValues.limit_mode,
+    watchedValues.income_percentage,
     watchedValues.currency,
     watchedValues.period,
     watchedValues.start_date,
@@ -367,24 +382,67 @@ export function BudgetForm({
 
         {/* 3. Límite + Moneda */}
         <div className="space-y-1.5">
-          <Label htmlFor="budget-limit" className="text-xs text-muted-foreground font-medium">
-            Límite
+          <Label htmlFor="budget-mode" className="text-xs text-muted-foreground font-medium">
+            Tipo de límite
           </Label>
-          <MoneyInput
-            id="budget-limit"
-            min={0}
-            step={0.01}
-            className={cn(
-              "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
-              "focus:border-primary focus:ring-2 focus:ring-ring/30 w-full"
-            )}
-            placeholder="0"
-            currency={watchedValues.currency}
-            {...register("limit_amount")}
-            aria-invalid={!!errors.limit_amount}
-          />
-          {errors.limit_amount && (
-            <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
+          <select
+            id="budget-mode"
+            {...register("limit_mode", {
+              onChange: (event) => {
+                if (event.target.value === "percentage" && watchedValues.limit_amount <= 0) {
+                  // Mantener un monto fijo válido sin usarlo como límite porcentual.
+                  setValue("limit_amount", 1)
+                }
+                if (event.target.value === "fixed") setValue("income_percentage", null)
+              },
+            })}
+            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="fixed">Monto fijo</option>
+            <option value="percentage">Porcentaje de ingresos</option>
+          </select>
+          {watchedValues.limit_mode === "percentage" ? (
+            <>
+              <Label htmlFor="budget-percentage">Porcentaje de ingresos</Label>
+              <Input
+                id="budget-percentage"
+                type="number"
+                min={0.01}
+                max={100}
+                step={0.01}
+                {...register("income_percentage")}
+                aria-invalid={!!errors.income_percentage}
+              />
+              {errors.income_percentage && (
+                <p className="text-xs text-destructive">{errors.income_percentage.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Usa los ingresos registrados del período en las cuentas seleccionadas y la moneda del presupuesto.
+                Las categorías solo filtran gastos. Sin cuentas seleccionadas, usa todas.
+              </p>
+            </>
+          ) : (
+            <>
+              <Label htmlFor="budget-limit" className="text-xs text-muted-foreground font-medium">
+                Límite
+              </Label>
+              <MoneyInput
+                id="budget-limit"
+                min={0}
+                step={0.01}
+                className={cn(
+                  "text-2xl font-bold tabular-nums h-14 rounded-xl border-border/60",
+                  "focus:border-primary focus:ring-2 focus:ring-ring/30 w-full"
+                )}
+                placeholder="0"
+                currency={watchedValues.currency}
+                {...register("limit_amount")}
+                aria-invalid={!!errors.limit_amount}
+              />
+              {errors.limit_amount && (
+                <p className="text-xs text-destructive">{errors.limit_amount.message}</p>
+              )}
+            </>
           )}
           {lockedCurrency !== null ? (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -572,31 +630,37 @@ export function BudgetForm({
               <TrendingDown className="h-3.5 w-3.5" />
               <span>Gasto en esta ventana</span>
             </div>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-lg font-bold tabular-nums">
-                {formatCurrency(liveProgress.spent, watchedValues.currency)}
-              </span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                de {formatCurrency(liveProgress.limit, watchedValues.currency)} límite
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-border overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-300",
-                  liveProgress.status === "exceeded"
-                    ? "bg-destructive"
-                    : liveProgress.status === "near"
-                    ? "bg-amber-500"
-                    : "bg-success"
-                )}
-                style={{ width: `${Math.min(liveProgress.percent, 100)}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-muted-foreground tabular-nums">
-              {liveProgress.percent.toFixed(0)}% del límite ·{" "}
-              {periodLabel(watchedValues.period)} · ventana actual
-            </p>
+            {liveProgress.status === "missing_income" ? (
+              <p className="text-sm text-muted-foreground">Sin ingresos registrados. Registrá ingresos para calcular el límite de este período.</p>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-lg font-bold tabular-nums">
+                    {formatCurrency(liveProgress.spent, watchedValues.currency)}
+                  </span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    de {formatCurrency(liveProgress.limit, watchedValues.currency)} límite
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-300 motion-reduce:transition-none",
+                      liveProgress.status === "exceeded"
+                        ? "bg-destructive"
+                        : liveProgress.status === "near"
+                        ? "bg-amber-500"
+                        : "bg-success"
+                    )}
+                    style={{ width: `${Math.min(liveProgress.percent, 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground tabular-nums">
+                  {liveProgress.percent.toFixed(0)}% del límite ·{" "}
+                  {periodLabel(watchedValues.period)} · ventana actual
+                </p>
+              </>
+            )}
           </div>
         )}
 

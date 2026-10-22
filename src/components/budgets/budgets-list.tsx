@@ -37,7 +37,8 @@ import {
   type Budget,
   type BudgetProgressStatus,
 } from "@/lib/budgets"
-import { MOVEMENTS_KEY } from "@/lib/movements"
+import { fetchBudgetMovements } from "@/lib/budget-income"
+import { BudgetIncomePending } from "./budget-income-pending"
 import { formatCurrency, cn } from "@/lib/utils"
 import {
   BudgetFilterBar,
@@ -75,13 +76,7 @@ async function fetchBudgets(): Promise<Budget[]> {
 
 async function fetchMovements(): Promise<Movement[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
-    .from("movements")
-    .select("*")
-    .order("date", { ascending: false })
-    .limit(500)
-  if (error) throw error
-  return data
+  return fetchBudgetMovements(supabase)
 }
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -191,6 +186,11 @@ function BudgetCard({
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
               {periodLabel(budget.period)}
             </span>
+            {budget.limit_mode === "percentage" && (
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {budget.income_percentage}% de ingresos
+              </span>
+            )}
             {budget.alert_threshold !== 80 && (
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
@@ -262,7 +262,10 @@ function BudgetCard({
       </div>
 
       {/* Progress */}
-      {!isPaused && (
+      {!isPaused && progress.status === "missing_income" && (
+        <div className="px-4 pb-4"><BudgetIncomePending budget={budget} spent={progress.spent} /></div>
+      )}
+      {!isPaused && progress.status !== "missing_income" && (
         <div className="px-4 pb-4 space-y-2">
           {/* Progress bar */}
           <div className="h-2 rounded-full bg-border overflow-hidden" role="progressbar"
@@ -313,7 +316,7 @@ function BudgetCard({
       {isPaused && (
         <div className="px-4 pb-4">
           <p className="text-xs text-muted-foreground">
-            Límite: {formatCurrency(budget.limit_amount, budget.currency)}
+            Límite: {budget.limit_mode === "percentage" ? `${budget.income_percentage}% de ingresos` : formatCurrency(budget.limit_amount, budget.currency)}
           </p>
         </div>
       )}
@@ -358,6 +361,8 @@ function CreateBudgetDialog({
           name: values.name,
           icon: values.icon?.trim() || null,
           limit_amount: values.limit_amount,
+          limit_mode: values.limit_mode,
+          income_percentage: values.limit_mode === "percentage" ? values.income_percentage : null,
           currency: values.currency,
           period: values.period,
           category_ids: values.category_ids,
@@ -457,6 +462,8 @@ function EditBudgetDialog({
           name: values.name,
           icon: values.icon?.trim() || null,
           limit_amount: values.limit_amount,
+          limit_mode: values.limit_mode,
+          income_percentage: values.limit_mode === "percentage" ? values.income_percentage : null,
           currency: values.currency,
           period: values.period,
           category_ids: values.category_ids,
@@ -559,10 +566,10 @@ function EditBudgetDialog({
 
 // ── Summary bar ───────────────────────────────────────────────────────────────
 
-function SummaryBar({ budgets, movements }: { budgets: Budget[]; movements: Movement[] }) {
+function SummaryBar({ budgets, movements, percentageMovements }: { budgets: Budget[]; movements: Movement[]; percentageMovements: Movement[] }) {
   const active = budgets.filter((b) => b.status === "active")
   const exceeded = active.filter((b) => {
-    const p = computeBudgetProgress(b, movements)
+    const p = computeBudgetProgress(b, b.limit_mode === "percentage" ? percentageMovements : movements)
     return p.status === "exceeded"
   })
 
@@ -602,8 +609,8 @@ export function BudgetsList() {
     queryFn: fetchBudgets,
   })
 
-  const { data: movements = [] } = useQuery({
-    queryKey: MOVEMENTS_KEY,
+  const { data: movements = [], isLoading: loadingMovements, isError: movementsError, refetch: refetchMovements } = useQuery({
+    queryKey: ["movements", "budgets-complete"],
     queryFn: fetchMovements,
   })
 
@@ -650,6 +657,8 @@ export function BudgetsList() {
   const rangedMovements = useMemo(() => {
     const { from, to } = filters.dateRange
     if (!from && !to) return movements
+    // Los porcentuales requieren el período completo, también para rollover.
+    // El filtro visual de fechas conserva el comportamiento de los montos fijos.
     return movements.filter((m) => {
       if (from && m.date < from) return false
       if (to && m.date > to) return false
@@ -686,12 +695,12 @@ export function BudgetsList() {
             return filters.sortDir === "asc" ? cmp : -cmp
           }
           case "porcentaje": {
-            const pa = computeBudgetProgress(a, rangedMovements).percent
-            const pb = computeBudgetProgress(b, rangedMovements).percent
+            const pa = computeBudgetProgress(a, a.limit_mode === "percentage" ? movements : rangedMovements).percent ?? -1
+            const pb = computeBudgetProgress(b, b.limit_mode === "percentage" ? movements : rangedMovements).percent ?? -1
             return filters.sortDir === "asc" ? pa - pb : pb - pa
           }
           case "limite": {
-            const cmp = a.limit_amount - b.limit_amount
+            const cmp = (computeBudgetProgress(a, movements).limit ?? -1) - (computeBudgetProgress(b, movements).limit ?? -1)
             return filters.sortDir === "asc" ? cmp : -cmp
           }
           case "recientes":
@@ -701,7 +710,7 @@ export function BudgetsList() {
           }
         }
       })
-  }, [budgets, filters, rangedMovements])
+  }, [budgets, filters, rangedMovements, movements])
 
   const isFiltered =
     filters.search.trim() !== "" ||
@@ -742,9 +751,9 @@ export function BudgetsList() {
           >
             Presupuestos
           </h1>
-          {!loadingBudgets && budgets.length > 0 && (
+          {!loadingBudgets && !loadingMovements && !movementsError && budgets.length > 0 && (
             <div className="mt-1">
-              <SummaryBar budgets={budgets} movements={rangedMovements} />
+              <SummaryBar budgets={budgets} movements={rangedMovements} percentageMovements={movements} />
             </div>
           )}
         </div>
@@ -752,7 +761,7 @@ export function BudgetsList() {
           {!loadingBudgets && budgets.length > 0 && !ms.selectionMode && (
             <SelectButton onClick={ms.enter} />
           )}
-          {!ms.selectionMode && <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} atLimit={atLimit} />}
+          {!ms.selectionMode && !loadingMovements && !movementsError && <CreateBudgetDialog categories={categories} accounts={accounts} movements={movements} isDemo={isDemo} atLimit={atLimit} />}
         </div>
       </div>
 
@@ -767,7 +776,7 @@ export function BudgetsList() {
       )}
 
       {/* Skeleton */}
-      {loadingBudgets && (
+      {(loadingBudgets || loadingMovements) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
@@ -791,8 +800,10 @@ export function BudgetsList() {
         <QueryError onRetry={() => refetchBudgets()} />
       )}
 
+      {movementsError && <QueryError onRetry={() => refetchMovements()} />}
+
       {/* Empty state */}
-      {!loadingBudgets && !budgetsError && budgets.length === 0 && (
+      {!loadingBudgets && !loadingMovements && !movementsError && !budgetsError && budgets.length === 0 && (
         <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-10 text-center space-y-5">
           <div className="w-16 h-16 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto">
             <Wallet className="h-8 w-8 text-primary" />
@@ -831,13 +842,13 @@ export function BudgetsList() {
       )}
 
       {/* Budget cards */}
-      {!loadingBudgets && displayBudgets.length > 0 && (
+      {!loadingBudgets && !loadingMovements && !movementsError && displayBudgets.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {displayBudgets.map((budget) => (
             <BudgetCard
               key={budget.id}
               budget={budget}
-              movements={rangedMovements}
+              movements={budget.limit_mode === "percentage" ? movements : rangedMovements}
               categories={categories}
               accounts={accounts}
               onEdit={setEditingBudget}
@@ -853,7 +864,7 @@ export function BudgetsList() {
       )}
 
       {/* Edit dialog */}
-      {editingBudget && (
+      {editingBudget && !loadingMovements && !movementsError && (
         <EditBudgetDialog
           budget={editingBudget}
           categories={categories}

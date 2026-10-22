@@ -9,6 +9,7 @@ import { WeeklyInsightsEmail } from "@/emails/weekly-insights"
 import { generateInsights, type InsightInput } from "@/lib/insights/engine"
 import { currentCycleSummary } from "@/lib/cards"
 import { computeBudgetProgress } from "@/lib/budgets"
+import { fetchBudgetMovements } from "@/lib/budget-income"
 import { todayAR } from "@/lib/date-utils"
 import { buildIpcMap, latestIpcMonth, adjustAmount } from "@/lib/inflation/adjust"
 import { summaryTotals } from "@/lib/stats"
@@ -159,11 +160,16 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    const insightBudgets = (budgets ?? [])
+    // Los presupuestos necesitan períodos completos y category_id para el gasto.
+    // Ante un error no se generan avisos con una base parcial.
+    const budgetMovements = await fetchBudgetMovements(admin, userId).catch((error) => {
+      console.error("[generate-insights] budget movements error", error)
+      return null
+    })
+    const insightBudgets = (budgetMovements === null ? [] : budgets ?? [])
       .map((b) => ({
-        name: (b.name as string) ?? "Presupuesto",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        progress: computeBudgetProgress(b as any, movements as any, today),
+        name: b.name,
+        progress: computeBudgetProgress(b, budgetMovements!, today),
       }))
       .filter((b) => b.progress.status === "near" || b.progress.status === "exceeded")
 

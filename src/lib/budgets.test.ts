@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import type { Budget } from "./budgets"
 import {
   currentWindow,
   activeBudgetWindow,
   computeBudgetProgress,
+  budgetLimitSchema,
 } from "./budgets"
 
 // ---------------------------------------------------------------------------
@@ -15,6 +16,8 @@ function makeBudget(overrides: Partial<Budget>): Budget {
     user_id: "user-1",
     name: "Test Budget",
     limit_amount: 1000,
+    limit_mode: "fixed",
+    income_percentage: null,
     currency: "ARS",
     period: "monthly",
     start_date: "2026-01-01",
@@ -248,6 +251,120 @@ function makeMovement(overrides: Partial<MovementRow>): MovementRow {
     ...overrides,
   }
 }
+
+describe("budget limit validation", () => {
+  it("S1/S2: preserves fixed amounts and validates percentage configuration", () => {
+    expect(budgetLimitSchema.safeParse({ limit_amount: 1000 }).success).toBe(true)
+    expect(budgetLimitSchema.safeParse({ limit_amount: 0 }).success).toBe(false)
+    for (const income_percentage of [null, 0, -1, 101, Infinity, NaN]) {
+      expect(budgetLimitSchema.safeParse({ limit_mode: "percentage", limit_amount: 1, income_percentage }).success).toBe(false)
+    }
+    for (const income_percentage of [0.01, 20, 100]) {
+      expect(budgetLimitSchema.safeParse({ limit_mode: "percentage", limit_amount: 1, income_percentage }).success).toBe(true)
+    }
+    expect(budgetLimitSchema.safeParse({ limit_mode: "other", limit_amount: 100 }).success).toBe(false)
+  })
+})
+
+describe("percentage budgets", () => {
+  const ref = new Date(2026, 5, 15)
+  const budget = makeBudget({ limit_mode: "percentage", income_percentage: 20 })
+
+  it("S1/S2: derives a dynamic limit from recorded income, not the fixed amount", () => {
+    const income = makeMovement({ type: "income", amount: 1_000_000 })
+    expect(computeBudgetProgress(budget, [income], ref).limit).toBe(200_000)
+    expect(computeBudgetProgress(budget, [income, income], ref).limit).toBe(400_000)
+  })
+
+  it("S2: missing income is unavailable, not a healthy zero percent", () => {
+    const progress = computeBudgetProgress(budget, [makeMovement({ amount: 50 })], ref)
+    expect(progress.status).toBe("missing_income")
+    expect(progress.limit).toBeNull()
+    expect(progress.percent).toBeNull()
+    expect(progress.remaining).toBeNull()
+    expect(progress.spent).toBe(50)
+  })
+
+  it("S3: income follows accounts and currency, never expense categories", () => {
+    const scoped = { ...budget, account_ids: ["acc-1"], category_ids: ["expense-cat"] }
+    const movements = [
+      makeMovement({ type: "income", amount: 1000, category_id: "salary" }),
+      makeMovement({ type: "income", amount: 9000, account_id: "other" }),
+      makeMovement({ type: "income", amount: 9000, is_future: true }),
+      makeMovement({ type: "transfer", amount: 9000 }),
+      makeMovement({ type: "income", amount: 9000, date: "2026-05-31" }),
+      makeMovement({ type: "income", amount: 9000, date: "2026-07-01" }),
+      makeMovement({ type: "income", amount: 9000, original_currency: "USD" }),
+      makeMovement({ type: "income", amount: 10, original_currency: "USD", converted_amount: 200 }),
+    ]
+    expect(computeBudgetProgress(scoped, movements, ref).limit).toBe(240)
+    expect(computeBudgetProgress({ ...scoped, account_ids: [] }, movements, ref).limit).toBe(2040)
+  })
+
+  it("S3: rollover uses the previous period's own income and only its positive surplus", () => {
+    const recurring = { ...budget, rollover_enabled: true }
+    const movements = [
+      makeMovement({ type: "income", amount: 1000, date: "2026-05-01" }),
+      makeMovement({ amount: 50, date: "2026-05-31" }),
+      makeMovement({ type: "income", amount: 500, date: "2026-06-30" }),
+    ]
+    expect(computeBudgetProgress(recurring, movements, ref)).toMatchObject({ baseLimit: 100, carry: 150, limit: 250 })
+    expect(computeBudgetProgress(recurring, movements.slice(1), ref).carry).toBe(0)
+    expect(computeBudgetProgress(recurring, movements.slice(0, 2), ref).status).toBe("missing_income")
+    expect(computeBudgetProgress({ ...recurring, start_date: "2026-06-01" }, movements, ref).carry).toBe(0)
+  })
+
+  it.each(["weekly", "biweekly", "monthly", "quarterly", "annual", null] as const)(
+    "S2: includes both boundaries and excludes outside dates for %s periods",
+    (period) => {
+      const scoped = { ...budget, period, start_date: "2026-01-01", end_date: "2026-01-10" }
+      const window = activeBudgetWindow(scoped, ref)
+      const movements = [
+        makeMovement({ type: "income", amount: 100, date: window.from }),
+        makeMovement({ type: "income", amount: 200, date: window.to }),
+        makeMovement({ type: "income", amount: 9000, date: "2025-12-31" }),
+        makeMovement({ type: "income", amount: 9000, date: "2027-01-01" }),
+      ]
+      expect(computeBudgetProgress(scoped, movements, ref).limit).toBe(60)
+    }
+  )
+
+  it("S3: keeps expense category/account exclusions and currency conversion", () => {
+    const scoped = { ...budget, currency: "USD" as const, category_ids: ["cat-1"], account_ids: ["acc-1"] }
+    const movements = [
+      makeMovement({ type: "income", amount: 1000, original_currency: "USD", category_id: "salary" }),
+      makeMovement({ amount: 500, original_currency: "ARS", converted_amount: 50 }),
+      makeMovement({ amount: 90, original_currency: "USD", category_id: "other" }),
+      makeMovement({ amount: 90, original_currency: "USD", account_id: "other" }),
+      makeMovement({ amount: 90, original_currency: "USD", is_future: true }),
+    ]
+    expect(computeBudgetProgress(scoped, movements, ref)).toMatchObject({ limit: 200, spent: 50, percent: 25, status: "on_track" })
+  })
+
+  it("S2: a limit rounded to zero cannot classify recorded expenses as healthy", () => {
+    const tiny = makeBudget({ limit_mode: "percentage", income_percentage: 0.01 })
+    const progress = computeBudgetProgress(tiny, [makeMovement({ type: "income", amount: 0.01 }), makeMovement({ amount: 1 })], ref)
+    expect(progress.limit).toBe(0)
+    expect(progress.status).toBe("exceeded")
+  })
+
+  it("S3: custom percentage budgets do not carry their own first window", () => {
+    const custom = { ...budget, period: null, start_date: "2026-06-01", end_date: "2026-06-30", rollover_enabled: true }
+    expect(computeBudgetProgress(custom, [makeMovement({ type: "income", amount: 1000 })], ref).carry).toBe(0)
+  })
+
+  it("S2: implicit period boundaries use Argentina's date, not the server date", () => {
+    vi.stubEnv("TZ", "UTC")
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-07-01T01:00:00Z"))
+    try {
+      expect(activeBudgetWindow(budget)).toEqual({ from: "2026-06-01", to: "2026-06-30" })
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllEnvs()
+    }
+  })
+})
 
 describe("computeBudgetProgress", () => {
   const ref = new Date(2026, 5, 15) // June 15 2026

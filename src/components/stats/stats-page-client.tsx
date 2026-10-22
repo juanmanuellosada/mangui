@@ -43,6 +43,8 @@ import { QueryError } from "@/components/ui/query-error"
 import { ShareWrappedReport } from "@/components/wrapped/share-wrapped-report"
 import { WrappedSheet } from "@/components/wrapped/wrapped-sheet"
 import { todayAR } from "@/lib/date-utils"
+import { computeBudgetProgress } from "@/lib/budgets"
+import { fetchBudgetMovements } from "@/lib/budget-income"
 
 type Movement = Tables<"movements">
 type Category = Tables<"categories">
@@ -203,7 +205,8 @@ function generateMonthlyReport(
   categories: Category[],
   budgets: Budget[],
   month: Date,
-  currency: "ARS" | "USD"
+  currency: "ARS" | "USD",
+  budgetMovements: Movement[]
 ): string {
   const from = format(startOfMonth(month), "yyyy-MM-dd")
   const to = format(endOfMonth(month), "yyyy-MM-dd")
@@ -259,9 +262,9 @@ function generateMonthlyReport(
   const activeBudgets = budgets.filter((b) => b.status === "active")
   if (activeBudgets.length > 0) {
     lines.push("## Presupuestos", "")
-    // Note: progress requires movement rows in specific shape; do basic spend comparison
     activeBudgets.forEach((b) => {
-      lines.push(`- **${b.name}:** límite ${formatCurrency(b.limit_amount, b.currency)}`)
+      const progress = computeBudgetProgress(b, budgetMovements, month)
+      lines.push(`- **${b.name}:** ${progress.status === "missing_income" ? "Sin ingresos registrados, falta la base de cálculo" : `límite ${formatCurrency(progress.limit, b.currency)}`}`)
     })
     lines.push("")
   }
@@ -383,16 +386,18 @@ export function StatsPageClient() {
     }
   }, [])
 
-  function handleMonthlyReport() {
+  async function handleMonthlyReport() {
     try {
+      const budgetMovements = await fetchBudgetMovements(createClient())
       const report = generateMonthlyReport(
         movements,
         categories,
         budgets,
-        new Date(),
-        currency
+        parseISO(todayAR()),
+        currency,
+        budgetMovements
       )
-      const monthStr = format(new Date(), "yyyy-MM", { locale: es })
+      const monthStr = format(parseISO(todayAR()), "yyyy-MM", { locale: es })
       const blob = new Blob([report], { type: "text/markdown;charset=utf-8" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")

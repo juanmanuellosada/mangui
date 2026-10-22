@@ -11,7 +11,9 @@ import {
   type Budget,
   type BudgetProgressStatus,
 } from "@/lib/budgets"
-import { fetchAllMovements } from "@/lib/movements"
+import { fetchBudgetMovements } from "@/lib/budget-income"
+import { BudgetIncomePending } from "@/components/budgets/budget-income-pending"
+import { QueryError } from "@/components/ui/query-error"
 import { formatCurrency, cn } from "@/lib/utils"
 import { renderCategoryIcon } from "@/lib/categories"
 
@@ -61,9 +63,9 @@ export function BudgetsSummary() {
     queryFn: fetchBudgets,
   })
 
-  const { data: movements = [], isLoading: loadingMovements } = useQuery({
-    queryKey: ["movements", "stats-all"],
-    queryFn: fetchAllMovements,
+  const { data: movements = [], isLoading: loadingMovements, isError: movementsError, refetch } = useQuery({
+    queryKey: ["movements", "budgets-complete"],
+    queryFn: () => fetchBudgetMovements(createClient()),
   })
 
   const isLoading = loadingBudgets || loadingMovements
@@ -108,11 +110,13 @@ export function BudgetsSummary() {
         </p>
       )}
 
+      {movementsError && <QueryError onRetry={() => refetch()} />}
       {/* Budget rows */}
-      {!isLoading && activeBudgets.length > 0 && (
+      {!isLoading && !movementsError && activeBudgets.length > 0 && (
         <div className="space-y-4">
           {activeBudgets.map((budget) => {
             const p = computeBudgetProgress(budget, movements)
+            if (p.status === "missing_income") return <BudgetIncomePending key={budget.id} budget={budget} spent={p.spent} />
             const showAlert = p.status === "exceeded" || p.status === "near"
 
             return (

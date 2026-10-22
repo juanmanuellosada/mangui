@@ -4,6 +4,7 @@ import { CheckCircle2, AlertTriangle, XCircle, Wallet } from "lucide-react"
 import { cn, formatCurrency } from "@/lib/utils"
 import { computeBudgetProgress, type Budget, type BudgetProgressStatus } from "@/lib/budgets"
 import type { Tables } from "@/lib/database.types"
+import { BudgetIncomePending } from "@/components/budgets/budget-income-pending"
 
 type Movement = Tables<"movements">
 
@@ -16,6 +17,7 @@ const STATUS_CONFIG: Record<BudgetProgressStatus, { icon: typeof CheckCircle2; l
   on_track: { icon: CheckCircle2, label: "Al día", color: "text-success" },
   near: { icon: AlertTriangle, label: "Cerca del límite", color: "text-accent" },
   exceeded: { icon: XCircle, label: "Excedido", color: "text-destructive" },
+  missing_income: { icon: Wallet, label: "Sin ingresos registrados", color: "text-muted-foreground" },
 }
 
 export function BudgetComplianceStrip({ budgets, movements }: BudgetComplianceStripProps) {
@@ -50,6 +52,7 @@ export function BudgetComplianceStrip({ budgets, movements }: BudgetComplianceSt
       <div className="space-y-3">
         {active.map((budget) => {
           const progress = computeBudgetProgress(budget, movRows)
+          if (progress.status === "missing_income") return <BudgetIncomePending key={budget.id} budget={budget} spent={progress.spent} />
           const cfg = STATUS_CONFIG[progress.status]
           const StatusIcon = cfg.icon
           const pct = Math.min(progress.percent, 100)

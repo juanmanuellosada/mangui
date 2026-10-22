@@ -16,12 +16,23 @@ import {
 import { es } from "date-fns/locale"
 import type { Tables, Enums } from "@/lib/database.types"
 import { amountInCurrency } from "@/lib/money"
+import { todayAR } from "@/lib/date-utils"
+import { z } from "zod"
 
 export type Budget = Tables<"budgets">
 export type BudgetPeriod = Enums<"budget_period">
 export type BudgetStatus = Enums<"budget_status">
 
 export const BUDGETS_KEY = ["budgets"] as const
+
+export const budgetLimitSchema = z.object({
+  limit_mode: z.enum(["fixed", "percentage"]).default("fixed"),
+  limit_amount: z.coerce.number().positive("El límite debe ser mayor a 0"),
+  income_percentage: z.coerce.number().min(0.01, "Debe ser entre 0,01 y 100").max(100, "Debe ser entre 0,01 y 100").nullable().optional(),
+}).refine((value) => value.limit_mode !== "percentage" || value.income_percentage != null, {
+  message: "Ingresá el porcentaje de ingresos",
+  path: ["income_percentage"],
+})
 
 /**
  * Compute the active window {from, to} as ISO date strings for a given period.
@@ -35,7 +46,7 @@ export const BUDGETS_KEY = ["budgets"] as const
 export function currentWindow(
   period: BudgetPeriod,
   startDate: string,
-  ref: Date = new Date()
+  ref: Date = parseISO(todayAR())
 ): { from: string; to: string } {
   const anchor = parseISO(startDate)
 
@@ -103,7 +114,7 @@ export function currentWindow(
  */
 export function activeBudgetWindow(
   budget: Budget,
-  ref: Date = new Date()
+  ref: Date = parseISO(todayAR())
 ): { from: string; to: string } {
   // Case 1: recurring with a preset period
   if (budget.is_recurring && budget.period !== null) {
@@ -151,7 +162,7 @@ export function activeBudgetWindow(
  */
 export function calendarPeriodWindow(
   period: BudgetPeriod,
-  ref: Date = new Date()
+  ref: Date = parseISO(todayAR())
 ): { from: string; to: string } {
   switch (period) {
     case "weekly": {
@@ -197,9 +208,9 @@ export function calendarPeriodWindow(
   }
 }
 
-export type BudgetProgressStatus = "on_track" | "near" | "exceeded"
+export type BudgetProgressStatus = "on_track" | "near" | "exceeded" | "missing_income"
 
-export interface BudgetProgress {
+interface AvailableBudgetProgress {
   spent: number
   /** Límite efectivo (baseLimit + carry). Se mantiene por compatibilidad con consumidores existentes. */
   limit: number
@@ -211,7 +222,19 @@ export interface BudgetProgress {
   effectiveLimit: number
   percent: number
   remaining: number
-  status: BudgetProgressStatus
+  status: Exclude<BudgetProgressStatus, "missing_income">
+}
+
+/** Sin base de ingresos no hay límite ni porcentaje de uso calculable. */
+export type BudgetProgress = AvailableBudgetProgress | {
+  status: "missing_income"
+  spent: number
+  limit: null
+  baseLimit: null
+  carry: number
+  effectiveLimit: null
+  percent: null
+  remaining: null
 }
 
 type MovementRow = {
@@ -251,10 +274,27 @@ function spentInWindow(
   }, 0)
 }
 
+function baseLimitInWindow(
+  budget: Budget,
+  movements: MovementRow[],
+  window: { from: string; to: string }
+): number | null {
+  if (budget.limit_mode !== "percentage") return budget.limit_amount
+  const income = movements.reduce((sum, m) => {
+    if (m.type !== "income" || m.is_future) return sum
+    if (m.date < window.from || m.date > window.to) return sum
+    if (budget.account_ids.length && !budget.account_ids.includes(m.account_id)) return sum
+    return sum + amountInCurrency(m, budget.currency)
+  }, 0)
+  if (income <= 0) return null
+  // Redondear el límite monetario a centavos una sola vez.
+  return Math.round(income * (budget.income_percentage ?? 0)) / 100
+}
+
 export function computeBudgetProgress(
   budget: Budget,
   movements: MovementRow[],
-  ref: Date = new Date()
+  ref: Date = parseISO(todayAR())
 ): BudgetProgress {
   const window = activeBudgetWindow(budget, ref)
   const spent = spentInWindow(budget, movements, window)
@@ -265,18 +305,25 @@ export function computeBudgetProgress(
   let carry = 0
   if (budget.rollover_enabled && budget.is_recurring) {
     const prevWindow = activeBudgetWindow(budget, addDays(parseISO(window.from), -1))
-    if (prevWindow.to >= budget.start_date) {
+    // El helper de períodos personalizados vuelve al ancla si no existe un
+    // período previo. No usar esa misma ventana como sobrante porcentual.
+    const hasPreviousWindow = budget.limit_mode !== "percentage" || prevWindow.from < window.from
+    if (hasPreviousWindow && prevWindow.to >= budget.start_date) {
       const prevSpent = spentInWindow(budget, movements, prevWindow)
-      carry = Math.max(0, budget.limit_amount - prevSpent)
+      const prevLimit = baseLimitInWindow(budget, movements, prevWindow)
+      carry = prevLimit === null ? 0 : Math.max(0, prevLimit - prevSpent)
     }
   }
 
-  const baseLimit = budget.limit_amount
+  const baseLimit = baseLimitInWindow(budget, movements, window)
+  if (baseLimit === null) {
+    return { spent, limit: null, baseLimit: null, carry, effectiveLimit: null, percent: null, remaining: null, status: "missing_income" }
+  }
   const effectiveLimit = baseLimit + carry
-  const percent = effectiveLimit > 0 ? Math.min((spent / effectiveLimit) * 100, 999) : 0
+  const percent = effectiveLimit > 0 ? Math.min((spent / effectiveLimit) * 100, 999) : spent > 0 ? 999 : 0
   const remaining = effectiveLimit - spent
   const threshold = budget.alert_threshold ?? 80
-  const status: BudgetProgressStatus =
+  const status: AvailableBudgetProgress["status"] =
     percent > 100 ? "exceeded" : percent >= threshold ? "near" : "on_track"
 
   return { spent, limit: effectiveLimit, baseLimit, carry, effectiveLimit, percent, remaining, status }
@@ -324,7 +371,7 @@ export function scopeLabel(
 }
 
 /** Window label in short format (e.g. "1 may. – 31 may.") */
-export function windowLabel(period: BudgetPeriod | null, startDate: string, ref: Date = new Date()): string {
+export function windowLabel(period: BudgetPeriod | null, startDate: string, ref: Date = parseISO(todayAR())): string {
   // For custom-range budgets without a period preset, show start date only
   if (period === null) {
     return format(parseISO(startDate), "d MMM yyyy", { locale: es })

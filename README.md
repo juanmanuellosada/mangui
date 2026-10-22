@@ -91,8 +91,10 @@ supabase/
 - Auth completo (Supabase Auth, login/registro/recuperación).
 - Movimientos, cuentas, tarjetas con cuotas, transferencias.
 - Recurrentes automáticos y reglas de categorización.
-- Presupuestos por categoría y metas de ahorro.
+- Presupuestos por categoría y metas de ahorro. Cada presupuesto puede usar un **monto fijo** o un **porcentaje de los ingresos registrados del período**. El porcentaje respeta las cuentas seleccionadas y la moneda del presupuesto, no sus categorías de gasto; por ejemplo, 20 % de $1.000.000 da un límite de $200.000. Sin ingresos disponibles muestra **Sin ingresos registrados**, sin indicar que el presupuesto está al día.
+  - Antes de desplegar el modo porcentual, aplicar `supabase/migrations/20261021234129_percentage_budget.sql`. Es aditiva: los presupuestos existentes conservan su modo fijo. No aplicar cambios de base de datos de producción como parte de las pruebas locales.
 - Estadísticas y dashboard con datos reales.
+- Radar inteligente: distingue gastos para revisar, proyección de cierre y movimientos previstos para los próximos 7 días, con accesos a movimientos y estadísticas. Las señales usan los registros disponibles; una proyección no es un límite de gasto.
 - IA (Manguito, sobre Gemini) para quick-add y chat.
 - PWA instalable con soporte offline y notificaciones push.
 - Multimoneda ARS/USD, inflación INDEC, sección "dónde rendir" y cobros con MercadoPago.

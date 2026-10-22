@@ -4,6 +4,8 @@ import { assertCronAuth } from "@/lib/cron-auth"
 import { sendPushToUser, tryNotify } from "@/lib/notifications"
 import { nextCloseDate, computeDueDate, toDateString, currentCycleSummary, dayOfMonth } from "@/lib/cards"
 import { computeBudgetProgress, activeBudgetWindow } from "@/lib/budgets"
+import { fetchBudgetMovements } from "@/lib/budget-income"
+import { todayAR } from "@/lib/date-utils"
 import { detectUnusualCharge } from "@/lib/insights/unusual"
 import { formatCurrency } from "@/lib/utils"
 import { amountInCurrency } from "@/lib/money"
@@ -228,11 +230,13 @@ export async function GET(req: NextRequest) {
           .eq("user_id", userId)
           .eq("status", "active")
 
+        const budgetMovements = await fetchBudgetMovements(admin, userId)
+        const budgetToday = parseISO(todayAR())
         for (const budget of budgets ?? []) {
-          const progress = computeBudgetProgress(budget, movements, today)
-          if (progress.status === "on_track") continue
+          const progress = computeBudgetProgress(budget, budgetMovements, budgetToday)
+          if (progress.status !== "near" && progress.status !== "exceeded") continue
 
-          const window = activeBudgetWindow(budget, today)
+          const window = activeBudgetWindow(budget, budgetToday)
           const eventKey =
             progress.status === "exceeded"
               ? `budget_exceeded:${budget.id}:${window.from}`

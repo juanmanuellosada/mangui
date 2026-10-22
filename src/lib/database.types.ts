@@ -280,6 +280,9 @@ export type Database = {
           id: string
           is_recurring: boolean
           limit_amount: number
+          // Opcionales para snapshots/cachés anteriores a la migración aditiva.
+          limit_mode?: "fixed" | "percentage"
+          income_percentage?: number | null
           name: string
           period: Database["public"]["Enums"]["budget_period"] | null
           rollover_enabled: boolean
@@ -299,6 +302,8 @@ export type Database = {
           id?: string
           is_recurring?: boolean
           limit_amount: number
+          limit_mode?: "fixed" | "percentage"
+          income_percentage?: number | null
           name: string
           period?: Database["public"]["Enums"]["budget_period"] | null
           rollover_enabled?: boolean
@@ -318,6 +323,8 @@ export type Database = {
           id?: string
           is_recurring?: boolean
           limit_amount?: number
+          limit_mode?: "fixed" | "percentage"
+          income_percentage?: number | null
           name?: string
           period?: Database["public"]["Enums"]["budget_period"] | null
           rollover_enabled?: boolean

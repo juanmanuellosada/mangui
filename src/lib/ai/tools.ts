@@ -31,6 +31,7 @@ import { computeInstallmentDate } from "@/lib/installments"
 import { nextCardPayment, listCardCycles, defaultCycleIndex, toDateString } from "@/lib/cards"
 import { resolveEntity, normalizeText } from "@/lib/entity-resolver"
 import { amountInCurrency } from "@/lib/money"
+import { fetchBudgetMovements } from "@/lib/budget-income"
 import { fetchDolarRates } from "@/lib/rates/dolar"
 import {
   computeProjection,
@@ -475,9 +476,9 @@ export interface EstadoPresupuestosResult {
     nombre: string
     periodo: string
     gastado: number
-    limite: number
-    porcentaje: number
-    restante: number
+    limite: number | null
+    porcentaje: number | null
+    restante: number | null
     estado: string
     ventana: { desde: string; hasta: string }
   }>
@@ -486,16 +487,12 @@ export interface EstadoPresupuestosResult {
 export async function estadoPresupuestos(
   supabase: SessionClient
 ): Promise<EstadoPresupuestosResult> {
-  const [budgetsRes, movsRes] = await Promise.all([
+  const [budgetsRes, movements] = await Promise.all([
     supabase.from("budgets").select("*").eq("status", "active"),
-    supabase
-      .from("movements")
-      .select("type, is_future, date, category_id, account_id, amount, converted_amount, original_currency")
-      .eq("is_future", false),
+    fetchBudgetMovements(supabase),
   ])
-
+  if (budgetsRes.error) throw new Error(budgetsRes.error.message)
   const budgets = budgetsRes.data ?? []
-  const movements = movsRes.data ?? []
 
   const presupuestos = budgets.map((b) => {
     const progress = computeBudgetProgress(
@@ -509,9 +506,9 @@ export async function estadoPresupuestos(
       nombre: b.name,
       periodo: periodoLabel,
       gastado: Math.round(progress.spent),
-      limite: Math.round(progress.limit),
-      porcentaje: Math.round(progress.percent),
-      restante: Math.round(progress.remaining),
+      limite: progress.limit === null ? null : Math.round(progress.limit),
+      porcentaje: progress.percent === null ? null : Math.round(progress.percent),
+      restante: progress.remaining === null ? null : Math.round(progress.remaining),
       estado: progress.status,
       ventana: { desde: window.from, hasta: window.to },
     }
